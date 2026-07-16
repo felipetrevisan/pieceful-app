@@ -8,7 +8,10 @@ import {
 } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type Achievement, unlockAchievements } from "@/lib/achievements";
 import { savePuzzle } from "@/lib/puzzle-db";
+import type { PhotoCredit } from "@/lib/unsplash";
+import { AchievementToast } from "./achievement-toast";
 import { CompletionModal } from "./completion-modal";
 import { Icon } from "./icons";
 import { PuzzleBoard } from "./puzzle-board";
@@ -19,6 +22,7 @@ interface Props {
   imageUrl: string;
   difficulty: PuzzleDifficulty;
   configuration: PuzzleConfiguration;
+  photoCredit?: PhotoCredit | null | undefined;
   initialSession: PuzzleSession;
 }
 
@@ -61,6 +65,7 @@ export function GameScreen({
   imageUrl,
   difficulty,
   configuration,
+  photoCredit,
   initialSession,
 }: Props) {
   const [session, setSession] = useState(initialSession);
@@ -71,13 +76,54 @@ export function GameScreen({
   const pauseTitleId = useId();
   const [saveStatus, setSaveStatus] = useState<"saving" | "saved" | "error">("saved");
   const [activeRegion, setActiveRegion] = useState("centro");
+  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   const saveTimer = useRef<number | null>(null);
-  const progress = calculateProgress(
-    session.pieces.filter((piece) => piece.isPlaced).length,
-    session.pieces.length,
-  );
+  const placedPieces = session.pieces.filter((piece) => piece.isPlaced).length;
+  const progress = calculateProgress(placedPieces, session.pieces.length);
   const completed = progress === 100;
   const pauseGame = useCallback(() => setPaused(true), []);
+  const sound = useCallback((frequency: number) => {
+    try {
+      const AudioContextClass = window.AudioContext;
+      const context = new AudioContextClass();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.05, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.16);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.16);
+    } catch {
+      /* O áudio nunca bloqueia a partida. */
+    }
+  }, []);
+  const dismissAchievement = useCallback(
+    () => setAchievementQueue((current) => current.slice(1)),
+    [],
+  );
+
+  useEffect(() => {
+    const unlocked = unlockAchievements({
+      placedPieces,
+      totalPieces: session.pieces.length,
+      hintsUsed: session.hintsUsed,
+      elapsedTime: session.elapsedTime,
+      completed,
+    });
+    if (unlocked.length > 0) {
+      setAchievementQueue((current) => [...current, ...unlocked]);
+      sound(880);
+      window.setTimeout(() => sound(1174), 120);
+    }
+  }, [
+    completed,
+    placedPieces,
+    session.elapsedTime,
+    session.hintsUsed,
+    session.pieces.length,
+    sound,
+  ]);
 
   const persist = useCallback(
     async (next: PuzzleSession) => {
@@ -89,6 +135,7 @@ export function GameScreen({
           image,
           difficulty,
           configuration,
+          photoCredit,
           session: next,
           updatedAt: new Date().toISOString(),
         });
@@ -97,7 +144,7 @@ export function GameScreen({
         setSaveStatus("error");
       }
     },
-    [configuration, difficulty, image, name],
+    [configuration, difficulty, image, name, photoCredit],
   );
 
   useEffect(() => {
@@ -173,23 +220,6 @@ export function GameScreen({
     sound(660);
   }
 
-  function sound(frequency: number) {
-    try {
-      const AudioContextClass = window.AudioContext;
-      const context = new AudioContextClass();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0.05, context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.16);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start();
-      oscillator.stop(context.currentTime + 0.16);
-    } catch {
-      /* O áudio nunca bloqueia a partida. */
-    }
-  }
-
   const trayPieces = useMemo(
     () =>
       session.pieces.filter((piece) => {
@@ -244,6 +274,18 @@ export function GameScreen({
           <span>
             <strong>{name}</strong>
             <small>Dificuldade: {difficulty}</small>
+            {photoCredit && (
+              <small className="game-photo-credit">
+                Foto por{" "}
+                <a href={photoCredit.photographerUrl} target="_blank" rel="noreferrer">
+                  {photoCredit.photographer}
+                </a>{" "}
+                no{" "}
+                <a href={photoCredit.unsplashUrl} target="_blank" rel="noreferrer">
+                  Unsplash
+                </a>
+              </small>
+            )}
           </span>
         </div>
         <div className="progress-cluster">
@@ -510,6 +552,21 @@ export function GameScreen({
           puzzlePieces={session.pieces}
           timelapse={session.timelapse}
           onReplay={replay}
+        />
+      )}
+      {achievementQueue[0] && (
+        <AchievementToast
+          key={achievementQueue[0].id}
+          achievement={achievementQueue[0]}
+          platform={
+            controllerName?.toLowerCase().includes("xbox")
+              ? "xbox"
+              : controllerName?.toLowerCase().includes("playstation") ||
+                  controllerName?.toLowerCase().includes("dual")
+                ? "playstation"
+                : "keyboard"
+          }
+          onDone={dismissAchievement}
         />
       )}
     </main>

@@ -40,3 +40,12 @@ Todas as rotas do frontend e da API são escritas em inglês. A interface pode p
 em português, mas novos caminhos públicos e endpoints devem seguir essa convenção.
 
 As fotos são processadas e armazenadas localmente no navegador. Nenhuma imagem é enviada pela API.
+
+## Unsplash
+
+Copie `apps/api/.env.example` para `apps/api/.env` e informe a Access Key criada no painel de
+desenvolvedores do Unsplash. O frontend usa `NEXT_PUBLIC_API_URL`, documentado em
+`apps/web/.env.example`, para buscar as fotos sem expor essa chave no navegador.
+
+A seleção mantém os créditos do fotógrafo e registra o download conforme as diretrizes da API do
+Unsplash. As imagens continuam sendo processadas e salvas somente no dispositivo do jogador.

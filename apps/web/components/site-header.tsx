@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Icon } from "./icons";
 
-export function SiteHeader({ active }: { active?: "home" | "create" | "puzzles" | "settings" }) {
+export function SiteHeader({
+  active,
+}: {
+  active?: "home" | "create" | "puzzles" | "achievements" | "settings";
+}) {
   return (
     <header className="site-header">
       <Link href="/" className="brand">
@@ -19,6 +23,9 @@ export function SiteHeader({ active }: { active?: "home" | "create" | "puzzles" 
         </Link>
         <Link className={active === "puzzles" ? "active" : ""} href="/puzzles">
           Meus quebra-cabeças
+        </Link>
+        <Link className={active === "achievements" ? "active" : ""} href="/achievements">
+          Conquistas
         </Link>
         <Link className={active === "settings" ? "active" : ""} href="/settings">
           Configurações

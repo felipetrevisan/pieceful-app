@@ -51,6 +51,7 @@ export function ResumeGame() {
       imageUrl={imageUrl}
       difficulty={puzzle.difficulty}
       configuration={puzzle.configuration}
+      photoCredit={puzzle.photoCredit}
       initialSession={puzzle.session}
     />
   );

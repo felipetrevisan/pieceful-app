@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { generateSession } from "@/lib/generate-session";
 import { processImage, validateImage } from "@/lib/image-processing";
 import { savePuzzle } from "@/lib/puzzle-db";
+import type { PhotoCredit } from "@/lib/unsplash";
 import { GameScreen } from "./game-screen";
 import { PuzzleBox } from "./puzzle-box";
 import { SiteHeader } from "./site-header";
@@ -32,6 +33,7 @@ export function CreateFlow() {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [photoCredit, setPhotoCredit] = useState<PhotoCredit | null>(null);
   const [session, setSession] = useState<PuzzleSession | null>(null);
 
   useEffect(
@@ -47,17 +49,24 @@ export function CreateFlow() {
     if (!next) {
       setFile(null);
       setPreviewUrl(null);
+      setPhotoCredit(null);
       return;
     }
     try {
       await validateImage(next);
       setFile(next);
       setPreviewUrl(URL.createObjectURL(next));
+      setPhotoCredit(null);
     } catch (caught) {
       setFile(null);
       setPreviewUrl(null);
       setError(caught instanceof Error ? caught.message : "Foto inválida.");
     }
+  }
+
+  async function chooseUnsplashPhoto(next: File, credit: PhotoCredit) {
+    await chooseFile(next);
+    setPhotoCredit(credit);
   }
 
   function chooseDifficulty(value: PuzzleDifficulty, rows: number, columns: number) {
@@ -89,6 +98,7 @@ export function CreateFlow() {
         difficulty,
         configuration,
         session: nextSession,
+        photoCredit,
         updatedAt: new Date().toISOString(),
       });
       setStage("box");
@@ -119,6 +129,7 @@ export function CreateFlow() {
         imageUrl={imageUrl}
         difficulty={difficulty}
         configuration={configuration}
+        photoCredit={photoCredit}
         initialSession={session}
       />
     );
@@ -135,7 +146,9 @@ export function CreateFlow() {
             zoom={zoom}
             rotation={rotation}
             error={error}
+            photoCredit={photoCredit}
             onFile={chooseFile}
+            onUnsplashPhoto={chooseUnsplashPhoto}
             onDifficulty={chooseDifficulty}
             onConfiguration={setConfiguration}
             onZoom={setZoom}

@@ -2,6 +2,12 @@
 
 import { DIFFICULTIES, type PuzzleConfiguration, type PuzzleDifficulty } from "@puzzled/shared";
 import { useEffect, useRef, useState } from "react";
+import {
+  type PhotoCredit,
+  searchUnsplashPhotos,
+  selectUnsplashPhoto,
+  type UnsplashPhoto,
+} from "@/lib/unsplash";
 import { Icon } from "./icons";
 
 interface Props {
@@ -12,7 +18,9 @@ interface Props {
   zoom: number;
   rotation: number;
   error: string | null;
+  photoCredit: PhotoCredit | null;
   onFile: (file: File | null) => void;
+  onUnsplashPhoto: (file: File, credit: PhotoCredit) => void;
   onDifficulty: (value: PuzzleDifficulty, rows: number, columns: number) => void;
   onConfiguration: (configuration: PuzzleConfiguration) => void;
   onZoom: (value: number) => void;
@@ -23,6 +31,11 @@ interface Props {
 export function UploadConfigurator(props: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [source, setSource] = useState<"device" | "unsplash">("device");
+  const [query, setQuery] = useState("");
+  const [photos, setPhotos] = useState<UnsplashPhoto[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const validTotal =
     props.configuration.totalPieces >= 6 && props.configuration.totalPieces <= 1000;
   const gridCells = Array.from(
@@ -55,29 +68,126 @@ export function UploadConfigurator(props: Props) {
     props.onConfiguration(next);
   }
 
+  async function searchPhotos(event: React.FormEvent) {
+    event.preventDefault();
+    if (query.trim().length < 2) return;
+    setSearching(true);
+    setPhotoError(null);
+    try {
+      setPhotos(await searchUnsplashPhotos(query.trim()));
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Não foi possível buscar fotos.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function chooseUnsplashPhoto(photo: UnsplashPhoto) {
+    setSearching(true);
+    setPhotoError(null);
+    try {
+      const file = await selectUnsplashPhoto(photo);
+      props.onUnsplashPhoto(file, photo);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Não foi possível escolher a foto.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
   return (
     <div className="creator-layout">
       <section className="photo-panel">
         <span className="section-kicker">NOVO DESAFIO</span>
         {!props.previewUrl ? (
-          <button
-            type="button"
-            className={`drop-zone ${dragging ? "dragging" : ""}`}
-            onClick={() => inputRef.current?.click()}
-            onDragEnter={() => setDragging(true)}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(event) => {
-              setDragging(false);
-              receive(event.dataTransfer.files);
-            }}
-          >
-            <span className="upload-orb">
-              <Icon name="upload" size={26} />
-            </span>
-            <strong>Arraste uma foto para cá</strong>
-            <span>ou clique para procurar no seu dispositivo</span>
-            <small>JPG, PNG ou WEBP · máximo 20 MB</small>
-          </button>
+          <div className="photo-source-picker">
+            <div className="photo-source-tabs" role="tablist" aria-label="Origem da foto">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={source === "device"}
+                className={source === "device" ? "active" : ""}
+                onClick={() => setSource("device")}
+              >
+                Meu dispositivo
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={source === "unsplash"}
+                className={source === "unsplash" ? "active" : ""}
+                onClick={() => setSource("unsplash")}
+              >
+                Unsplash
+              </button>
+            </div>
+            {source === "device" ? (
+              <button
+                type="button"
+                className={`drop-zone ${dragging ? "dragging" : ""}`}
+                onClick={() => inputRef.current?.click()}
+                onDragEnter={() => setDragging(true)}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(event) => {
+                  setDragging(false);
+                  receive(event.dataTransfer.files);
+                }}
+              >
+                <span className="upload-orb">
+                  <Icon name="upload" size={26} />
+                </span>
+                <strong>Arraste uma foto para cá</strong>
+                <span>ou clique para procurar no seu dispositivo</span>
+                <small>JPG, PNG ou WEBP · máximo 20 MB</small>
+              </button>
+            ) : (
+              <div className="unsplash-picker">
+                <form className="unsplash-search" onSubmit={searchPhotos}>
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Busque natureza, cidades, animais…"
+                    aria-label="Buscar fotos no Unsplash"
+                  />
+                  <button type="submit" disabled={searching || query.trim().length < 2}>
+                    {searching ? "Buscando…" : "Buscar"}
+                  </button>
+                </form>
+                {photos.length > 0 ? (
+                  <div className="unsplash-grid">
+                    {photos.map((photo) => (
+                      <article key={photo.id}>
+                        <button
+                          type="button"
+                          disabled={searching}
+                          onClick={() => chooseUnsplashPhoto(photo)}
+                        >
+                          <img src={photo.thumbnailUrl} alt={photo.description} />
+                        </button>
+                        <small>
+                          Foto por{" "}
+                          <a href={photo.photographerUrl} target="_blank" rel="noreferrer">
+                            {photo.photographer}
+                          </a>{" "}
+                          no{" "}
+                          <a href={photo.unsplashUrl} target="_blank" rel="noreferrer">
+                            Unsplash
+                          </a>
+                        </small>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="unsplash-empty">
+                    <strong>Encontre uma imagem para sua próxima montagem</strong>
+                    <span>As fotos incluem crédito aos seus criadores.</span>
+                  </div>
+                )}
+                {photoError && <p className="error-message">{photoError}</p>}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="photo-editor">
             <div className="crop-frame">
@@ -125,6 +235,18 @@ export function UploadConfigurator(props: Props) {
                 Excluir foto
               </button>
             </div>
+            {props.photoCredit && (
+              <small className="selected-photo-credit">
+                Foto por{" "}
+                <a href={props.photoCredit.photographerUrl} target="_blank" rel="noreferrer">
+                  {props.photoCredit.photographer}
+                </a>{" "}
+                no{" "}
+                <a href={props.photoCredit.unsplashUrl} target="_blank" rel="noreferrer">
+                  Unsplash
+                </a>
+              </small>
+            )}
           </div>
         )}
         <input

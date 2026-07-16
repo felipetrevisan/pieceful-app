@@ -1,5 +1,6 @@
 import type { PuzzleSession } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
+import type { PhotoCredit } from "./unsplash";
 
 const DB_NAME = "meu-quebra-cabeca";
 const STORE = "partidas";
@@ -12,6 +13,7 @@ export interface SavedPuzzle {
   configuration: PuzzleConfiguration;
   session: PuzzleSession;
   image: Blob;
+  photoCredit?: PhotoCredit | null | undefined;
   updatedAt: string;
 }
 
