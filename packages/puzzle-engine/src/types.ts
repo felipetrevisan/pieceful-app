@@ -31,6 +31,25 @@ export interface Camera {
   zoom: number;
 }
 
+export interface PuzzleTimelapsePiece {
+  id: string;
+  x: number;
+  y: number;
+  rotation: number;
+  isPlaced: boolean;
+  visible: boolean;
+}
+
+export interface PuzzleTimelapseFrame {
+  at: number;
+  changes: PuzzleTimelapsePiece[];
+}
+
+export interface PuzzleTimelapse {
+  initial: PuzzleTimelapsePiece[];
+  frames: PuzzleTimelapseFrame[];
+}
+
 export interface PuzzleSession {
   puzzleId: string;
   seed: number;
@@ -40,4 +59,5 @@ export interface PuzzleSession {
   camera: Camera;
   activeRegion: string | null;
   completedAt: string | null;
+  timelapse?: PuzzleTimelapse;
 }

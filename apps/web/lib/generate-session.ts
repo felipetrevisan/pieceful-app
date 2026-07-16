@@ -39,6 +39,17 @@ export function generateSession(
         camera: { x: 0, y: 0, zoom: 1 },
         activeRegion: "centro",
         completedAt: null,
+        timelapse: {
+          initial: pieces.map((piece) => ({
+            id: piece.id,
+            x: piece.currentPosition.x,
+            y: piece.currentPosition.y,
+            rotation: piece.currentPosition.rotation,
+            isPlaced: piece.isPlaced,
+            visible: piece.trayId === null,
+          })),
+          frames: [],
+        },
       });
     };
     worker.onerror = () => {

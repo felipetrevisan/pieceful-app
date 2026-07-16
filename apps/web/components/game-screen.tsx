@@ -1,6 +1,11 @@
 "use client";
 
-import { calculateProgress, type PuzzlePiece, type PuzzleSession } from "@puzzled/puzzle-engine";
+import {
+  calculateProgress,
+  type PuzzlePiece,
+  type PuzzleSession,
+  type PuzzleTimelapsePiece,
+} from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { savePuzzle } from "@/lib/puzzle-db";
@@ -28,6 +33,27 @@ const regions = [
   "inferior-central",
   "inferior-direita",
 ];
+
+function framePiece(piece: PuzzlePiece): PuzzleTimelapsePiece {
+  return {
+    id: piece.id,
+    x: piece.currentPosition.x,
+    y: piece.currentPosition.y,
+    rotation: piece.currentPosition.rotation,
+    isPlaced: piece.isPlaced,
+    visible: piece.trayId === null,
+  };
+}
+
+function changedPiece(before: PuzzlePiece, after: PuzzlePiece): boolean {
+  return (
+    before.currentPosition.x !== after.currentPosition.x ||
+    before.currentPosition.y !== after.currentPosition.y ||
+    before.currentPosition.rotation !== after.currentPosition.rotation ||
+    before.isPlaced !== after.isPlaced ||
+    before.trayId !== after.trayId
+  );
+}
 
 export function GameScreen({
   name,
@@ -97,11 +123,31 @@ export function GameScreen({
   }, [persist, session]);
 
   function updatePieces(pieces: PuzzlePiece[]) {
-    setSession((current) => ({
-      ...current,
-      pieces,
-      completedAt: pieces.every((piece) => piece.isPlaced) ? new Date().toISOString() : null,
-    }));
+    setSession((current) => {
+      const previous = new Map(current.pieces.map((piece) => [piece.id, piece]));
+      const changes = pieces
+        .filter((piece) => {
+          const before = previous.get(piece.id);
+          return !before || changedPiece(before, piece);
+        })
+        .map(framePiece);
+      const timelapse = current.timelapse ?? {
+        initial: current.pieces.map(framePiece),
+        frames: [],
+      };
+      return {
+        ...current,
+        pieces,
+        completedAt: pieces.every((piece) => piece.isPlaced) ? new Date().toISOString() : null,
+        timelapse:
+          changes.length > 0
+            ? {
+                ...timelapse,
+                frames: [...timelapse.frames, { at: current.elapsedTime, changes }].slice(-1200),
+              }
+            : timelapse,
+      };
+    });
   }
 
   function useHint() {
@@ -175,7 +221,13 @@ export function GameScreen({
   }
 
   function replay() {
-    setSession({ ...initialSession, elapsedTime: 0, hintsUsed: 0, completedAt: null });
+    setSession({
+      ...initialSession,
+      elapsedTime: 0,
+      hintsUsed: 0,
+      completedAt: null,
+      timelapse: { initial: initialSession.pieces.map(framePiece), frames: [] },
+    });
   }
 
   const time = new Date(session.elapsedTime * 1000).toISOString().slice(11, 19);
@@ -360,6 +412,10 @@ export function GameScreen({
           elapsed={session.elapsedTime}
           hints={session.hintsUsed}
           imageUrl={imageUrl}
+          rows={configuration.rows}
+          columns={configuration.columns}
+          puzzlePieces={session.pieces}
+          timelapse={session.timelapse}
           onReplay={replay}
         />
       )}
