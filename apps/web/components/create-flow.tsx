@@ -4,7 +4,7 @@ import type { PuzzleSession } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
 import { useEffect, useMemo, useState } from "react";
 import { generateSession } from "@/lib/generate-session";
-import { processImage, validateImage } from "@/lib/image-processing";
+import { processImage, retainImageFile, validateImage } from "@/lib/image-processing";
 import { savePuzzle } from "@/lib/puzzle-db";
 import type { PhotoCredit } from "@/lib/unsplash";
 import { GameScreen } from "./game-screen";
@@ -45,21 +45,31 @@ export function CreateFlow() {
 
   async function chooseFile(next: File | null) {
     setError(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
     if (!next) {
       setFile(null);
-      setPreviewUrl(null);
+      setPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
       setPhotoCredit(null);
       return;
     }
     try {
-      await validateImage(next);
-      setFile(next);
-      setPreviewUrl(URL.createObjectURL(next));
+      const retainedFile = await retainImageFile(next);
+      await validateImage(retainedFile);
+      const nextPreviewUrl = URL.createObjectURL(retainedFile);
+      setFile(retainedFile);
+      setPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return nextPreviewUrl;
+      });
       setPhotoCredit(null);
     } catch (caught) {
       setFile(null);
-      setPreviewUrl(null);
+      setPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
       setError(caught instanceof Error ? caught.message : "Foto inválida.");
     }
   }

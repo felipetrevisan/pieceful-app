@@ -5,6 +5,21 @@ const signatures = [
   [0x52, 0x49, 0x46, 0x46],
 ] as const;
 
+export async function retainImageFile(file: File): Promise<File> {
+  if (file.size > MAX_BYTES) throw new Error("A foto deve ter no máximo 20 MB.");
+  try {
+    const bytes = await file.arrayBuffer();
+    return new File([bytes], file.name || `foto-${Date.now()}.jpg`, {
+      type: file.type || "image/jpeg",
+      lastModified: file.lastModified || Date.now(),
+    });
+  } catch {
+    throw new Error(
+      "Não foi possível acessar essa foto. Baixe-a para o dispositivo ou permita acesso às Fotos e tente novamente.",
+    );
+  }
+}
+
 export async function validateImage(file: File): Promise<void> {
   if (file.size > MAX_BYTES) throw new Error("A foto deve ter no máximo 20 MB.");
   const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());

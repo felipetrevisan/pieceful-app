@@ -19,7 +19,7 @@ interface Props {
   rotation: number;
   error: string | null;
   photoCredit: PhotoCredit | null;
-  onFile: (file: File | null) => void;
+  onFile: (file: File | null) => Promise<void>;
   onUnsplashPhoto: (file: File, credit: PhotoCredit) => void;
   onDifficulty: (value: PuzzleDifficulty, rows: number, columns: number) => void;
   onConfiguration: (configuration: PuzzleConfiguration) => void;
@@ -53,9 +53,10 @@ export function UploadConfigurator(props: Props) {
     };
   }, []);
 
-  function receive(files: FileList | null) {
+  async function receive(files: FileList | null) {
     const file = files?.item(0);
-    if (file) props.onFile(file);
+    if (file) await props.onFile(file);
+    if (inputRef.current) inputRef.current.value = "";
   }
 
   function customDimension(key: "rows" | "columns", value: number) {
@@ -130,7 +131,7 @@ export function UploadConfigurator(props: Props) {
                 onDragLeave={() => setDragging(false)}
                 onDrop={(event) => {
                   setDragging(false);
-                  receive(event.dataTransfer.files);
+                  void receive(event.dataTransfer.files);
                 }}
               >
                 <span className="upload-orb">
@@ -230,7 +231,7 @@ export function UploadConfigurator(props: Props) {
               <button
                 type="button"
                 className="text-button danger"
-                onClick={() => props.onFile(null)}
+                onClick={() => void props.onFile(null)}
               >
                 Excluir foto
               </button>
@@ -254,7 +255,7 @@ export function UploadConfigurator(props: Props) {
           className="sr-only"
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          onChange={(event) => receive(event.target.files)}
+          onChange={(event) => void receive(event.target.files)}
         />
         {props.error && (
           <p className="error-message" role="alert">
