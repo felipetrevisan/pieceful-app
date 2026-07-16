@@ -89,16 +89,30 @@ export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
           onClick={open}
           aria-label="Abrir a caixa do quebra-cabeça"
         >
+          <span className="box-floor" />
+          <div className="box-depth" aria-hidden="true">
+            <span className="box-depth-side" />
+            <span className="box-depth-bottom" />
+          </div>
           <div ref={lidRef} className="box-lid">
             <img src={imageUrl} alt="" />
-            <span>MEU QUEBRA-CABEÇA</span>
+            <span className="box-lid-shade" />
+            <span className="box-edition">EDIÇÃO ÚNICA</span>
+            <span className="box-brand">
+              <Icon name="puzzle" size={22} />
+              <strong>MEU QUEBRA-CABEÇA</strong>
+              <small>feito com a sua memória</small>
+            </span>
           </div>
           <div className="box-base">
-            <strong>Minha memória especial</strong>
-            <span>
-              {pieces.toLocaleString("pt-BR")} peças · {difficulty}
+            <span className="box-base-rim" />
+            <span className="box-base-copy">
+              <strong>Minha memória especial</strong>
+              <span>
+                {pieces.toLocaleString("pt-BR")} peças · {difficulty}
+              </span>
             </span>
-            <small>
+            <small className="box-open-label">
               {opening
                 ? `Organizando suas ${pieces.toLocaleString("pt-BR")} peças…`
                 : "Clique para abrir"}

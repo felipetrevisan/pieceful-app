@@ -55,9 +55,21 @@ export default function Home() {
               <Icon name="puzzle" size={30} />
             </div>
             <div className="puzzle-cube">
-              <div className="cube-top" />
-              <div className="cube-face">
-                <Icon name="puzzle" size={34} />
+              <div className="cube-top">
+                <span />
+              </div>
+              <div className="cube-side">
+                <i />
+                <i />
+                <i />
+              </div>
+              <div className="cube-face cube-front">
+                <span className="cube-kicker">EDIÇÃO PESSOAL</span>
+                <div className="cube-mark">
+                  <Icon name="puzzle" size={38} />
+                </div>
+                <strong>Meu quebra-cabeça</strong>
+                <small>Uma memória em cada peça</small>
               </div>
             </div>
           </div>

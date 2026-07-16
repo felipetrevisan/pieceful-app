@@ -1,4 +1,4 @@
-import type { Camera, PuzzlePiecePosition } from "./types";
+import type { Camera, PuzzlePiece, PuzzlePiecePosition } from "./types";
 
 export interface Point {
   x: number;
@@ -24,6 +24,37 @@ export function canSnap(
 ): boolean {
   const rotation = ((current.rotation % 360) + 360) % 360;
   return rotation === target.rotation && snapDistance(current, target) <= tolerance;
+}
+
+function normalizedRotation(rotation: number): number {
+  return ((rotation % 360) + 360) % 360;
+}
+
+export function neighborSnapOffset(
+  moving: PuzzlePiece,
+  stationary: PuzzlePiece,
+  tolerance: number,
+): Point | null {
+  const rowDistance = Math.abs(moving.row - stationary.row);
+  const columnDistance = Math.abs(moving.column - stationary.column);
+  if (rowDistance + columnDistance !== 1) return null;
+
+  const rotation = normalizedRotation(moving.currentPosition.rotation);
+  if (rotation !== normalizedRotation(stationary.currentPosition.rotation)) return null;
+
+  const radians = (rotation * Math.PI) / 180;
+  const correctX = moving.correctPosition.x - stationary.correctPosition.x;
+  const correctY = moving.correctPosition.y - stationary.correctPosition.y;
+  const rotatedX = correctX * Math.cos(radians) - correctY * Math.sin(radians);
+  const rotatedY = correctX * Math.sin(radians) + correctY * Math.cos(radians);
+  const targetX = stationary.currentPosition.x + rotatedX;
+  const targetY = stationary.currentPosition.y + rotatedY;
+  const offset = {
+    x: targetX - moving.currentPosition.x,
+    y: targetY - moving.currentPosition.y,
+  };
+
+  return Math.hypot(offset.x, offset.y) <= tolerance ? offset : null;
 }
 
 export function calculateProgress(placed: number, total: number): number {

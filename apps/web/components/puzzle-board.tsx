@@ -3,6 +3,7 @@
 import {
   calculateProgress,
   canSnap,
+  neighborSnapOffset,
   type PuzzlePiece,
   tracePiecePath,
 } from "@puzzled/puzzle-engine";
@@ -25,6 +26,7 @@ interface View {
 }
 interface Drag {
   id: string | null;
+  memberIds: string[];
   offsetX: number;
   offsetY: number;
   panning: boolean;
@@ -47,6 +49,7 @@ export function PuzzleBoard({
   const viewRef = useRef<View>({ zoom: 1, panX: 0, panY: 0 });
   const dragRef = useRef<Drag>({
     id: null,
+    memberIds: [],
     offsetX: 0,
     offsetY: 0,
     panning: false,
@@ -213,8 +216,14 @@ export function PuzzleBoard({
           world.y <= piece.currentPosition.y + 1.2,
       );
     if (hit) {
+      const memberIds = hit.groupId
+        ? piecesRef.current
+            .filter((piece) => piece.groupId === hit.groupId && !piece.isPlaced)
+            .map((piece) => piece.id)
+        : [hit.id];
       dragRef.current = {
         id: hit.id,
+        memberIds,
         offsetX: world.x - hit.currentPosition.x,
         offsetY: world.y - hit.currentPosition.y,
         panning: false,
@@ -225,6 +234,7 @@ export function PuzzleBoard({
     } else
       dragRef.current = {
         id: null,
+        memberIds: [],
         offsetX: viewRef.current.panX,
         offsetY: viewRef.current.panY,
         panning: true,
@@ -243,14 +253,20 @@ export function PuzzleBoard({
       viewRef.current.panY = drag.offsetY + point.y - drag.startY;
     } else {
       const world = worldPoint(point.x, point.y);
+      const anchor = piecesRef.current.find((piece) => piece.id === drag.id);
+      if (!anchor) return;
+      const nextX = world.x - drag.offsetX;
+      const nextY = world.y - drag.offsetY;
+      const deltaX = nextX - anchor.currentPosition.x;
+      const deltaY = nextY - anchor.currentPosition.y;
       piecesRef.current = piecesRef.current.map((piece) =>
-        piece.id === drag.id
+        drag.memberIds.includes(piece.id)
           ? {
               ...piece,
               currentPosition: {
                 ...piece.currentPosition,
-                x: world.x - drag.offsetX,
-                y: world.y - drag.offsetY,
+                x: piece.currentPosition.x + deltaX,
+                y: piece.currentPosition.y + deltaY,
               },
             }
           : piece,
@@ -260,19 +276,82 @@ export function PuzzleBoard({
   }
 
   function pointerUp() {
-    const id = dragRef.current.id;
-    dragRef.current = { id: null, offsetX: 0, offsetY: 0, panning: false, startX: 0, startY: 0 };
+    const { id, memberIds } = dragRef.current;
+    dragRef.current = {
+      id: null,
+      memberIds: [],
+      offsetX: 0,
+      offsetY: 0,
+      panning: false,
+      startX: 0,
+      startY: 0,
+    };
     if (!id) return;
-    const updated = piecesRef.current.map((piece) =>
-      piece.id === id && canSnap(piece.currentPosition, piece.correctPosition, 0.38)
-        ? {
-            ...piece,
-            currentPosition: { ...piece.correctPosition },
-            isPlaced: true,
-            groupId: "tabuleiro",
-          }
-        : piece,
+    const moving = piecesRef.current.filter((piece) => memberIds.includes(piece.id));
+    const boardMatch = moving.find((piece) =>
+      canSnap(piece.currentPosition, piece.correctPosition, 0.38),
     );
+    let updated = piecesRef.current;
+
+    if (boardMatch) {
+      const deltaX = boardMatch.correctPosition.x - boardMatch.currentPosition.x;
+      const deltaY = boardMatch.correctPosition.y - boardMatch.currentPosition.y;
+      updated = updated.map((piece) =>
+        memberIds.includes(piece.id)
+          ? {
+              ...piece,
+              currentPosition: {
+                ...piece.currentPosition,
+                x: piece.currentPosition.x + deltaX,
+                y: piece.currentPosition.y + deltaY,
+              },
+              isPlaced: true,
+              groupId: "tabuleiro",
+            }
+          : piece,
+      );
+    } else {
+      let connection: { offsetX: number; offsetY: number; stationary: PuzzlePiece } | undefined;
+      for (const movingPiece of moving) {
+        for (const stationary of updated) {
+          if (memberIds.includes(stationary.id) || stationary.trayId !== null) continue;
+          const offset = neighborSnapOffset(movingPiece, stationary, 0.28);
+          if (offset) {
+            connection = { offsetX: offset.x, offsetY: offset.y, stationary };
+            break;
+          }
+        }
+        if (connection) break;
+      }
+
+      if (connection) {
+        const connectedIds = connection.stationary.groupId
+          ? updated
+              .filter((piece) => piece.groupId === connection?.stationary.groupId)
+              .map((piece) => piece.id)
+          : [connection.stationary.id];
+        const groupId = connection.stationary.isPlaced
+          ? "tabuleiro"
+          : (connection.stationary.groupId ?? `grupo-${connection.stationary.id}`);
+        const mergedIds = new Set([...memberIds, ...connectedIds]);
+        updated = updated.map((piece) => {
+          if (!mergedIds.has(piece.id)) return piece;
+          const wasMoving = memberIds.includes(piece.id);
+          return {
+            ...piece,
+            currentPosition: wasMoving
+              ? {
+                  ...piece.currentPosition,
+                  x: piece.currentPosition.x + connection.offsetX,
+                  y: piece.currentPosition.y + connection.offsetY,
+                }
+              : piece.currentPosition,
+            groupId,
+            isPlaced: groupId === "tabuleiro",
+          };
+        });
+      }
+    }
     piecesRef.current = updated;
     onPiecesChange(updated);
     onProgress(calculateProgress(updated.filter((piece) => piece.isPlaced).length, updated.length));
@@ -294,26 +373,34 @@ export function PuzzleBoard({
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "r", "R"].includes(event.key))
       event.preventDefault();
     const delta = event.shiftKey ? 0.02 : 0.08;
-    const updated = piecesRef.current.map((piece) =>
-      piece.id === selected.id
-        ? {
-            ...piece,
-            currentPosition: {
-              ...piece.currentPosition,
-              x:
-                piece.currentPosition.x +
-                (event.key === "ArrowRight" ? delta : event.key === "ArrowLeft" ? -delta : 0),
-              y:
-                piece.currentPosition.y +
-                (event.key === "ArrowDown" ? delta : event.key === "ArrowUp" ? -delta : 0),
-              rotation:
-                event.key.toLowerCase() === "r"
-                  ? (piece.currentPosition.rotation + 90) % 360
-                  : piece.currentPosition.rotation,
-            },
-          }
-        : piece,
+    const selectedIds = new Set(
+      selected.groupId
+        ? visible.filter((piece) => piece.groupId === selected.groupId).map((piece) => piece.id)
+        : [selected.id],
     );
+    const updated = piecesRef.current.map((piece) => {
+      if (!selectedIds.has(piece.id)) return piece;
+      const rotate = event.key.toLowerCase() === "r";
+      const relativeX = piece.currentPosition.x - selected.currentPosition.x;
+      const relativeY = piece.currentPosition.y - selected.currentPosition.y;
+      return {
+        ...piece,
+        currentPosition: {
+          ...piece.currentPosition,
+          x: rotate
+            ? selected.currentPosition.x - relativeY
+            : piece.currentPosition.x +
+              (event.key === "ArrowRight" ? delta : event.key === "ArrowLeft" ? -delta : 0),
+          y: rotate
+            ? selected.currentPosition.y + relativeX
+            : piece.currentPosition.y +
+              (event.key === "ArrowDown" ? delta : event.key === "ArrowUp" ? -delta : 0),
+          rotation: rotate
+            ? (piece.currentPosition.rotation + 90) % 360
+            : piece.currentPosition.rotation,
+        },
+      };
+    });
     piecesRef.current = updated;
     setSelectedId(selected.id);
     if (event.key === "0") {

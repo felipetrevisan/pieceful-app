@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { canSnap, generatePieces, screenToWorld, worldToScreen } from ".";
+import { canSnap, generatePieces, neighborSnapOffset, screenToWorld, worldToScreen } from ".";
 
 describe("topologia", () => {
   test("é determinística e mantém bordas complementares", () => {
@@ -30,5 +30,20 @@ describe("geometria", () => {
   test("snap exige proximidade e rotação", () => {
     expect(canSnap({ x: 1.05, y: 1, rotation: 360 }, { x: 1, y: 1, rotation: 0 }, 0.1)).toBe(true);
     expect(canSnap({ x: 1.05, y: 1, rotation: 90 }, { x: 1, y: 1, rotation: 0 }, 0.1)).toBe(false);
+  });
+
+  test("ímã reconhece apenas vizinhas corretas e respeita a rotação", () => {
+    const [left, right, far] = generatePieces(1, 3, 2026);
+    if (!left || !right || !far) throw new Error("Peças de teste ausentes");
+    left.currentPosition = { x: 2.92, y: 4, rotation: 0 };
+    right.currentPosition = { x: 4, y: 4, rotation: 0 };
+    far.currentPosition = { x: 3, y: 4, rotation: 0 };
+
+    const offset = neighborSnapOffset(left, right, 0.12);
+    expect(offset?.x).toBeCloseTo(0.08);
+    expect(offset?.y).toBe(0);
+    expect(neighborSnapOffset(left, far, 0.2)).toBeNull();
+    right.currentPosition.rotation = 90;
+    expect(neighborSnapOffset(left, right, 0.2)).toBeNull();
   });
 });
