@@ -1,0 +1,17 @@
+{
+  "name": "@puzzled/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "elysia": "1.4.4"
+  },
+  "devDependencies": {
+    "@types/bun": "1.2.20",
+    "typescript": "5.9.2"
+  }
+}

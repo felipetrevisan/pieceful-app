@@ -1,0 +1,24 @@
+{
+  "name": "meu-quebra-cabeca",
+  "private": true,
+  "packageManager": "bun@1.2.20",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --cwd apps/web dev",
+    "dev:api": "bun --cwd apps/api dev",
+    "build": "bun --cwd apps/web build && bun --cwd apps/api build && bun scripts/prepare-sites.ts",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "bun --cwd apps/web typecheck && bun --cwd apps/api typecheck",
+    "test": "bun test packages apps",
+    "clean": "rm -rf apps/web/.next apps/api/dist"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.0",
+    "@types/bun": "1.2.20",
+    "typescript": "5.9.2"
+  }
+}

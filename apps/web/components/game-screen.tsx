@@ -1,0 +1,368 @@
+"use client";
+
+import { calculateProgress, type PuzzlePiece, type PuzzleSession } from "@puzzled/puzzle-engine";
+import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { savePuzzle } from "@/lib/puzzle-db";
+import { CompletionModal } from "./completion-modal";
+import { Icon } from "./icons";
+import { PuzzleBoard } from "./puzzle-board";
+
+interface Props {
+  name: string;
+  image: Blob;
+  imageUrl: string;
+  difficulty: PuzzleDifficulty;
+  configuration: PuzzleConfiguration;
+  initialSession: PuzzleSession;
+}
+
+const regions = [
+  "superior-esquerda",
+  "superior-central",
+  "superior-direita",
+  "centro-esquerdo",
+  "centro",
+  "centro-direito",
+  "inferior-esquerda",
+  "inferior-central",
+  "inferior-direita",
+];
+
+export function GameScreen({
+  name,
+  image,
+  imageUrl,
+  difficulty,
+  configuration,
+  initialSession,
+}: Props) {
+  const [session, setSession] = useState(initialSession);
+  const [paused, setPaused] = useState(false);
+  const [tray, setTray] = useState<"todas" | "bordas" | "centro" | "grupos">("todas");
+  const pauseTitleId = useId();
+  const [saveStatus, setSaveStatus] = useState<"saving" | "saved" | "error">("saved");
+  const [activeRegion, setActiveRegion] = useState("centro");
+  const saveTimer = useRef<number | null>(null);
+  const progress = calculateProgress(
+    session.pieces.filter((piece) => piece.isPlaced).length,
+    session.pieces.length,
+  );
+  const completed = progress === 100;
+
+  const persist = useCallback(
+    async (next: PuzzleSession) => {
+      setSaveStatus("saving");
+      try {
+        await savePuzzle({
+          id: next.puzzleId,
+          name,
+          image,
+          difficulty,
+          configuration,
+          session: next,
+          updatedAt: new Date().toISOString(),
+        });
+        setSaveStatus("saved");
+      } catch {
+        setSaveStatus("error");
+      }
+    },
+    [configuration, difficulty, image, name],
+  );
+
+  useEffect(() => {
+    if (paused || completed || !configuration.timerEnabled) return;
+    const timer = window.setInterval(
+      () => setSession((current) => ({ ...current, elapsedTime: current.elapsedTime + 1 })),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [completed, configuration.timerEnabled, paused]);
+
+  useEffect(() => {
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => persist(session), 900);
+    return () => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    };
+  }, [persist, session]);
+
+  useEffect(() => {
+    const saveOnHide = () => {
+      if (document.visibilityState === "hidden") void persist(session);
+    };
+    document.addEventListener("visibilitychange", saveOnHide);
+    return () => document.removeEventListener("visibilitychange", saveOnHide);
+  }, [persist, session]);
+
+  function updatePieces(pieces: PuzzlePiece[]) {
+    setSession((current) => ({
+      ...current,
+      pieces,
+      completedAt: pieces.every((piece) => piece.isPlaced) ? new Date().toISOString() : null,
+    }));
+  }
+
+  function useHint() {
+    const candidate = session.pieces.find((piece) => !piece.isPlaced);
+    if (!candidate) return;
+    updatePieces(
+      session.pieces.map((piece) =>
+        piece.id === candidate.id
+          ? {
+              ...piece,
+              isPlaced: true,
+              trayId: null,
+              groupId: "tabuleiro",
+              currentPosition: { ...piece.correctPosition },
+            }
+          : piece,
+      ),
+    );
+    setSession((current) => ({ ...current, hintsUsed: current.hintsUsed + 1 }));
+    sound(660);
+  }
+
+  function sound(frequency: number) {
+    try {
+      const AudioContextClass = window.AudioContext;
+      const context = new AudioContextClass();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.05, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.16);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.16);
+    } catch {
+      /* O áudio nunca bloqueia a partida. */
+    }
+  }
+
+  const trayPieces = useMemo(
+    () =>
+      session.pieces.filter((piece) => {
+        if (piece.trayId === null || piece.isPlaced) return false;
+        if (tray === "todas") return true;
+        if (tray === "grupos") return piece.groupId !== null;
+        return piece.trayId === tray;
+      }),
+    [session.pieces, tray],
+  );
+
+  function moveFromTray(id: string) {
+    const index = session.pieces.findIndex((piece) => piece.id === id);
+    const piece = session.pieces[index];
+    if (!piece) return;
+    const offset = (index % 12) / 12;
+    updatePieces(
+      session.pieces.map((candidate) =>
+        candidate.id === id
+          ? {
+              ...candidate,
+              trayId: null,
+              currentPosition: {
+                ...candidate.currentPosition,
+                x: -1 + offset * (configuration.columns + 1),
+                y: -0.8,
+              },
+            }
+          : candidate,
+      ),
+    );
+  }
+
+  function replay() {
+    setSession({ ...initialSession, elapsedTime: 0, hintsUsed: 0, completedAt: null });
+  }
+
+  const time = new Date(session.elapsedTime * 1000).toISOString().slice(11, 19);
+  return (
+    <main className="game-shell">
+      <header className="game-toolbar">
+        <div>
+          <a href="/" className="back-button" aria-label="Voltar ao início">
+            ←
+          </a>
+          <span>
+            <strong>{name}</strong>
+            <small>Dificuldade: {difficulty}</small>
+          </span>
+        </div>
+        <div className="progress-cluster">
+          <span>{progress}% concluído</span>
+          <div className="progress-track">
+            <i style={{ width: `${progress}%` }} />
+          </div>
+          <small>
+            {session.pieces.filter((piece) => piece.isPlaced).length} de {session.pieces.length}
+          </small>
+        </div>
+        <div className="timer">
+          ◷ <strong>{time}</strong>
+        </div>
+        <div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setPaused(true)}
+            aria-label="Pausar"
+          >
+            <Icon name="pause" />
+          </button>
+          <button type="button" className="icon-button" aria-label="Som">
+            <Icon name="volume" />
+          </button>
+        </div>
+      </header>
+      <section className="game-area">
+        <PuzzleBoard
+          imageUrl={imageUrl}
+          rows={configuration.rows}
+          columns={configuration.columns}
+          pieces={session.pieces}
+          onPiecesChange={updatePieces}
+          onProgress={(value) => {
+            if (value > progress) sound(520);
+          }}
+          focusRegion={activeRegion}
+        />
+        {configuration.totalPieces >= 500 && (
+          <aside className="minimap glass-card">
+            <div>
+              <strong>Mapa do tabuleiro</strong>
+              <span>{activeRegion.replaceAll("-", " ")}</span>
+            </div>
+            <div className="region-grid">
+              {regions.map((region) => (
+                <button
+                  key={region}
+                  type="button"
+                  className={activeRegion === region ? "active" : ""}
+                  onClick={() => {
+                    setActiveRegion(region);
+                    setSession((current) => ({ ...current, activeRegion: region }));
+                  }}
+                  aria-label={`Focar região ${region.replaceAll("-", " ")}`}
+                />
+              ))}
+            </div>
+          </aside>
+        )}
+      </section>
+      <section className="game-dock">
+        <div className="dock-tools">
+          <button type="button">
+            <Icon name="puzzle" />
+            <span>
+              Alternar
+              <br />
+              peças
+            </span>
+          </button>
+          <button type="button">
+            <Icon name="grid" />
+            <span>
+              Organizar
+              <br />
+              bordas
+            </span>
+          </button>
+          {configuration.referenceEnabled && (
+            <button
+              type="button"
+              onClick={() => window.open(imageUrl, "referencia", "width=900,height=700")}
+            >
+              <Icon name="folder" />
+              <span>
+                Mostrar
+                <br />
+                referência
+              </span>
+            </button>
+          )}
+        </div>
+        {configuration.hintsEnabled && (
+          <button type="button" className="hint-button" onClick={useHint}>
+            ♧ Dar uma dica
+          </button>
+        )}
+        <div className="save-state" aria-live="polite">
+          {saveStatus === "saving"
+            ? "Salvando…"
+            : saveStatus === "saved"
+              ? "Progresso salvo"
+              : "Não foi possível salvar"}
+        </div>
+      </section>
+      {session.pieces.some((piece) => piece.trayId !== null && !piece.isPlaced) && (
+        <aside className="piece-tray glass-card">
+          <div className="tray-header">
+            <div>
+              <strong>Bandejas</strong>
+              <span>{trayPieces.length} peças</span>
+            </div>
+            <div>
+              {(["todas", "bordas", "centro", "grupos"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={tray === value ? "active" : ""}
+                  onClick={() => setTray(value)}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="virtual-list">
+            {trayPieces.slice(0, 60).map((piece) => (
+              <button type="button" key={piece.id} onClick={() => moveFromTray(piece.id)}>
+                <span className="mini-piece">
+                  {piece.row + 1}:{piece.column + 1}
+                </span>
+                <small>Levar ao tabuleiro</small>
+              </button>
+            ))}
+          </div>
+          {trayPieces.length > 60 && (
+            <p>Mostrando 60 peças por vez para manter a partida fluida.</p>
+          )}
+        </aside>
+      )}
+      {paused && (
+        <div className="modal-backdrop">
+          <div
+            className="pause-modal glass-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={pauseTitleId}
+          >
+            <span className="card-icon">
+              <Icon name="pause" />
+            </span>
+            <h2 id={pauseTitleId}>Partida pausada</h2>
+            <p>Seu progresso está seguro neste dispositivo.</p>
+            <button type="button" className="primary-button" onClick={() => setPaused(false)}>
+              Continuar montagem
+            </button>
+            <a href="/" className="secondary-button">
+              Sair para o início
+            </a>
+          </div>
+        </div>
+      )}
+      {completed && (
+        <CompletionModal
+          pieces={configuration.totalPieces}
+          elapsed={session.elapsedTime}
+          hints={session.hintsUsed}
+          imageUrl={imageUrl}
+          onReplay={replay}
+        />
+      )}
+    </main>
+  );
+}
