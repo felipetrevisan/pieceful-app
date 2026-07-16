@@ -65,6 +65,8 @@ export function GameScreen({
 }: Props) {
   const [session, setSession] = useState(initialSession);
   const [paused, setPaused] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [controllerName, setControllerName] = useState<string | null>(null);
   const [tray, setTray] = useState<"todas" | "bordas" | "centro" | "grupos">("todas");
   const pauseTitleId = useId();
   const [saveStatus, setSaveStatus] = useState<"saving" | "saved" | "error">("saved");
@@ -75,6 +77,7 @@ export function GameScreen({
     session.pieces.length,
   );
   const completed = progress === 100;
+  const pauseGame = useCallback(() => setPaused(true), []);
 
   const persist = useCallback(
     async (next: PuzzleSession) => {
@@ -256,6 +259,14 @@ export function GameScreen({
           ◷ <strong>{time}</strong>
         </div>
         <div>
+          <a
+            href="/configuracoes"
+            className="icon-button"
+            aria-label="Abrir configurações"
+            title="Configurações"
+          >
+            <Icon name="settings" />
+          </a>
           <button
             type="button"
             className="icon-button"
@@ -280,6 +291,8 @@ export function GameScreen({
             if (value > progress) sound(520);
           }}
           focusRegion={activeRegion}
+          onPause={pauseGame}
+          onControllerChange={setControllerName}
         />
         {configuration.totalPieces >= 500 && (
           <aside className="minimap glass-card">
@@ -314,6 +327,16 @@ export function GameScreen({
               peças
             </span>
           </button>
+          <button type="button" onClick={() => setControlsOpen(true)}>
+            <span className="dock-device-icon" aria-hidden="true">
+              ⌨
+            </span>
+            <span>
+              Ver
+              <br />
+              controles
+            </span>
+          </button>
           <button type="button">
             <Icon name="grid" />
             <span>
@@ -325,6 +348,7 @@ export function GameScreen({
           {configuration.referenceEnabled && (
             <button
               type="button"
+              className="reference-tool"
               onClick={() => window.open(imageUrl, "referencia", "width=900,height=700")}
             >
               <Icon name="folder" />
@@ -406,6 +430,75 @@ export function GameScreen({
           </div>
         </div>
       )}
+      {controlsOpen && (
+        <div className="modal-backdrop">
+          <section
+            className="controls-panel glass-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Controles do jogo"
+          >
+            <header>
+              <div>
+                <span className="section-kicker">COMO JOGAR</span>
+                <h2>Controles</h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setControlsOpen(false)}
+                aria-label="Fechar controles"
+              >
+                ×
+              </button>
+            </header>
+            <div className="controller-status" aria-live="polite">
+              <span aria-hidden="true">🎮</span>
+              {controllerName
+                ? `${controllerName} conectado`
+                : "Conecte um controle e pressione um botão"}
+            </div>
+            <div className="controls-grid">
+              <ControlGroup
+                icon="⌨"
+                title="Teclado e mouse"
+                rows={[
+                  ["Arrastar", "Mover peça ou grupo"],
+                  ["↑ ↓ ← →", "Mover peça selecionada"],
+                  ["R", "Rotacionar 90°"],
+                  ["[  ]", "Peça anterior / próxima"],
+                  ["+  −", "Zoom"],
+                  ["0", "Centralizar tabuleiro"],
+                ]}
+              />
+              <ControlGroup
+                icon="XBOX"
+                title="Xbox"
+                rows={[
+                  ["L", "Mover peça"],
+                  ["A", "Próxima peça"],
+                  ["B", "Rotacionar"],
+                  ["LB / RB", "Alternar peça"],
+                  ["LT / RT", "Zoom"],
+                  ["MENU", "Pausar"],
+                ]}
+              />
+              <ControlGroup
+                icon="PS"
+                title="PlayStation"
+                rows={[
+                  ["L", "Mover peça"],
+                  ["×", "Próxima peça"],
+                  ["○", "Rotacionar"],
+                  ["L1 / R1", "Alternar peça"],
+                  ["L2 / R2", "Zoom"],
+                  ["OPTIONS", "Pausar"],
+                ]}
+              />
+            </div>
+          </section>
+        </div>
+      )}
       {completed && (
         <CompletionModal
           pieces={configuration.totalPieces}
@@ -420,5 +513,31 @@ export function GameScreen({
         />
       )}
     </main>
+  );
+}
+
+function ControlGroup({
+  icon,
+  title,
+  rows,
+}: {
+  icon: string;
+  title: string;
+  rows: [string, string][];
+}) {
+  return (
+    <section className="control-group">
+      <h3>
+        <span aria-hidden="true">{icon}</span> {title}
+      </h3>
+      <dl>
+        {rows.map(([key, action]) => (
+          <div key={`${key}-${action}`}>
+            <dt>{key}</dt>
+            <dd>{action}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }

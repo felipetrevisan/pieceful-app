@@ -311,6 +311,10 @@
   font-size: 8px;
   color: var(--muted);
 }
+.dock-tools button .dock-device-icon {
+  font-size: 21px;
+  line-height: 1;
+}
 .hint-button {
   min-height: 44px;
   padding: 0 24px;
@@ -472,6 +476,96 @@
 .pause-modal p {
   color: var(--muted);
   margin: 0 0 8px;
+}
+.controls-panel {
+  width: min(920px, calc(100% - 32px));
+  max-height: 88vh;
+  overflow: auto;
+  padding: 26px;
+  background: linear-gradient(145deg, rgba(34, 42, 61, 0.98), rgba(11, 19, 38, 0.98));
+}
+.controls-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.controls-panel h2 {
+  margin: 5px 0 0;
+  font-size: 30px;
+}
+.controller-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 20px 0;
+  padding: 11px 14px;
+  border: 1px solid rgba(76, 215, 246, 0.22);
+  border-radius: 13px;
+  background: rgba(76, 215, 246, 0.07);
+  color: var(--cyan);
+  font-size: 12px;
+}
+.controller-status > span {
+  font-size: 20px;
+}
+.controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.control-group {
+  padding: 17px;
+  border: 1px solid rgba(208, 188, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(6, 14, 32, 0.4);
+}
+.control-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+.control-group h3 span {
+  min-width: 34px;
+  min-height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0 7px;
+  border: 1px solid rgba(76, 215, 246, 0.3);
+  border-radius: 9px;
+  background: rgba(76, 215, 246, 0.08);
+  color: var(--cyan);
+  font-size: 10px;
+  font-weight: 900;
+}
+.control-group dl {
+  margin: 0;
+}
+.control-group dl > div {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  border-top: 1px solid rgba(208, 188, 255, 0.08);
+}
+.control-group dt {
+  width: fit-content;
+  max-width: 68px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: rgba(160, 120, 255, 0.15);
+  color: var(--primary-light);
+  font-size: 9px;
+  font-weight: 850;
+  text-align: center;
+}
+.control-group dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
 }
 .completion-dialog {
   position: fixed;
@@ -737,6 +831,9 @@
   .completion-dialog h2 {
     font-size: 24px;
   }
+  .controls-grid {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 520px) {
   .box-scene {
@@ -769,7 +866,7 @@
   .game-dock {
     grid-template-columns: 1fr auto;
   }
-  .dock-tools button:nth-child(n + 3) {
+  .dock-tools .reference-tool {
     display: none;
   }
   .hint-button {
@@ -801,5 +898,10 @@
   }
   .minimap {
     display: none;
+  }
+  .controls-panel {
+    width: calc(100% - 20px);
+    max-height: calc(100dvh - 20px);
+    padding: 18px;
   }
 }

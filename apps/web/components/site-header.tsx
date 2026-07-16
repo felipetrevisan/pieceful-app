@@ -24,9 +24,14 @@ export function SiteHeader({ active }: { active?: "inicio" | "criar" | "meus" | 
           Configurações
         </Link>
       </nav>
-      <Link className="icon-button" href="/configuracoes" aria-label="Abrir configurações">
+      <a
+        className="icon-button"
+        href="/configuracoes"
+        aria-label="Abrir configurações"
+        title="Configurações"
+      >
         <Icon name="settings" size={18} />
-      </Link>
+      </a>
     </header>
   );
 }

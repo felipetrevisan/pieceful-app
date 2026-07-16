@@ -8,6 +8,7 @@ import {
   tracePiecePath,
 } from "@puzzled/puzzle-engine";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { controllerLabel, gamepadButtonCommand, gamepadDirections } from "@/lib/gamepad-controls";
 
 interface Props {
   imageUrl: string;
@@ -16,6 +17,8 @@ interface Props {
   pieces: PuzzlePiece[];
   onPiecesChange: (pieces: PuzzlePiece[]) => void;
   onProgress: (progress: number) => void;
+  onPause: () => void;
+  onControllerChange: (name: string | null) => void;
   focusRegion?: string;
 }
 
@@ -41,6 +44,8 @@ export function PuzzleBoard({
   pieces,
   onPiecesChange,
   onProgress,
+  onPause,
+  onControllerChange,
   focusRegion,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,6 +62,9 @@ export function PuzzleBoard({
     startY: 0,
   });
   const animationRef = useRef(0);
+  const gamepadButtonsRef = useRef<boolean[]>([]);
+  const gamepadAxisAtRef = useRef(0);
+  const gamepadIdRef = useRef<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoomLabel, setZoomLabel] = useState(100);
 
@@ -182,6 +190,57 @@ export function PuzzleBoard({
       scheduleDraw();
     }
   }, [focusRegion, scheduleDraw]);
+
+  useEffect(() => {
+    let frame = 0;
+    const dispatchKey = (key: string) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.focus({ preventScroll: true });
+      canvas.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    };
+    const poll = (now: number) => {
+      const gamepad = navigator.getGamepads?.().find((candidate) => candidate?.connected) ?? null;
+      const nextId = gamepad?.id ?? null;
+      if (nextId !== gamepadIdRef.current) {
+        gamepadIdRef.current = nextId;
+        onControllerChange(nextId ? controllerLabel(nextId) : null);
+        gamepadButtonsRef.current = [];
+      }
+      if (gamepad) {
+        const pressed = gamepad.buttons.map((button) => button.pressed);
+        const justPressed = (index: number) =>
+          pressed[index] === true && gamepadButtonsRef.current[index] !== true;
+        for (let index = 0; index < pressed.length; index += 1) {
+          if (!justPressed(index)) continue;
+          const command = gamepadButtonCommand(index);
+          if (command === "next") dispatchKey("]");
+          else if (command === "previous") dispatchKey("[");
+          else if (command === "rotate") dispatchKey("r");
+          else if (command === "reset") dispatchKey("0");
+          else if (command === "zoom-out") dispatchKey("-");
+          else if (command === "zoom-in") dispatchKey("+");
+          else if (command === "pause") onPause();
+        }
+        gamepadButtonsRef.current = pressed;
+
+        if (now - gamepadAxisAtRef.current > 85) {
+          const { left, right, up, down } = gamepadDirections(gamepad.axes, pressed);
+          if (left) dispatchKey("ArrowLeft");
+          else if (right) dispatchKey("ArrowRight");
+          if (up) dispatchKey("ArrowUp");
+          else if (down) dispatchKey("ArrowDown");
+          if (left || right || up || down) gamepadAxisAtRef.current = now;
+        }
+      }
+      frame = requestAnimationFrame(poll);
+    };
+    frame = requestAnimationFrame(poll);
+    return () => {
+      cancelAnimationFrame(frame);
+      if (gamepadIdRef.current) onControllerChange(null);
+    };
+  }, [onControllerChange, onPause]);
 
   function canvasPoint(event: React.PointerEvent<HTMLCanvasElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -370,8 +429,35 @@ export function PuzzleBoard({
     const visible = piecesRef.current.filter((piece) => piece.trayId === null && !piece.isPlaced);
     const selected = visible.find((piece) => piece.id === selectedId) ?? visible[0];
     if (!selected) return;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "r", "R"].includes(event.key))
+    if (event.key === "[" || event.key === "]") {
       event.preventDefault();
+      const currentIndex = visible.findIndex((piece) => piece.id === selectedId);
+      const direction = event.key === "]" ? 1 : -1;
+      const baseIndex = currentIndex >= 0 ? currentIndex : direction > 0 ? -1 : 0;
+      const nextIndex = (baseIndex + direction + visible.length) % visible.length;
+      setSelectedId(visible[nextIndex]?.id ?? selected.id);
+      scheduleDraw();
+      return;
+    }
+    if (event.key === "+" || event.key === "-") {
+      event.preventDefault();
+      const multiplier = event.key === "+" ? 1.12 : 0.88;
+      const next = Math.min(4, Math.max(0.25, viewRef.current.zoom * multiplier));
+      viewRef.current.zoom = next;
+      setZoomLabel(Math.round(next * 100));
+      scheduleDraw();
+      return;
+    }
+    if (event.key === "0") {
+      event.preventDefault();
+      viewRef.current = { zoom: 1, panX: 0, panY: 0 };
+      setZoomLabel(100);
+      scheduleDraw();
+      return;
+    }
+    const actionable = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "r", "R"];
+    if (!actionable.includes(event.key)) return;
+    event.preventDefault();
     const delta = event.shiftKey ? 0.02 : 0.08;
     const selectedIds = new Set(
       selected.groupId
@@ -403,10 +489,6 @@ export function PuzzleBoard({
     });
     piecesRef.current = updated;
     setSelectedId(selected.id);
-    if (event.key === "0") {
-      viewRef.current = { zoom: 1, panX: 0, panY: 0 };
-      setZoomLabel(100);
-    }
     onPiecesChange(updated);
     scheduleDraw();
   }

@@ -81,8 +81,11 @@ canvas:focus-visible {
   z-index: 1;
 }
 .recent-puzzle-backdrop {
-  position: fixed;
-  inset: 72px 0 0;
+  position: absolute;
+  top: 72px;
+  right: 0;
+  left: 0;
+  height: 610px;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
@@ -93,7 +96,7 @@ canvas:focus-visible {
   inset: 0;
   background:
     radial-gradient(circle at 72% 34%, rgba(11, 19, 38, 0.28), rgba(11, 19, 38, 0.86) 68%),
-    linear-gradient(180deg, rgba(6, 14, 32, 0.48), rgba(6, 14, 32, 0.9));
+    linear-gradient(180deg, rgba(6, 14, 32, 0.48), rgba(6, 14, 32, 0.72) 72%, var(--bg));
 }
 .recent-puzzle-slide {
   position: absolute;
