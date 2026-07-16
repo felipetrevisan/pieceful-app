@@ -1,5 +1,10 @@
 import type { PuzzleEdge, PuzzlePieceShape } from "./types";
 
+export function edgeBump(edge: PuzzleEdge, direction: 1 | -1): number {
+  if (edge === "flat") return 0;
+  return (edge === "tab" ? 0.22 : -0.22) * direction;
+}
+
 function horizontal(
   ctx: CanvasRenderingContext2D,
   edge: PuzzleEdge,
@@ -13,7 +18,7 @@ function horizontal(
     ctx.lineTo(end, y);
     return;
   }
-  const bump = edge === "tab" ? -0.22 : 0.22;
+  const bump = -edgeBump(edge, direction);
   ctx.lineTo(x + length * 0.32 * direction, y);
   ctx.bezierCurveTo(
     x + length * 0.34 * direction,
@@ -39,7 +44,7 @@ function vertical(
     ctx.lineTo(x, end);
     return;
   }
-  const bump = edge === "tab" ? 0.22 : -0.22;
+  const bump = edgeBump(edge, direction);
   ctx.lineTo(x, y + length * 0.32 * direction);
   ctx.bezierCurveTo(
     x + bump * length,

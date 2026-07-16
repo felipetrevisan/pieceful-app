@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { canSnap, generatePieces, neighborSnapOffset, screenToWorld, worldToScreen } from ".";
+import {
+  canSnap,
+  edgeBump,
+  generatePieces,
+  neighborSnapOffset,
+  screenToWorld,
+  worldToScreen,
+} from ".";
 
 describe("topologia", () => {
   test("é determinística e mantém bordas complementares", () => {
@@ -18,6 +25,13 @@ describe("topologia", () => {
       );
       if (bottom) expect(bottom.shape.top).not.toBe(piece.shape.bottom);
     }
+  });
+
+  test("pinos e cavidades compartilham a mesma curva nos quatro lados", () => {
+    expect(edgeBump("tab", 1)).toBe(edgeBump("blank", -1));
+    expect(edgeBump("blank", 1)).toBe(edgeBump("tab", -1));
+    expect(edgeBump("tab", 1)).toBeGreaterThan(0);
+    expect(edgeBump("tab", -1)).toBeLessThan(0);
   });
 });
 
