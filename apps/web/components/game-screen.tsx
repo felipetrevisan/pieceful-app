@@ -7,7 +7,15 @@ import {
   type PuzzleTimelapsePiece,
 } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type Achievement, unlockAchievements } from "@/lib/achievements";
 import { savePuzzle } from "@/lib/puzzle-db";
 import type { PhotoCredit } from "@/lib/unsplash";
@@ -266,7 +274,10 @@ export function GameScreen({
   const time = new Date(session.elapsedTime * 1000).toISOString().slice(11, 19);
   return (
     <main className="game-shell">
-      <header className="game-toolbar">
+      <header
+        className="game-toolbar"
+        style={{ "--game-progress": `${progress}%` } as CSSProperties}
+      >
         <div>
           <a href="/" className="back-button" aria-label="Voltar ao início">
             ←
@@ -290,11 +301,8 @@ export function GameScreen({
         </div>
         <div className="progress-cluster">
           <span>{progress}% concluído</span>
-          <div className="progress-track">
-            <i style={{ width: `${progress}%` }} />
-          </div>
           <small>
-            {session.pieces.filter((piece) => piece.isPlaced).length} de {session.pieces.length}
+            {placedPieces} de {session.pieces.length}
           </small>
         </div>
         <div className="timer">

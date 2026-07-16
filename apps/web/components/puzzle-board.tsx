@@ -94,6 +94,7 @@ export function PuzzleBoard({
   const dragRef = useRef<Drag>(emptyDrag());
   const touchPointsRef = useRef(new Map<number, ScreenPoint>());
   const pinchRef = useRef<Pinch | null>(null);
+  const appliedFocusRegionRef = useRef<string | null>(null);
   const animationRef = useRef(0);
   const gamepadButtonsRef = useRef<boolean[]>([]);
   const gamepadAxisAtRef = useRef(0);
@@ -199,7 +200,12 @@ export function PuzzleBoard({
   }, [pieces, scheduleDraw]);
 
   useEffect(() => {
-    if (!focusRegion) return;
+    if (!focusRegion) {
+      appliedFocusRegionRef.current = null;
+      return;
+    }
+    if (appliedFocusRegionRef.current === focusRegion) return;
+    appliedFocusRegionRef.current = focusRegion;
     const positions: Record<string, [number, number]> = {
       "superior-esquerda": [0.25, 0.25],
       "superior-central": [0, 0.25],
