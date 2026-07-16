@@ -16,6 +16,13 @@ bun install
 bun run dev
 ```
 
+O Turborepo inicia os workspaces web e API em paralelo. Para executar apenas um deles:
+
+```bash
+bun run dev:web
+bun run dev:api
+```
+
 Validação completa:
 
 ```bash
@@ -24,5 +31,7 @@ bun run typecheck
 bun run test
 bun run build
 ```
+
+Os pipelines usam cache local em `.turbo` e respeitam o grafo de dependências dos workspaces.
 
 As fotos são processadas e armazenadas localmente no navegador. Nenhuma imagem é enviada pela API.

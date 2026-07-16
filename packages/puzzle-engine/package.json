@@ -5,6 +5,10 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "lint": "biome check src",
+    "test": "bun test src"
+  },
   "dependencies": {
     "@puzzled/shared": "workspace:*"
   }

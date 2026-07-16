@@ -5,7 +5,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check app components lib workers",
+    "test": "bun test lib"
   },
   "dependencies": {
     "@puzzled/puzzle-engine": "workspace:*",
