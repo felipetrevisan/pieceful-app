@@ -100,7 +100,7 @@ export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
             <span className="box-edition">EDIÇÃO ÚNICA</span>
             <span className="box-brand">
               <Icon name="puzzle" size={22} />
-              <strong>MEU QUEBRA-CABEÇA</strong>
+              <strong>PIECEFUL</strong>
               <small>feito com a sua memória</small>
             </span>
           </div>

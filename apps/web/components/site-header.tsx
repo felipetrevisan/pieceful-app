@@ -8,7 +8,7 @@ export function SiteHeader({ active }: { active?: "inicio" | "criar" | "meus" | 
         <span className="brand-mark">
           <Icon name="puzzle" size={18} />
         </span>{" "}
-        Meu Quebra-Cabeça
+        Pieceful
       </Link>
       <nav aria-label="Navegação principal">
         <Link className={active === "inicio" ? "active" : ""} href="/">

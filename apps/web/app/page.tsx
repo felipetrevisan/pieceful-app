@@ -70,7 +70,7 @@ export default function Home() {
                 <div className="cube-mark">
                   <Icon name="puzzle" size={38} />
                 </div>
-                <strong>Meu quebra-cabeça</strong>
+                <strong>Pieceful</strong>
                 <small>Uma memória em cada peça</small>
               </div>
             </div>

@@ -58,7 +58,7 @@ function drawFrame(
   ctx.textAlign = "center";
   ctx.fillStyle = "#4cd7f6";
   ctx.font = "800 22px Inter, sans-serif";
-  ctx.fillText("MEU QUEBRA-CABEÇA", width / 2, 66);
+  ctx.fillText("PIECEFUL", width / 2, 66);
   ctx.fillStyle = "#f5f6ff";
   ctx.font = "700 42px Inter, sans-serif";
   ctx.fillText("Uma memória, peça por peça", width / 2, 122);
@@ -130,7 +130,7 @@ function drawFrame(
   ctx.textAlign = "center";
   ctx.fillStyle = "#d9ddf5";
   ctx.font = "600 16px Inter, sans-serif";
-  ctx.fillText("Criado com Meu Quebra-Cabeça", width / 2, 1250);
+  ctx.fillText("Criado com Pieceful", width / 2, 1250);
 }
 
 export async function createTimelapse(options: Options): Promise<Blob> {

@@ -3,18 +3,18 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: { default: "Meu Quebra-Cabeça", template: "%s · Meu Quebra-Cabeça" },
+  title: { default: "Pieceful", template: "%s · Pieceful" },
   description: "Transforme suas fotos em quebra-cabeças personalizados de até 1.000 peças.",
   openGraph: {
-    title: "Meu Quebra-Cabeça",
+    title: "Pieceful",
     description: "Transforme suas fotos em quebra-cabeças personalizados de até 1.000 peças.",
-    images: [{ url: "/og.png", width: 1731, height: 909, alt: "Meu Quebra-Cabeça" }],
+    images: [{ url: "/og.png", width: 1731, height: 909, alt: "Pieceful" }],
     locale: "pt_BR",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Meu Quebra-Cabeça",
+    title: "Pieceful",
     description: "Transforme suas fotos em quebra-cabeças personalizados.",
     images: ["/og.png"],
   },

@@ -8,7 +8,7 @@ const app = new Elysia()
       mensagem: code === "VALIDATION" ? "Dados inválidos." : "Serviço indisponível.",
     };
   })
-  .get("/saude", () => ({ ok: true, servico: "Meu Quebra-Cabeça" }))
+  .get("/saude", () => ({ ok: true, servico: "Pieceful" }))
   .post("/api/conquistas", ({ body }) => ({ ok: true, conquista: body }), {
     body: t.Object({
       puzzleId: t.String({ maxLength: 100 }),
