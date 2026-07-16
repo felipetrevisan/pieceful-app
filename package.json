@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "bun --cwd apps/web dev",
     "dev:api": "bun --cwd apps/api dev",
-    "build": "bun --cwd apps/web build && bun --cwd apps/api build && bun scripts/prepare-sites.ts",
+    "build": "bun --cwd apps/web build && bun --cwd apps/api build",
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "bun --cwd apps/web typecheck && bun --cwd apps/api typecheck",
