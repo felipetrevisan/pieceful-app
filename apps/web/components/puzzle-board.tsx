@@ -28,6 +28,7 @@ interface View {
   panY: number;
 }
 interface Drag {
+  pointerId: number | null;
   id: string | null;
   memberIds: string[];
   offsetX: number;
@@ -35,6 +36,44 @@ interface Drag {
   panning: boolean;
   startX: number;
   startY: number;
+}
+
+interface Pinch {
+  startDistance: number;
+  startZoom: number;
+  worldX: number;
+  worldY: number;
+}
+
+interface ScreenPoint {
+  x: number;
+  y: number;
+}
+
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 4;
+
+function emptyDrag(): Drag {
+  return {
+    pointerId: null,
+    id: null,
+    memberIds: [],
+    offsetX: 0,
+    offsetY: 0,
+    panning: false,
+    startX: 0,
+    startY: 0,
+  };
+}
+
+function pinchMetrics(points: ScreenPoint[]) {
+  const first = points[0];
+  const second = points[1];
+  if (!first || !second) return null;
+  return {
+    distance: Math.hypot(second.x - first.x, second.y - first.y),
+    midpoint: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 },
+  };
 }
 
 export function PuzzleBoard({
@@ -52,15 +91,9 @@ export function PuzzleBoard({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const piecesRef = useRef(pieces);
   const viewRef = useRef<View>({ zoom: 1, panX: 0, panY: 0 });
-  const dragRef = useRef<Drag>({
-    id: null,
-    memberIds: [],
-    offsetX: 0,
-    offsetY: 0,
-    panning: false,
-    startX: 0,
-    startY: 0,
-  });
+  const dragRef = useRef<Drag>(emptyDrag());
+  const touchPointsRef = useRef(new Map<number, ScreenPoint>());
+  const pinchRef = useRef<Pinch | null>(null);
   const animationRef = useRef(0);
   const gamepadButtonsRef = useRef<boolean[]>([]);
   const gamepadAxisAtRef = useRef(0);
@@ -262,6 +295,24 @@ export function PuzzleBoard({
   function pointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = canvasPoint(event);
+    if (event.pointerType === "touch") {
+      touchPointsRef.current.set(event.pointerId, point);
+      if (touchPointsRef.current.size >= 2) {
+        const metrics = pinchMetrics([...touchPointsRef.current.values()]);
+        if (!metrics) return;
+        const world = worldPoint(metrics.midpoint.x, metrics.midpoint.y);
+        pinchRef.current = {
+          startDistance: Math.max(metrics.distance, 1),
+          startZoom: viewRef.current.zoom,
+          worldX: world.x,
+          worldY: world.y,
+        };
+        piecesRef.current = pieces;
+        dragRef.current = emptyDrag();
+        scheduleDraw();
+        return;
+      }
+    }
     const world = worldPoint(point.x, point.y);
     const hit = [...piecesRef.current]
       .reverse()
@@ -281,6 +332,7 @@ export function PuzzleBoard({
             .map((piece) => piece.id)
         : [hit.id];
       dragRef.current = {
+        pointerId: event.pointerId,
         id: hit.id,
         memberIds,
         offsetX: world.x - hit.currentPosition.x,
@@ -292,6 +344,7 @@ export function PuzzleBoard({
       setSelectedId(hit.id);
     } else
       dragRef.current = {
+        pointerId: event.pointerId,
         id: null,
         memberIds: [],
         offsetX: viewRef.current.panX,
@@ -304,7 +357,40 @@ export function PuzzleBoard({
   }
 
   function pointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (event.pointerType === "touch" && touchPointsRef.current.has(event.pointerId)) {
+      touchPointsRef.current.set(event.pointerId, canvasPoint(event));
+      if (pinchRef.current && touchPointsRef.current.size >= 2) {
+        event.preventDefault();
+        const metrics = pinchMetrics([...touchPointsRef.current.values()]);
+        const canvas = canvasRef.current;
+        if (!metrics || !canvas) return;
+        const pinch = pinchRef.current;
+        const nextZoom = Math.min(
+          MAX_ZOOM,
+          Math.max(MIN_ZOOM, pinch.startZoom * (metrics.distance / pinch.startDistance)),
+        );
+        const base = Math.min(
+          (canvas.clientWidth - 96) / columns,
+          (canvas.clientHeight - 96) / rows,
+        );
+        const cell = base * nextZoom;
+        viewRef.current = {
+          zoom: nextZoom,
+          panX:
+            metrics.midpoint.x -
+            canvas.clientWidth / 2 +
+            (columns * cell) / 2 -
+            pinch.worldX * cell,
+          panY:
+            metrics.midpoint.y - canvas.clientHeight / 2 + (rows * cell) / 2 - pinch.worldY * cell,
+        };
+        setZoomLabel(Math.round(nextZoom * 100));
+        scheduleDraw();
+        return;
+      }
+    }
     const drag = dragRef.current;
+    if (drag.pointerId !== event.pointerId) return;
     if (!drag.id && !drag.panning) return;
     const point = canvasPoint(event);
     if (drag.panning) {
@@ -334,17 +420,18 @@ export function PuzzleBoard({
     scheduleDraw();
   }
 
-  function pointerUp() {
+  function pointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (event.pointerType === "touch") {
+      touchPointsRef.current.delete(event.pointerId);
+      if (pinchRef.current) {
+        if (touchPointsRef.current.size < 2) pinchRef.current = null;
+        dragRef.current = emptyDrag();
+        return;
+      }
+    }
+    if (dragRef.current.pointerId !== event.pointerId) return;
     const { id, memberIds } = dragRef.current;
-    dragRef.current = {
-      id: null,
-      memberIds: [],
-      offsetX: 0,
-      offsetY: 0,
-      panning: false,
-      startX: 0,
-      startY: 0,
-    };
+    dragRef.current = emptyDrag();
     if (!id) return;
     const moving = piecesRef.current.filter((piece) => memberIds.includes(piece.id));
     const boardMatch = moving.find((piece) =>
@@ -419,7 +506,10 @@ export function PuzzleBoard({
 
   function wheel(event: React.WheelEvent<HTMLCanvasElement>) {
     event.preventDefault();
-    const next = Math.min(4, Math.max(0.25, viewRef.current.zoom * (event.deltaY > 0 ? 0.9 : 1.1)));
+    const next = Math.min(
+      MAX_ZOOM,
+      Math.max(MIN_ZOOM, viewRef.current.zoom * (event.deltaY > 0 ? 0.9 : 1.1)),
+    );
     viewRef.current.zoom = next;
     setZoomLabel(Math.round(next * 100));
     scheduleDraw();
@@ -442,7 +532,7 @@ export function PuzzleBoard({
     if (event.key === "+" || event.key === "-") {
       event.preventDefault();
       const multiplier = event.key === "+" ? 1.12 : 0.88;
-      const next = Math.min(4, Math.max(0.25, viewRef.current.zoom * multiplier));
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, viewRef.current.zoom * multiplier));
       viewRef.current.zoom = next;
       setZoomLabel(Math.round(next * 100));
       scheduleDraw();
@@ -505,7 +595,7 @@ export function PuzzleBoard({
         onWheel={wheel}
         onKeyDown={keyDown}
         tabIndex={0}
-        aria-label="Tabuleiro do quebra-cabeça. Use o ponteiro para arrastar peças, a roda para zoom ou as setas para mover a peça selecionada."
+        aria-label="Tabuleiro do quebra-cabeça. Arraste peças com um dedo, use dois dedos para aplicar zoom ou use as setas para mover a peça selecionada."
       />
       <span className="zoom-badge" aria-live="polite">
         {zoomLabel}%

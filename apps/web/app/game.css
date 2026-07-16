@@ -273,6 +273,7 @@
   height: 100%;
   display: block;
   cursor: grab;
+  touch-action: none;
 }
 .puzzle-canvas:active {
   cursor: grabbing;
