@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
+import { RecentPuzzleBackdrop } from "@/components/recent-puzzle-backdrop";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -23,7 +24,8 @@ const journey = [
 
 export default function Home() {
   return (
-    <div className="site-shell">
+    <div className="site-shell home-shell">
+      <RecentPuzzleBackdrop />
       <SiteHeader active="inicio" />
       <main>
         <section className="hero">
