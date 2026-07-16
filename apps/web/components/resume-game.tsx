@@ -39,7 +39,7 @@ export function ResumeGame() {
       <div className="empty-state fullscreen">
         <h1>Partida não encontrada</h1>
         <p>Esta partida pode ter sido removida ou pertencer a outro dispositivo.</p>
-        <a className="primary-button" href="/meus-quebra-cabecas">
+        <a className="primary-button" href="/puzzles">
           Voltar à coleção
         </a>
       </div>

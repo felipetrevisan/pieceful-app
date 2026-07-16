@@ -124,7 +124,7 @@ export function CreateFlow() {
     );
   return (
     <div className="site-shell creator-shell">
-      <SiteHeader active="criar" />
+      <SiteHeader active="create" />
       <main>
         {stage === "create" && (
           <UploadConfigurator

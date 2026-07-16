@@ -34,4 +34,9 @@ bun run build
 
 Os pipelines usam cache local em `.turbo` e respeitam o grafo de dependências dos workspaces.
 
+## Convenção de rotas
+
+Todas as rotas do frontend e da API são escritas em inglês. A interface pode permanecer localizada
+em português, mas novos caminhos públicos e endpoints devem seguir essa convenção.
+
 As fotos são processadas e armazenadas localmente no navegador. Nenhuma imagem é enviada pela API.

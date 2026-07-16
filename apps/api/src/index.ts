@@ -5,11 +5,11 @@ const app = new Elysia()
     set.status = code === "VALIDATION" ? 400 : 500;
     return {
       ok: false,
-      mensagem: code === "VALIDATION" ? "Dados inválidos." : "Serviço indisponível.",
+      message: code === "VALIDATION" ? "Dados inválidos." : "Serviço indisponível.",
     };
   })
-  .get("/saude", () => ({ ok: true, servico: "Pieceful" }))
-  .post("/api/conquistas", ({ body }) => ({ ok: true, conquista: body }), {
+  .get("/health", () => ({ ok: true, service: "Pieceful" }))
+  .post("/api/achievements", ({ body }) => ({ ok: true, achievement: body }), {
     body: t.Object({
       puzzleId: t.String({ maxLength: 100 }),
       pieces: t.Integer({ minimum: 6, maximum: 1000 }),

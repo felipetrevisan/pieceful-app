@@ -41,7 +41,7 @@ export function SavedPuzzles() {
         </span>
         <h2>Sua estante está esperando</h2>
         <p>Crie o primeiro quebra-cabeça e ele ficará salvo aqui, neste dispositivo.</p>
-        <Link className="primary-button" href="/criar">
+        <Link className="primary-button" href="/create">
           Criar agora
         </Link>
       </div>
@@ -69,7 +69,7 @@ export function SavedPuzzles() {
                 {progress}% concluído · salvo{" "}
                 {new Date(puzzle.updatedAt).toLocaleDateString("pt-BR")}
               </p>
-              <Link className="primary-button" href={`/quebra-cabeca?id=${puzzle.id}`}>
+              <Link className="primary-button" href={`/puzzle?id=${puzzle.id}`}>
                 {progress > 0 ? "Continuar montagem" : "Abrir caixa"}
               </Link>
             </div>

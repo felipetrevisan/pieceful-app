@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 export default function MyPuzzlesPage() {
   return (
     <div className="site-shell">
-      <SiteHeader active="meus" />
+      <SiteHeader active="puzzles" />
       <main className="content-page">
         <span className="section-kicker">SUA COLEÇÃO</span>
         <h1>Meus quebra-cabeças</h1>

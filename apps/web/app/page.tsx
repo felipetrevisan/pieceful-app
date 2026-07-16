@@ -26,7 +26,7 @@ export default function Home() {
   return (
     <div className="site-shell home-shell">
       <RecentPuzzleBackdrop />
-      <SiteHeader active="inicio" />
+      <SiteHeader active="home" />
       <main>
         <section className="hero">
           <div className="hero-copy">
@@ -42,7 +42,7 @@ export default function Home() {
               Traga suas memórias à vida com uma experiência tátil e imersiva. Construa, peça por
               peça, seus momentos favoritos em um ambiente digital deslumbrante.
             </p>
-            <Link href="/criar" className="primary-button">
+            <Link href="/create" className="primary-button">
               <Icon name="play" size={16} /> Criar meu quebra-cabeça
             </Link>
           </div>

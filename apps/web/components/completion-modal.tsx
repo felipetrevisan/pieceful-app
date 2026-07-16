@@ -178,7 +178,7 @@ export function CompletionModal({
         <button type="button" className="secondary-button" onClick={onReplay}>
           Jogar novamente
         </button>
-        <Link href="/criar" className="primary-button">
+        <Link href="/create" className="primary-button">
           Criar novo quebra-cabeça
         </Link>
       </div>

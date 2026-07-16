@@ -260,7 +260,7 @@ export function GameScreen({
         </div>
         <div>
           <a
-            href="/configuracoes"
+            href="/settings"
             className="icon-button"
             aria-label="Abrir configurações"
             title="Configurações"

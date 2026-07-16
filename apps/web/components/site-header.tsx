@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Icon } from "./icons";
 
-export function SiteHeader({ active }: { active?: "inicio" | "criar" | "meus" | "config" }) {
+export function SiteHeader({ active }: { active?: "home" | "create" | "puzzles" | "settings" }) {
   return (
     <header className="site-header">
       <Link href="/" className="brand">
@@ -11,22 +11,22 @@ export function SiteHeader({ active }: { active?: "inicio" | "criar" | "meus" | 
         Pieceful
       </Link>
       <nav aria-label="Navegação principal">
-        <Link className={active === "inicio" ? "active" : ""} href="/">
+        <Link className={active === "home" ? "active" : ""} href="/">
           Início
         </Link>
-        <Link className={active === "criar" ? "active" : ""} href="/criar">
+        <Link className={active === "create" ? "active" : ""} href="/create">
           Criar
         </Link>
-        <Link className={active === "meus" ? "active" : ""} href="/meus-quebra-cabecas">
+        <Link className={active === "puzzles" ? "active" : ""} href="/puzzles">
           Meus quebra-cabeças
         </Link>
-        <Link className={active === "config" ? "active" : ""} href="/configuracoes">
+        <Link className={active === "settings" ? "active" : ""} href="/settings">
           Configurações
         </Link>
       </nav>
       <a
         className="icon-button"
-        href="/configuracoes"
+        href="/settings"
         aria-label="Abrir configurações"
         title="Configurações"
       >
