@@ -9,6 +9,7 @@ import {
 } from "@puzzled/puzzle-engine";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { controllerLabel, gamepadButtonCommand, gamepadDirections } from "@/lib/gamepad-controls";
+import { orderPiecesForDisplay } from "@/lib/puzzle-layer";
 
 interface Props {
   imageUrl: string;
@@ -144,7 +145,11 @@ export function PuzzleBoard({
       ctx.lineTo(originX + column * cell, originY + rows * cell);
       ctx.stroke();
     }
-    const visible = piecesRef.current.filter((piece) => piece.trayId === null);
+    const visible = orderPiecesForDisplay(
+      piecesRef.current.filter((piece) => piece.trayId === null),
+      selectedId,
+      dragRef.current.memberIds,
+    );
     for (const piece of visible) {
       const x = originX + piece.currentPosition.x * cell;
       const y = originY + piece.currentPosition.y * cell;
@@ -158,8 +163,13 @@ export function PuzzleBoard({
       ctx.clip();
       ctx.drawImage(image, -piece.column * cell, -piece.row * cell, columns * cell, rows * cell);
       ctx.restore();
-      ctx.strokeStyle = piece.id === selectedId ? "#4cd7f6" : "rgba(255,255,255,.65)";
-      ctx.lineWidth = piece.id === selectedId ? 3 : 1;
+      ctx.strokeStyle =
+        piece.id === selectedId
+          ? "#4cd7f6"
+          : piece.isPlaced
+            ? "rgba(255,255,255,.42)"
+            : "rgba(255,255,255,.92)";
+      ctx.lineWidth = piece.id === selectedId ? 3 : piece.isPlaced ? 0.75 : 1.5;
       ctx.shadowColor = piece.isPlaced ? "rgba(76,215,246,.25)" : "rgba(0,0,0,.55)";
       ctx.shadowBlur = piece.id === dragRef.current.id ? 22 : 8;
       ctx.shadowOffsetY = piece.id === dragRef.current.id ? 8 : 3;
@@ -322,11 +332,14 @@ export function PuzzleBoard({
       }
     }
     const world = worldPoint(point.x, point.y);
-    const hit = [...piecesRef.current]
+    const hit = orderPiecesForDisplay(
+      piecesRef.current.filter((piece) => piece.trayId === null),
+      selectedId,
+      [],
+    )
       .reverse()
       .find(
         (piece) =>
-          piece.trayId === null &&
           !piece.isPlaced &&
           world.x >= piece.currentPosition.x - 0.2 &&
           world.x <= piece.currentPosition.x + 1.2 &&
