@@ -15,13 +15,20 @@ interface UnsplashSearchResponse {
   results: UnsplashPhoto[];
 }
 
+const localNetworkOrigin =
+  /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(?::\d+)?$/;
+const configuredOrigins = (Bun.env.WEB_ORIGIN ?? "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const unsplashHeaders = () => ({
   Authorization: `Client-ID ${Bun.env.UNSPLASH_ACCESS_KEY}`,
   "Accept-Version": "v1",
 });
 
 const app = new Elysia()
-  .use(cors({ origin: Bun.env.WEB_ORIGIN ?? "http://localhost:3000" }))
+  .use(cors({ origin: [...configuredOrigins, localNetworkOrigin], credentials: false }))
   .onError(({ code, set }) => {
     set.status = code === "VALIDATION" ? 400 : 500;
     return {

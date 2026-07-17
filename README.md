@@ -47,5 +47,10 @@ Copie `apps/api/.env.example` para `apps/api/.env` e informe a Access Key criada
 desenvolvedores do Unsplash. O frontend usa `NEXT_PUBLIC_API_URL`, documentado em
 `apps/web/.env.example`, para buscar as fotos sem expor essa chave no navegador.
 
+Depois de criar o arquivo, inicie web e API juntos com `bun run dev`. Para abrir pelo celular na
+mesma rede, use `http://IP_DO_COMPUTADOR:3000`; o frontend direciona automaticamente as chamadas
+para a porta `3001` do mesmo computador. Se o firewall do sistema solicitar permissão para conexões
+de entrada do Bun, permita o acesso à rede local.
+
 A seleção mantém os créditos do fotógrafo e registra o download conforme as diretrizes da API do
 Unsplash. As imagens continuam sendo processadas e salvas somente no dispositivo do jogador.
