@@ -19,6 +19,7 @@ interface Props {
   onProgress: (progress: number) => void;
   onPause: () => void;
   onControllerChange: (name: string | null) => void;
+  rotationEnabled: boolean;
   focusRegion?: string;
 }
 
@@ -85,6 +86,7 @@ export function PuzzleBoard({
   onProgress,
   onPause,
   onControllerChange,
+  rotationEnabled,
   focusRegion,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -521,6 +523,35 @@ export function PuzzleBoard({
     scheduleDraw();
   }
 
+  function rotateSelectedPiece() {
+    if (!rotationEnabled) return;
+    const visible = piecesRef.current.filter((piece) => piece.trayId === null && !piece.isPlaced);
+    const selected = visible.find((piece) => piece.id === selectedId);
+    if (!selected) return;
+    const selectedIds = new Set(
+      selected.groupId
+        ? visible.filter((piece) => piece.groupId === selected.groupId).map((piece) => piece.id)
+        : [selected.id],
+    );
+    const updated = piecesRef.current.map((piece) => {
+      if (!selectedIds.has(piece.id)) return piece;
+      const relativeX = piece.currentPosition.x - selected.currentPosition.x;
+      const relativeY = piece.currentPosition.y - selected.currentPosition.y;
+      return {
+        ...piece,
+        currentPosition: {
+          ...piece.currentPosition,
+          x: selected.currentPosition.x - relativeY,
+          y: selected.currentPosition.y + relativeX,
+          rotation: (piece.currentPosition.rotation + 90) % 360,
+        },
+      };
+    });
+    piecesRef.current = updated;
+    onPiecesChange(updated);
+    scheduleDraw();
+  }
+
   function keyDown(event: React.KeyboardEvent<HTMLCanvasElement>) {
     const visible = piecesRef.current.filter((piece) => piece.trayId === null && !piece.isPlaced);
     const selected = visible.find((piece) => piece.id === selectedId) ?? visible[0];
@@ -551,7 +582,13 @@ export function PuzzleBoard({
       scheduleDraw();
       return;
     }
-    const actionable = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "r", "R"];
+    if (event.key.toLowerCase() === "r") {
+      if (!rotationEnabled) return;
+      event.preventDefault();
+      rotateSelectedPiece();
+      return;
+    }
+    const actionable = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
     if (!actionable.includes(event.key)) return;
     event.preventDefault();
     const delta = event.shiftKey ? 0.02 : 0.08;
@@ -562,24 +599,16 @@ export function PuzzleBoard({
     );
     const updated = piecesRef.current.map((piece) => {
       if (!selectedIds.has(piece.id)) return piece;
-      const rotate = event.key.toLowerCase() === "r";
-      const relativeX = piece.currentPosition.x - selected.currentPosition.x;
-      const relativeY = piece.currentPosition.y - selected.currentPosition.y;
       return {
         ...piece,
         currentPosition: {
           ...piece.currentPosition,
-          x: rotate
-            ? selected.currentPosition.x - relativeY
-            : piece.currentPosition.x +
-              (event.key === "ArrowRight" ? delta : event.key === "ArrowLeft" ? -delta : 0),
-          y: rotate
-            ? selected.currentPosition.y + relativeX
-            : piece.currentPosition.y +
-              (event.key === "ArrowDown" ? delta : event.key === "ArrowUp" ? -delta : 0),
-          rotation: rotate
-            ? (piece.currentPosition.rotation + 90) % 360
-            : piece.currentPosition.rotation,
+          x:
+            piece.currentPosition.x +
+            (event.key === "ArrowRight" ? delta : event.key === "ArrowLeft" ? -delta : 0),
+          y:
+            piece.currentPosition.y +
+            (event.key === "ArrowDown" ? delta : event.key === "ArrowUp" ? -delta : 0),
         },
       };
     });
@@ -601,8 +630,23 @@ export function PuzzleBoard({
         onWheel={wheel}
         onKeyDown={keyDown}
         tabIndex={0}
-        aria-label="Tabuleiro do quebra-cabeça. Arraste peças com um dedo, use dois dedos para aplicar zoom ou use as setas para mover a peça selecionada."
+        aria-label="Tabuleiro do quebra-cabeça. Arraste peças com um dedo, use dois dedos para aplicar zoom e selecione uma peça para girá-la."
       />
+      {rotationEnabled &&
+        selectedId &&
+        pieces.some(
+          (piece) => piece.id === selectedId && piece.trayId === null && !piece.isPlaced,
+        ) && (
+          <button
+            type="button"
+            className="mobile-rotate-button"
+            onClick={rotateSelectedPiece}
+            aria-label="Girar peça selecionada 90 graus"
+          >
+            <strong aria-hidden="true">↻</strong>
+            Girar peça
+          </button>
+        )}
       <span className="zoom-badge" aria-live="polite">
         {zoomLabel}%
       </span>

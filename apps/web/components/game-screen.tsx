@@ -343,6 +343,7 @@ export function GameScreen({
           focusRegion={activeRegion}
           onPause={pauseGame}
           onControllerChange={setControllerName}
+          rotationEnabled={configuration.rotationEnabled}
         />
         {configuration.totalPieces >= 500 && (
           <aside className="minimap glass-card">
@@ -509,6 +510,15 @@ export function GameScreen({
                 : "Conecte um controle e pressione um botão"}
             </div>
             <div className="controls-grid">
+              <ControlGroup
+                icon="☝"
+                title="Celular e tablet"
+                rows={[
+                  ["1 dedo", "Mover peça ou tabuleiro"],
+                  ["2 dedos", "Zoom e navegação"],
+                  ["Selecionar + ↻", "Rotacionar 90°"],
+                ]}
+              />
               <ControlGroup
                 icon="⌨"
                 title="Teclado e mouse"

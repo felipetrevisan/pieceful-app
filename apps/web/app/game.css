@@ -309,6 +309,9 @@
   font-size: 11px;
   pointer-events: none;
 }
+.mobile-rotate-button {
+  display: none;
+}
 .game-dock {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -823,6 +826,30 @@
   }
   .game-toolbar > div:last-child .icon-button:last-child {
     display: none;
+  }
+  .mobile-rotate-button {
+    position: absolute;
+    right: 14px;
+    bottom: 58px;
+    z-index: 4;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 15px;
+    border: 1px solid rgba(76, 215, 246, 0.58);
+    border-radius: 999px;
+    background: rgba(6, 14, 32, 0.9);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: 0 8px 24px rgba(6, 14, 32, 0.38);
+    cursor: pointer;
+  }
+  .mobile-rotate-button strong {
+    color: var(--cyan);
+    font-size: 24px;
+    line-height: 1;
   }
   .piece-tray {
     top: auto;
