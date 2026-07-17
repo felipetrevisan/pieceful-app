@@ -171,6 +171,48 @@ canvas:focus-visible {
   background: var(--cyan);
   box-shadow: 0 0 12px var(--cyan);
 }
+.mobile-navigation {
+  display: none;
+  padding: 0;
+  border: 0;
+}
+.mobile-navigation summary {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(149, 142, 160, 0.18);
+  border-radius: 50%;
+  background: rgba(45, 52, 73, 0.72);
+  cursor: pointer;
+  list-style: none;
+}
+.mobile-navigation summary::-webkit-details-marker {
+  display: none;
+}
+.menu-lines {
+  width: 18px;
+  display: grid;
+  gap: 4px;
+}
+.menu-lines i {
+  height: 2px;
+  display: block;
+  border-radius: 99px;
+  background: currentColor;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+.mobile-navigation[open] .menu-lines i:first-child {
+  transform: translateY(6px) rotate(45deg);
+}
+.mobile-navigation[open] .menu-lines i:nth-child(2) {
+  opacity: 0;
+}
+.mobile-navigation[open] .menu-lines i:last-child {
+  transform: translateY(-6px) rotate(-45deg);
+}
 .icon-button {
   width: 42px;
   height: 42px;
@@ -1283,11 +1325,45 @@ summary {
   .site-header {
     padding: 0 16px;
   }
-  .site-header nav {
+  .site-header > .desktop-navigation {
+    display: none;
+  }
+  .site-header .mobile-navigation {
+    display: block;
+    margin-left: auto;
+    position: relative;
+  }
+  .site-header .mobile-navigation nav {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: -52px;
+    width: min(290px, calc(100vw - 32px));
+    display: grid;
+    gap: 4px;
+    padding: 10px;
+    border: 1px solid rgba(149, 142, 160, 0.22);
+    border-radius: 18px;
+    background: rgba(6, 14, 32, 0.97);
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(18px);
+  }
+  .site-header .mobile-navigation nav a {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+  .site-header .mobile-navigation nav a.active {
+    background: rgba(76, 215, 246, 0.1);
+    color: var(--cyan);
+  }
+  .site-header .mobile-navigation nav a.active::after {
     display: none;
   }
   .site-header .icon-button {
-    margin-left: auto;
+    margin-left: 0;
   }
   .hero {
     grid-template-columns: 1fr;

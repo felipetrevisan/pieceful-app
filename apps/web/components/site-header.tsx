@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { Icon } from "./icons";
 
-export function SiteHeader({
-  active,
-}: {
-  active?: "home" | "create" | "puzzles" | "achievements" | "settings";
-}) {
+type HeaderRoute = "home" | "create" | "puzzles" | "achievements" | "settings";
+
+const navigation: { key: HeaderRoute; href: string; label: string }[] = [
+  { key: "home", href: "/", label: "Início" },
+  { key: "create", href: "/create", label: "Criar" },
+  { key: "puzzles", href: "/puzzles", label: "Meus quebra-cabeças" },
+  { key: "achievements", href: "/achievements", label: "Conquistas" },
+  { key: "settings", href: "/settings", label: "Configurações" },
+];
+
+export function SiteHeader({ active }: { active?: HeaderRoute }) {
   return (
     <header className="site-header">
       <Link href="/" className="brand">
@@ -14,23 +20,29 @@ export function SiteHeader({
         </span>{" "}
         Pieceful
       </Link>
-      <nav aria-label="Navegação principal">
-        <Link className={active === "home" ? "active" : ""} href="/">
-          Início
-        </Link>
-        <Link className={active === "create" ? "active" : ""} href="/create">
-          Criar
-        </Link>
-        <Link className={active === "puzzles" ? "active" : ""} href="/puzzles">
-          Meus quebra-cabeças
-        </Link>
-        <Link className={active === "achievements" ? "active" : ""} href="/achievements">
-          Conquistas
-        </Link>
-        <Link className={active === "settings" ? "active" : ""} href="/settings">
-          Configurações
-        </Link>
+      <nav className="desktop-navigation" aria-label="Navegação principal">
+        {navigation.map((item) => (
+          <Link key={item.key} className={active === item.key ? "active" : ""} href={item.href}>
+            {item.label}
+          </Link>
+        ))}
       </nav>
+      <details className="mobile-navigation">
+        <summary aria-label="Abrir menu de navegação">
+          <span aria-hidden="true" className="menu-lines">
+            <i />
+            <i />
+            <i />
+          </span>
+        </summary>
+        <nav aria-label="Navegação mobile">
+          {navigation.map((item) => (
+            <Link key={item.key} className={active === item.key ? "active" : ""} href={item.href}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </details>
       <a
         className="icon-button"
         href="/settings"
