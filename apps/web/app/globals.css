@@ -99,6 +99,42 @@ html[data-theme="storybook"] {
   --cyan: #26716a;
   --pink: #d39a2e;
 }
+html[data-theme="cyberpunk"] {
+  --bg: #08060d;
+  --bg-deep: #020104;
+  --surface: #17121d;
+  --surface-high: #292031;
+  --text: #fff9de;
+  --muted: #c4b8ca;
+  --primary: #ff2b91;
+  --primary-light: #ff72b9;
+  --cyan: #00f0ff;
+  --pink: #ffe600;
+}
+html[data-theme="hologram"] {
+  --bg: #031922;
+  --bg-deep: #010b11;
+  --surface: #082b36;
+  --surface-high: #0b4350;
+  --text: #dfffff;
+  --muted: #8fc9ce;
+  --primary: #18e6d2;
+  --primary-light: #78fff0;
+  --cyan: #51c8ff;
+  --pink: #b68cff;
+}
+html[data-theme="space"] {
+  --bg: #050a12;
+  --bg-deep: #010308;
+  --surface: #151d28;
+  --surface-high: #26313e;
+  --text: #eef4f8;
+  --muted: #a7b1bc;
+  --primary: #e8662f;
+  --primary-light: #ff9b62;
+  --cyan: #80d9ee;
+  --pink: #f4c95d;
+}
 html[data-theme="candy"],
 html[data-theme="jungle"],
 html[data-theme="rainbow"],
@@ -203,13 +239,53 @@ html[data-theme="storybook"] body {
     radial-gradient(circle at 12% 18%, rgba(165, 69, 56, 0.14), transparent 20rem),
     radial-gradient(circle at 88% 80%, rgba(38, 113, 106, 0.12), transparent 22rem), var(--bg);
 }
+html[data-theme="cyberpunk"] body {
+  background:
+    repeating-linear-gradient(115deg, transparent 0 48px, rgba(255, 230, 0, 0.05) 49px 51px),
+    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 43, 145, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 75% 8%, rgba(255, 43, 145, 0.24), transparent 28rem), var(--bg);
+  background-size:
+    auto,
+    42px 42px,
+    42px 42px,
+    auto,
+    auto;
+  animation: cyber-scan 12s linear infinite;
+}
+html[data-theme="hologram"] body {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 5px, rgba(120, 255, 240, 0.025) 6px),
+    radial-gradient(ellipse at 50% -10%, rgba(24, 230, 210, 0.3), transparent 36rem),
+    radial-gradient(circle at 8% 72%, rgba(81, 200, 255, 0.14), transparent 22rem), var(--bg);
+  animation: hologram-pulse 7s ease-in-out infinite alternate;
+}
+html[data-theme="space"] body {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.82) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(128, 217, 238, 0.52) 0 1px, transparent 1.5px),
+    radial-gradient(ellipse at 50% -15%, rgba(47, 86, 126, 0.38), transparent 36rem), var(--bg);
+  background-position:
+    0 0,
+    27px 31px,
+    0 0,
+    0 0;
+  background-size:
+    79px 79px,
+    113px 113px,
+    auto,
+    auto;
+}
 html[data-theme="candy"] .game-shell,
 html[data-theme="jungle"] .game-shell,
 html[data-theme="rainbow"] .game-shell,
 html[data-theme="ocean"] .game-shell,
 html[data-theme="arcade"] .game-shell,
 html[data-theme="castle"] .game-shell,
-html[data-theme="storybook"] .game-shell {
+html[data-theme="storybook"] .game-shell,
+html[data-theme="cyberpunk"] .game-shell,
+html[data-theme="hologram"] .game-shell,
+html[data-theme="space"] .game-shell {
   background:
     radial-gradient(
       circle at 14% 18%,
@@ -244,6 +320,26 @@ html[data-theme="storybook"] .game-shell {
       0 32px,
       32px 0,
       0 0,
+      0 0;
+  }
+}
+@keyframes cyber-scan {
+  to {
+    background-position:
+      96px 0,
+      0 42px,
+      42px 0,
+      0 0,
+      0 0;
+  }
+}
+@keyframes hologram-pulse {
+  to {
+    filter: saturate(1.18) brightness(1.06);
+    background-position:
+      0 18px,
+      4% 8%,
+      -3% -5%,
       0 0;
   }
 }
@@ -1438,6 +1534,27 @@ summary {
   border-radius: 6px 18px 6px 18px;
   background: linear-gradient(145deg, #fffaf0, #efdcb6 70%, #d2755d);
 }
+.theme-preview-cyberpunk .theme-preview {
+  border: 2px solid #ffe600;
+  border-radius: 0 16px 0 16px;
+  background:
+    linear-gradient(115deg, transparent 46%, rgba(255, 230, 0, 0.65) 47% 50%, transparent 51%),
+    linear-gradient(145deg, #08060d, #54124b 55%, #ff2b91);
+}
+.theme-preview-hologram .theme-preview {
+  border: 1px solid #78fff0;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 5px, rgba(120, 255, 240, 0.16) 6px),
+    linear-gradient(145deg, #031922, #0b6570 55%, #b68cff);
+  box-shadow: inset 0 0 22px rgba(120, 255, 240, 0.45);
+}
+.theme-preview-space .theme-preview {
+  border: 3px double #8fa0ad;
+  border-radius: 28px 8px 28px 8px;
+  background:
+    radial-gradient(circle at 68% 28%, #f4c95d 0 3px, transparent 4px),
+    linear-gradient(145deg, #050a12, #26313e 62%, #e8662f);
+}
 @keyframes theme-icon-float {
   50% {
     transform: translateY(-6px) rotate(4deg) scale(1.06);
@@ -2117,6 +2234,216 @@ html[data-theme="storybook"] .game-toolbar small,
 html[data-theme="storybook"] .game-dock span,
 html[data-theme="storybook"] .game-dock .save-state {
   color: #f5dfc3;
+}
+
+html[data-theme="cyberpunk"] body,
+html[data-theme="cyberpunk"] button,
+html[data-theme="cyberpunk"] input {
+  font-family: "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+}
+html[data-theme="cyberpunk"] .site-header {
+  border-bottom: 3px solid #ffe600;
+  background: rgba(8, 6, 13, 0.96);
+  box-shadow:
+    0 5px 0 #ff2b91,
+    0 8px 0 rgba(0, 240, 255, 0.7);
+}
+html[data-theme="cyberpunk"] .site-header nav a.active {
+  color: #08060d;
+  background: #ffe600;
+}
+html[data-theme="cyberpunk"] .glass-card {
+  border: 2px solid #ff2b91;
+  border-radius: 0 24px 0 24px;
+  background:
+    linear-gradient(135deg, rgba(255, 230, 0, 0.1) 0 12px, transparent 13px), rgba(17, 12, 24, 0.94);
+  box-shadow:
+    7px 7px 0 rgba(0, 240, 255, 0.75),
+    -5px -5px 0 rgba(255, 43, 145, 0.22);
+}
+html[data-theme="cyberpunk"] .hero h1,
+html[data-theme="cyberpunk"] .content-page > h1 {
+  color: #fff9de;
+  font-style: italic;
+  font-weight: 950;
+  letter-spacing: -0.065em;
+  text-shadow:
+    4px 3px 0 #ff2b91,
+    -3px -2px 0 #00f0ff;
+  text-transform: uppercase;
+}
+html[data-theme="cyberpunk"] .primary-button,
+html[data-theme="cyberpunk"] .hint-button {
+  border: 2px solid #ffe600;
+  border-radius: 0 15px 0 15px;
+  background: linear-gradient(105deg, #ff2b91, #9d1970 58%, #00f0ff);
+  color: #fff;
+  box-shadow: 5px 5px 0 #ffe600;
+  text-transform: uppercase;
+}
+html[data-theme="cyberpunk"] .secondary-button,
+html[data-theme="cyberpunk"] .icon-button,
+html[data-theme="cyberpunk"] .mobile-navigation summary {
+  border: 2px solid #00f0ff;
+  border-radius: 0 12px 0 12px;
+  background: #17121d;
+  color: #ffe600;
+}
+html[data-theme="cyberpunk"] .theme-option,
+html[data-theme="cyberpunk"] .mobile-navigation nav,
+html[data-theme="cyberpunk"] .piece-tray {
+  border-radius: 0 18px 0 18px;
+  background: rgba(17, 12, 24, 0.97);
+}
+html[data-theme="cyberpunk"] .game-toolbar,
+html[data-theme="cyberpunk"] .game-dock {
+  border-color: #ffe600;
+  border-radius: 0;
+  background: rgba(8, 6, 13, 0.97);
+}
+html[data-theme="cyberpunk"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(255, 43, 145, 0.76), rgba(0, 240, 255, 0.54));
+}
+html[data-theme="cyberpunk"] .game-toolbar small,
+html[data-theme="cyberpunk"] .game-dock span,
+html[data-theme="cyberpunk"] .game-dock .save-state {
+  color: #e9dff0;
+}
+
+html[data-theme="hologram"] body,
+html[data-theme="hologram"] button,
+html[data-theme="hologram"] input {
+  font-family: "Avenir Next", Avenir, system-ui, sans-serif;
+}
+html[data-theme="hologram"] .site-header {
+  border-bottom: 1px solid rgba(120, 255, 240, 0.72);
+  background: rgba(3, 25, 34, 0.62);
+  box-shadow:
+    inset 0 -1px 18px rgba(24, 230, 210, 0.14),
+    0 12px 40px rgba(24, 230, 210, 0.1);
+  backdrop-filter: blur(22px) saturate(1.4);
+}
+html[data-theme="hologram"] .glass-card {
+  border: 1px solid rgba(120, 255, 240, 0.64);
+  border-radius: 18px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 6px, rgba(120, 255, 240, 0.022) 7px),
+    linear-gradient(145deg, rgba(11, 67, 80, 0.66), rgba(3, 25, 34, 0.42));
+  box-shadow:
+    inset 0 0 36px rgba(24, 230, 210, 0.08),
+    0 0 28px rgba(81, 200, 255, 0.12);
+  backdrop-filter: blur(22px) saturate(1.35);
+}
+html[data-theme="hologram"] .hero h1,
+html[data-theme="hologram"] .content-page > h1 {
+  color: #dfffff;
+  font-weight: 450;
+  letter-spacing: 0.02em;
+  text-shadow:
+    0 0 12px rgba(120, 255, 240, 0.84),
+    0 0 34px rgba(81, 200, 255, 0.5);
+}
+html[data-theme="hologram"] .primary-button,
+html[data-theme="hologram"] .hint-button {
+  border: 1px solid #78fff0;
+  background: linear-gradient(110deg, rgba(24, 230, 210, 0.5), rgba(81, 200, 255, 0.44));
+  color: #dfffff;
+  box-shadow:
+    inset 0 0 18px rgba(120, 255, 240, 0.18),
+    0 0 20px rgba(24, 230, 210, 0.28);
+}
+html[data-theme="hologram"] .secondary-button,
+html[data-theme="hologram"] .icon-button,
+html[data-theme="hologram"] .mobile-navigation summary {
+  border: 1px solid rgba(120, 255, 240, 0.68);
+  background: rgba(8, 43, 54, 0.66);
+  color: #dfffff;
+  box-shadow: inset 0 0 14px rgba(81, 200, 255, 0.1);
+}
+html[data-theme="hologram"] .mobile-navigation nav,
+html[data-theme="hologram"] .piece-tray {
+  border: 1px solid rgba(120, 255, 240, 0.55);
+  background: rgba(3, 25, 34, 0.9);
+  backdrop-filter: blur(22px);
+}
+html[data-theme="hologram"] .game-toolbar,
+html[data-theme="hologram"] .game-dock {
+  border-color: rgba(120, 255, 240, 0.72);
+  background: rgba(3, 25, 34, 0.82);
+  box-shadow: inset 0 0 26px rgba(24, 230, 210, 0.08);
+  backdrop-filter: blur(20px);
+}
+html[data-theme="hologram"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(24, 230, 210, 0.56), rgba(182, 140, 255, 0.44));
+}
+html[data-theme="hologram"] .game-toolbar small,
+html[data-theme="hologram"] .game-dock span,
+html[data-theme="hologram"] .game-dock .save-state {
+  color: #aee5e6;
+}
+
+html[data-theme="space"] body,
+html[data-theme="space"] button,
+html[data-theme="space"] input {
+  font-family: Eurostile, "Arial Narrow", system-ui, sans-serif;
+}
+html[data-theme="space"] .site-header {
+  border-bottom: 4px double #647482;
+  background: rgba(10, 15, 22, 0.96);
+  box-shadow: 0 5px 0 #e8662f;
+}
+html[data-theme="space"] .glass-card {
+  border: 3px double #647482;
+  border-radius: 30px 8px 30px 8px;
+  background:
+    linear-gradient(135deg, rgba(244, 201, 93, 0.14) 0 16px, transparent 17px),
+    linear-gradient(145deg, rgba(38, 49, 62, 0.96), rgba(12, 18, 27, 0.97));
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 255, 255, 0.02),
+    0 12px 0 rgba(0, 0, 0, 0.28);
+}
+html[data-theme="space"] .hero h1,
+html[data-theme="space"] .content-page > h1 {
+  color: #eef4f8;
+  font-weight: 750;
+  letter-spacing: 0.025em;
+  text-shadow: 3px 3px 0 #2d3c4a;
+  text-transform: uppercase;
+}
+html[data-theme="space"] .primary-button,
+html[data-theme="space"] .hint-button {
+  border: 2px solid #ffb17e;
+  border-radius: 24px 7px 24px 7px;
+  background: linear-gradient(110deg, #e8662f, #a23c1d);
+  color: #fff;
+  box-shadow: 0 5px 0 #632813;
+  text-transform: uppercase;
+}
+html[data-theme="space"] .secondary-button,
+html[data-theme="space"] .icon-button,
+html[data-theme="space"] .mobile-navigation summary {
+  border: 2px solid #647482;
+  border-radius: 18px 6px 18px 6px;
+  background: #151d28;
+  color: #eef4f8;
+}
+html[data-theme="space"] .mobile-navigation nav,
+html[data-theme="space"] .piece-tray {
+  border: 2px solid #647482;
+  background: rgba(15, 22, 32, 0.97);
+}
+html[data-theme="space"] .game-toolbar,
+html[data-theme="space"] .game-dock {
+  border-color: #647482;
+  background: rgba(10, 15, 22, 0.97);
+}
+html[data-theme="space"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(232, 102, 47, 0.66), rgba(128, 217, 238, 0.42));
+}
+html[data-theme="space"] .game-toolbar small,
+html[data-theme="space"] .game-dock span,
+html[data-theme="space"] .game-dock .save-state {
+  color: #bdc8d1;
 }
 
 @media (max-width: 850px) {

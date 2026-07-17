@@ -49,6 +49,24 @@ const themes: { id: ThemeId; icon: string; name: string; description: string }[]
     name: "Storybook",
     description: "Papel, tinta e livro de histórias",
   },
+  {
+    id: "cyberpunk",
+    icon: "🌆",
+    name: "Cyberpunk City",
+    description: "Neon intenso, painéis angulares e cidade digital",
+  },
+  {
+    id: "hologram",
+    icon: "◈",
+    name: "Holographic UI",
+    description: "Vidro translúcido, scanners e luz holográfica",
+  },
+  {
+    id: "space",
+    icon: "🛰️",
+    name: "Space Station",
+    description: "Metal, estrelas e interface de nave espacial",
+  },
 ];
 
 export function SettingsPanel() {

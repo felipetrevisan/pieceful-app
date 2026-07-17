@@ -8,6 +8,9 @@ export const themeIds = [
   "arcade",
   "castle",
   "storybook",
+  "cyberpunk",
+  "hologram",
+  "space",
 ] as const;
 export type ThemeId = (typeof themeIds)[number];
 

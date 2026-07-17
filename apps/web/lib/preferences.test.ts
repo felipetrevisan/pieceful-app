@@ -25,7 +25,15 @@ describe("preferências visuais", () => {
   });
 
   test("reconhece os novos estilos completos", () => {
-    for (const theme of ["ocean", "arcade", "castle", "storybook"] as const) {
+    for (const theme of [
+      "ocean",
+      "arcade",
+      "castle",
+      "storybook",
+      "cyberpunk",
+      "hologram",
+      "space",
+    ] as const) {
       const { storage } = storageWith(JSON.stringify({ theme }));
       expect(readPreferences(storage).theme).toBe(theme);
     }
