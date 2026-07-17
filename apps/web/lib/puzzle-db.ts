@@ -17,6 +17,27 @@ export interface SavedPuzzle {
   updatedAt: string;
 }
 
+function normalizedRotation(rotation: number): number {
+  return ((rotation % 360) + 360) % 360;
+}
+
+export function recoverSavedPuzzle(puzzle: SavedPuzzle): SavedPuzzle {
+  const requiresRotation = puzzle.session.pieces.some(
+    (piece) =>
+      !piece.isPlaced &&
+      normalizedRotation(piece.currentPosition.rotation) !==
+        normalizedRotation(piece.correctPosition.rotation),
+  );
+  if (puzzle.configuration.rotationEnabled || !requiresRotation) return puzzle;
+  return {
+    ...puzzle,
+    configuration: {
+      ...puzzle.configuration,
+      rotationEnabled: true,
+    },
+  };
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, VERSION);
@@ -49,7 +70,7 @@ export async function listPuzzles(): Promise<SavedPuzzle[]> {
     request.onerror = () => reject(new Error("Não foi possível carregar suas partidas."));
   });
   database.close();
-  return result.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return result.map(recoverSavedPuzzle).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function getPuzzle(id: string): Promise<SavedPuzzle | null> {
@@ -60,7 +81,7 @@ export async function getPuzzle(id: string): Promise<SavedPuzzle | null> {
     request.onerror = () => reject(new Error("Não foi possível restaurar esta partida."));
   });
   database.close();
-  return result ?? null;
+  return result ? recoverSavedPuzzle(result) : null;
 }
 
 export async function deletePuzzle(id: string): Promise<void> {

@@ -11,6 +11,7 @@ export function generateSession(
   rows: number,
   columns: number,
   seed: number,
+  rotationEnabled: boolean,
 ): Promise<PuzzleSession> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("../workers/puzzle.worker.ts", import.meta.url));
@@ -28,6 +29,10 @@ export function generateSession(
       const large = event.data.pieces.length > 150;
       const pieces = event.data.pieces.map((piece, index) => ({
         ...piece,
+        currentPosition: {
+          ...piece.currentPosition,
+          rotation: rotationEnabled ? piece.currentPosition.rotation : 0,
+        },
         trayId: large && index >= 24 ? piece.trayId : null,
       }));
       resolve({

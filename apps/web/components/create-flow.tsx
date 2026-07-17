@@ -98,6 +98,7 @@ export function CreateFlow() {
         configuration.rows,
         configuration.columns,
         seed,
+        configuration.rotationEnabled,
       );
       setProcessedImage(image);
       setSession(nextSession);
