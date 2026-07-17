@@ -62,3 +62,17 @@ export async function getPuzzle(id: string): Promise<SavedPuzzle | null> {
   database.close();
   return result ?? null;
 }
+
+export async function deletePuzzle(id: string): Promise<void> {
+  const database = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE, "readwrite");
+      transaction.objectStore(STORE).delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(new Error("Não foi possível excluir o quebra-cabeça."));
+    });
+  } finally {
+    database.close();
+  }
+}

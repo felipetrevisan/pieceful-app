@@ -983,6 +983,10 @@ summary {
   color: var(--muted);
   max-width: 540px;
 }
+.empty-state p + .primary-button,
+.empty-state p + .secondary-button {
+  margin-top: 18px;
+}
 .saved-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1013,6 +1017,30 @@ summary {
 .saved-card p {
   color: var(--muted);
   font-size: 12px;
+}
+.saved-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.delete-puzzle-button {
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 180, 171, 0.32);
+  border-radius: 999px;
+  background: rgba(147, 0, 10, 0.12);
+  color: var(--danger);
+  cursor: pointer;
+  font-weight: 750;
+}
+.delete-puzzle-button:hover {
+  border-color: var(--danger);
+  background: rgba(147, 0, 10, 0.22);
+}
+.delete-puzzle-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 .progress-track {
   height: 7px;
@@ -1340,6 +1368,10 @@ summary {
   .saved-card img {
     height: 190px;
     min-height: 0;
+  }
+  .saved-card-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
   .site-footer {
     font-size: 10px;

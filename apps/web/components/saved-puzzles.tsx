@@ -3,12 +3,13 @@
 import { calculateProgress } from "@puzzled/puzzle-engine";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { listPuzzles, type SavedPuzzle } from "@/lib/puzzle-db";
+import { deletePuzzle, listPuzzles, type SavedPuzzle } from "@/lib/puzzle-db";
 import { Icon } from "./icons";
 
 export function SavedPuzzles() {
   const [puzzles, setPuzzles] = useState<SavedPuzzle[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   useEffect(() => {
     listPuzzles()
       .then(setPuzzles)
@@ -16,6 +17,21 @@ export function SavedPuzzles() {
         setError("Não foi possível abrir suas partidas. Verifique o armazenamento do navegador."),
       );
   }, []);
+  async function removePuzzle(puzzle: SavedPuzzle) {
+    const confirmed = window.confirm(
+      `Excluir “${puzzle.name}”? A imagem e todo o progresso serão apagados deste dispositivo.`,
+    );
+    if (!confirmed) return;
+    setDeletingId(puzzle.id);
+    try {
+      await deletePuzzle(puzzle.id);
+      setPuzzles((current) => current?.filter(({ id }) => id !== puzzle.id) ?? []);
+    } catch {
+      setError("Não foi possível excluir o quebra-cabeça. Tente novamente.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
   if (error)
     return (
       <div className="empty-state">
@@ -69,9 +85,20 @@ export function SavedPuzzles() {
                 {progress}% concluído · salvo{" "}
                 {new Date(puzzle.updatedAt).toLocaleDateString("pt-BR")}
               </p>
-              <Link className="primary-button" href={`/puzzle?id=${puzzle.id}`}>
-                {progress > 0 ? "Continuar montagem" : "Abrir caixa"}
-              </Link>
+              <div className="saved-card-actions">
+                <Link className="primary-button" href={`/puzzle?id=${puzzle.id}`}>
+                  {progress > 0 ? "Continuar montagem" : "Abrir caixa"}
+                </Link>
+                <button
+                  type="button"
+                  className="delete-puzzle-button"
+                  disabled={deletingId === puzzle.id}
+                  onClick={() => void removePuzzle(puzzle)}
+                  aria-label={`Excluir quebra-cabeça ${puzzle.name}`}
+                >
+                  {deletingId === puzzle.id ? "Excluindo…" : "Excluir"}
+                </button>
+              </div>
             </div>
           </article>
         );
