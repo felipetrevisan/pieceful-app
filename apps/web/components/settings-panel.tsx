@@ -25,6 +25,30 @@ const themes: { id: ThemeId; icon: string; name: string; description: string }[]
     name: "Rainbow Sky",
     description: "Céu, nuvens e cartões flutuantes",
   },
+  {
+    id: "ocean",
+    icon: "🐳",
+    name: "Ocean Splash",
+    description: "Ondas, bolhas e aventura submarina",
+  },
+  {
+    id: "arcade",
+    icon: "👾",
+    name: "Pixel Arcade",
+    description: "Pixels, neon e energia retrô",
+  },
+  {
+    id: "castle",
+    icon: "🏰",
+    name: "Magic Castle",
+    description: "Estrelas, ouro e fantasia encantada",
+  },
+  {
+    id: "storybook",
+    icon: "📖",
+    name: "Storybook",
+    description: "Papel, tinta e livro de histórias",
+  },
 ];
 
 export function SettingsPanel() {

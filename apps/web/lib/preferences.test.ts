@@ -24,6 +24,13 @@ describe("preferências visuais", () => {
     });
   });
 
+  test("reconhece os novos estilos completos", () => {
+    for (const theme of ["ocean", "arcade", "castle", "storybook"] as const) {
+      const { storage } = storageWith(JSON.stringify({ theme }));
+      expect(readPreferences(storage).theme).toBe(theme);
+    }
+  });
+
   test("volta ao tema clássico quando o valor é desconhecido", () => {
     const { storage } = storageWith(JSON.stringify({ theme: "unknown" }));
     expect(readPreferences(storage).theme).toBe("classic");

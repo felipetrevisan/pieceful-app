@@ -1,5 +1,14 @@
 export const PREFERENCES_KEY = "puzzled-preferences";
-export const themeIds = ["classic", "candy", "jungle", "rainbow"] as const;
+export const themeIds = [
+  "classic",
+  "candy",
+  "jungle",
+  "rainbow",
+  "ocean",
+  "arcade",
+  "castle",
+  "storybook",
+] as const;
 export type ThemeId = (typeof themeIds)[number];
 
 export interface Preferences {

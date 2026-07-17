@@ -51,9 +51,60 @@ html[data-theme="rainbow"] {
   --cyan: #008fb7;
   --pink: #ee4f98;
 }
+html[data-theme="ocean"] {
+  --bg: #dff9f7;
+  --bg-deep: #b8eae8;
+  --surface: #f7fffe;
+  --surface-high: #d6f4f2;
+  --text: #083c50;
+  --muted: #47717c;
+  --primary: #00a8a8;
+  --primary-light: #4edbd0;
+  --cyan: #007eae;
+  --pink: #ff8a5c;
+}
+html[data-theme="arcade"] {
+  --bg: #09051e;
+  --bg-deep: #03010d;
+  --surface: #171039;
+  --surface-high: #281753;
+  --text: #f5f1ff;
+  --muted: #bcb0d6;
+  --primary: #ff3cac;
+  --primary-light: #ff83d0;
+  --cyan: #22e8ff;
+  --pink: #ffe24c;
+}
+html[data-theme="castle"] {
+  --bg: #f8edff;
+  --bg-deep: #e7d0f7;
+  --surface: #fffaff;
+  --surface-high: #f0ddfa;
+  --text: #41245f;
+  --muted: #765c88;
+  --primary: #8f51c7;
+  --primary-light: #c58be8;
+  --cyan: #a06000;
+  --pink: #df4c99;
+}
+html[data-theme="storybook"] {
+  --bg: #f4ead4;
+  --bg-deep: #e2d1ad;
+  --surface: #fffaf0;
+  --surface-high: #f0e1c1;
+  --text: #402f27;
+  --muted: #766156;
+  --primary: #a54538;
+  --primary-light: #d2755d;
+  --cyan: #26716a;
+  --pink: #d39a2e;
+}
 html[data-theme="candy"],
 html[data-theme="jungle"],
-html[data-theme="rainbow"] {
+html[data-theme="rainbow"],
+html[data-theme="ocean"],
+html[data-theme="castle"],
+html[data-theme="storybook"] {
   color-scheme: light;
 }
 
@@ -110,9 +161,55 @@ html[data-theme="rainbow"] body {
   background-size: 116% 116%;
   animation: playful-background 12s ease-in-out infinite alternate;
 }
+html[data-theme="ocean"] body {
+  background:
+    radial-gradient(ellipse at 20% 110%, rgba(0, 168, 168, 0.28) 0 18rem, transparent 18.2rem),
+    radial-gradient(ellipse at 75% 108%, rgba(0, 126, 174, 0.2) 0 23rem, transparent 23.2rem),
+    radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 5px, transparent 6px), var(--bg);
+  background-size:
+    120% 120%,
+    120% 120%,
+    72px 72px,
+    auto;
+  animation: playful-background 16s ease-in-out infinite alternate;
+}
+html[data-theme="arcade"] body {
+  background:
+    linear-gradient(rgba(34, 232, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 60, 172, 0.07) 1px, transparent 1px),
+    radial-gradient(circle at 50% 10%, rgba(114, 47, 190, 0.35), transparent 30rem), var(--bg);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto,
+    auto;
+  animation: arcade-grid 10s linear infinite;
+}
+html[data-theme="castle"] body {
+  background:
+    radial-gradient(circle, rgba(143, 81, 199, 0.22) 0 2px, transparent 3px),
+    radial-gradient(circle at 15% 18%, rgba(223, 76, 153, 0.2), transparent 20rem),
+    radial-gradient(circle at 88% 12%, rgba(255, 198, 72, 0.28), transparent 18rem), var(--bg);
+  background-size:
+    46px 46px,
+    115% 115%,
+    115% 115%,
+    auto;
+  animation: playful-background 15s ease-in-out infinite alternate;
+}
+html[data-theme="storybook"] body {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, rgba(64, 47, 39, 0.045) 31px 32px),
+    radial-gradient(circle at 12% 18%, rgba(165, 69, 56, 0.14), transparent 20rem),
+    radial-gradient(circle at 88% 80%, rgba(38, 113, 106, 0.12), transparent 22rem), var(--bg);
+}
 html[data-theme="candy"] .game-shell,
 html[data-theme="jungle"] .game-shell,
-html[data-theme="rainbow"] .game-shell {
+html[data-theme="rainbow"] .game-shell,
+html[data-theme="ocean"] .game-shell,
+html[data-theme="arcade"] .game-shell,
+html[data-theme="castle"] .game-shell,
+html[data-theme="storybook"] .game-shell {
   background:
     radial-gradient(
       circle at 14% 18%,
@@ -139,6 +236,15 @@ html[data-theme="rainbow"] .game-shell {
       -7% 8%,
       6% -5%,
       -5% 4%;
+  }
+}
+@keyframes arcade-grid {
+  to {
+    background-position:
+      0 32px,
+      32px 0,
+      0 0,
+      0 0;
   }
 }
 button,
@@ -1313,6 +1419,25 @@ summary {
 .theme-preview-rainbow .theme-preview {
   background: linear-gradient(145deg, #ff6fae, #b96cff 42%, #49e4ff 72%, #ffd84d);
 }
+.theme-preview-ocean .theme-preview {
+  background: linear-gradient(165deg, #7af1e6, #1ab5c8 48%, #0879aa 49%, #064d7a);
+}
+.theme-preview-arcade .theme-preview {
+  border: 2px solid #22e8ff;
+  border-radius: 4px;
+  background:
+    linear-gradient(rgba(34, 232, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 60, 172, 0.15) 1px, transparent 1px), #09051e;
+  background-size: 16px 16px;
+}
+.theme-preview-castle .theme-preview {
+  background: linear-gradient(145deg, #f8c8ed, #b782e1 50%, #7041a3 72%, #ffd464);
+}
+.theme-preview-storybook .theme-preview {
+  border: 2px dashed #a54538;
+  border-radius: 6px 18px 6px 18px;
+  background: linear-gradient(145deg, #fffaf0, #efdcb6 70%, #d2755d);
+}
 @keyframes theme-icon-float {
   50% {
     transform: translateY(-6px) rotate(4deg) scale(1.06);
@@ -1727,6 +1852,271 @@ html[data-theme="rainbow"] .game-toolbar::before {
     rgba(255, 212, 77, 0.4),
     rgba(85, 199, 255, 0.42)
   );
+}
+
+html[data-theme="ocean"] body {
+  font-family: ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif;
+}
+html[data-theme="ocean"] .hero-copy > p {
+  color: var(--muted);
+}
+html[data-theme="ocean"] .site-header {
+  border-bottom: 6px solid #ff9a66;
+  background: rgba(5, 87, 112, 0.94);
+  color: #edffff;
+  box-shadow: 0 8px 0 rgba(0, 168, 168, 0.35);
+}
+html[data-theme="ocean"] .site-header nav a,
+html[data-theme="ocean"] .site-header nav a.active,
+html[data-theme="ocean"] .site-header nav a:hover {
+  color: #edffff;
+}
+html[data-theme="ocean"] .glass-card {
+  border: 3px solid #1bb8bd;
+  border-radius: 42px 42px 24px 24px;
+  background:
+    radial-gradient(circle at 88% 14%, rgba(255, 255, 255, 0.8) 0 10px, transparent 11px),
+    radial-gradient(circle at 78% 28%, rgba(255, 255, 255, 0.64) 0 5px, transparent 6px),
+    rgba(247, 255, 254, 0.93);
+  box-shadow:
+    0 9px 0 #83dcd7,
+    0 24px 48px rgba(0, 93, 119, 0.15);
+}
+html[data-theme="ocean"] .primary-button,
+html[data-theme="ocean"] .hint-button {
+  border: 2px solid #075f77;
+  background: linear-gradient(110deg, #24c9c1, #63e5da 55%, #ff9a66);
+  color: #083c50;
+  box-shadow: 0 6px 0 #075f77;
+}
+html[data-theme="ocean"] .icon-button,
+html[data-theme="ocean"] .secondary-button,
+html[data-theme="ocean"] .mobile-navigation summary {
+  border: 2px solid #1bb8bd;
+  background: #f7fffe;
+  color: #083c50;
+}
+html[data-theme="ocean"] .mobile-navigation nav,
+html[data-theme="ocean"] .piece-tray {
+  background: rgba(247, 255, 254, 0.96);
+}
+html[data-theme="ocean"] .game-toolbar,
+html[data-theme="ocean"] .game-dock {
+  border-color: #ff9a66;
+  background: rgba(5, 87, 112, 0.94);
+  color: #edffff;
+}
+html[data-theme="ocean"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(36, 201, 193, 0.58), rgba(255, 154, 102, 0.42));
+}
+html[data-theme="ocean"] .game-toolbar small,
+html[data-theme="ocean"] .game-dock span,
+html[data-theme="ocean"] .game-dock .save-state {
+  color: #c9f7f4;
+}
+
+html[data-theme="arcade"] body,
+html[data-theme="arcade"] button,
+html[data-theme="arcade"] input {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+html[data-theme="arcade"] .site-header {
+  border-bottom: 3px solid #22e8ff;
+  background: rgba(3, 1, 13, 0.96);
+  box-shadow: 0 5px 0 #ff3cac;
+}
+html[data-theme="arcade"] .glass-card {
+  border: 2px solid #22e8ff;
+  border-radius: 2px;
+  background:
+    linear-gradient(rgba(34, 232, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 60, 172, 0.04) 1px, transparent 1px), rgba(9, 5, 30, 0.94);
+  background-size: 16px 16px;
+  box-shadow:
+    6px 6px 0 #ff3cac,
+    0 0 30px rgba(34, 232, 255, 0.16);
+}
+html[data-theme="arcade"] .hero h1,
+html[data-theme="arcade"] .content-page > h1 {
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  text-shadow:
+    4px 0 #ff3cac,
+    -4px 0 #22e8ff;
+  text-transform: uppercase;
+}
+html[data-theme="arcade"] .primary-button,
+html[data-theme="arcade"] .secondary-button,
+html[data-theme="arcade"] .hint-button,
+html[data-theme="arcade"] .icon-button,
+html[data-theme="arcade"] .mobile-navigation summary {
+  border: 2px solid #22e8ff;
+  border-radius: 2px;
+  background: #171039;
+  color: #fff;
+  box-shadow: 4px 4px 0 #ff3cac;
+  text-transform: uppercase;
+}
+html[data-theme="arcade"] .primary-button,
+html[data-theme="arcade"] .hint-button {
+  background: linear-gradient(90deg, #ff3cac, #783cff 55%, #22e8ff);
+}
+html[data-theme="arcade"] .theme-option,
+html[data-theme="arcade"] .mobile-navigation nav,
+html[data-theme="arcade"] .piece-tray {
+  border-radius: 2px;
+  background: rgba(9, 5, 30, 0.97);
+}
+html[data-theme="arcade"] .game-toolbar,
+html[data-theme="arcade"] .game-dock {
+  border-color: #22e8ff;
+  background: rgba(3, 1, 13, 0.96);
+}
+html[data-theme="arcade"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(255, 60, 172, 0.58), rgba(34, 232, 255, 0.46));
+}
+html[data-theme="arcade"] .game-toolbar small,
+html[data-theme="arcade"] .game-dock span,
+html[data-theme="arcade"] .game-dock .save-state {
+  color: #c5f8ff;
+}
+
+html[data-theme="castle"] body {
+  font-family: Georgia, "Times New Roman", serif;
+}
+html[data-theme="castle"] .hero-copy > p {
+  color: var(--muted);
+}
+html[data-theme="castle"] .site-header {
+  border-bottom: 6px double #d9a92f;
+  background: rgba(92, 48, 126, 0.95);
+  color: #fff8df;
+  box-shadow: 0 7px 0 rgba(197, 139, 232, 0.45);
+}
+html[data-theme="castle"] .site-header nav a,
+html[data-theme="castle"] .site-header nav a.active,
+html[data-theme="castle"] .site-header nav a:hover {
+  color: #fff8df;
+}
+html[data-theme="castle"] .glass-card {
+  border: 3px double #a97524;
+  border-radius: 28px 8px 28px 8px;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(255, 207, 83, 0.2) 0 32px, transparent 33px),
+    rgba(255, 250, 255, 0.95);
+  box-shadow:
+    0 8px 0 #d9b7ed,
+    0 24px 50px rgba(87, 42, 119, 0.16);
+}
+html[data-theme="castle"] .hero h1,
+html[data-theme="castle"] .content-page > h1 {
+  color: #5c307e;
+  text-shadow: 2px 3px 0 rgba(217, 169, 47, 0.35);
+}
+html[data-theme="castle"] .primary-button,
+html[data-theme="castle"] .hint-button {
+  border: 2px solid #6b357d;
+  border-radius: 24px 8px 24px 8px;
+  background: linear-gradient(110deg, #d954a0, #ffd55a 52%, #b776df);
+  color: #41245f;
+  box-shadow: 0 6px 0 #6b357d;
+}
+html[data-theme="castle"] .icon-button,
+html[data-theme="castle"] .secondary-button,
+html[data-theme="castle"] .mobile-navigation summary {
+  border: 2px solid #a97524;
+  background: #fffaff;
+  color: #41245f;
+}
+html[data-theme="castle"] .mobile-navigation nav,
+html[data-theme="castle"] .piece-tray {
+  background: rgba(255, 250, 255, 0.97);
+}
+html[data-theme="castle"] .game-toolbar,
+html[data-theme="castle"] .game-dock {
+  border-color: #d9a92f;
+  background: rgba(92, 48, 126, 0.95);
+  color: #fff8df;
+}
+html[data-theme="castle"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(217, 84, 160, 0.52), rgba(255, 213, 90, 0.46));
+}
+html[data-theme="castle"] .game-toolbar small,
+html[data-theme="castle"] .game-dock span,
+html[data-theme="castle"] .game-dock .save-state {
+  color: #f0dcff;
+}
+
+html[data-theme="storybook"] body,
+html[data-theme="storybook"] button,
+html[data-theme="storybook"] input {
+  font-family: Georgia, "Times New Roman", serif;
+}
+html[data-theme="storybook"] .hero-copy > p {
+  color: var(--muted);
+}
+html[data-theme="storybook"] .site-header {
+  border-bottom: 5px solid #d39a2e;
+  background: rgba(112, 47, 40, 0.96);
+  color: #fff8e8;
+  box-shadow: 0 7px 0 rgba(64, 47, 39, 0.22);
+}
+html[data-theme="storybook"] .site-header nav a,
+html[data-theme="storybook"] .site-header nav a.active,
+html[data-theme="storybook"] .site-header nav a:hover {
+  color: #fff8e8;
+}
+html[data-theme="storybook"] .glass-card {
+  border: 2px dashed #8b5947;
+  border-radius: 5px 20px 6px 20px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(64, 47, 39, 0.04) 28px 29px),
+    rgba(255, 250, 240, 0.97);
+  box-shadow:
+    7px 8px 0 #dfcda7,
+    0 20px 42px rgba(64, 47, 39, 0.14);
+}
+html[data-theme="storybook"] .hero h1,
+html[data-theme="storybook"] .content-page > h1 {
+  color: #703228;
+  letter-spacing: -0.025em;
+  text-shadow: 2px 2px 0 rgba(211, 154, 46, 0.22);
+}
+html[data-theme="storybook"] .primary-button,
+html[data-theme="storybook"] .hint-button {
+  border: 2px solid #60352e;
+  border-radius: 6px 16px 6px 16px;
+  background: linear-gradient(110deg, #d2755d, #e7b550 58%, #68a49a);
+  color: #402f27;
+  box-shadow: 0 5px 0 #60352e;
+}
+html[data-theme="storybook"] .icon-button,
+html[data-theme="storybook"] .secondary-button,
+html[data-theme="storybook"] .mobile-navigation summary {
+  border: 2px solid #8b5947;
+  border-radius: 6px 14px 6px 14px;
+  background: #fffaf0;
+  color: #402f27;
+}
+html[data-theme="storybook"] .mobile-navigation nav,
+html[data-theme="storybook"] .piece-tray {
+  border-radius: 5px;
+  background: rgba(255, 250, 240, 0.97);
+}
+html[data-theme="storybook"] .game-toolbar,
+html[data-theme="storybook"] .game-dock {
+  border-color: #d39a2e;
+  background: rgba(112, 47, 40, 0.95);
+  color: #fff8e8;
+}
+html[data-theme="storybook"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(210, 117, 93, 0.5), rgba(211, 154, 46, 0.44));
+}
+html[data-theme="storybook"] .game-toolbar small,
+html[data-theme="storybook"] .game-dock span,
+html[data-theme="storybook"] .game-dock .save-state {
+  color: #f5dfc3;
 }
 
 @media (max-width: 850px) {
