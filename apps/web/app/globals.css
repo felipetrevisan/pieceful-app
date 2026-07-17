@@ -2306,8 +2306,9 @@ html[data-theme="cyberpunk"] .site-header {
     0 8px 0 rgba(0, 240, 255, 0.7);
 }
 html[data-theme="cyberpunk"] .site-header nav a.active {
-  color: #08060d;
-  background: #ffe600;
+  color: #ffe600;
+  background: transparent;
+  text-shadow: 0 0 14px rgba(255, 230, 0, 0.5);
 }
 html[data-theme="cyberpunk"] .glass-card {
   border: 2px solid #ff2b91;
