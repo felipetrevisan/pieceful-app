@@ -12,14 +12,19 @@ import {
 
 const themes: { id: ThemeId; icon: string; name: string; description: string }[] = [
   { id: "classic", icon: "✦", name: "Cosmic Night", description: "O visual original do Pieceful" },
-  { id: "candy", icon: "🍭", name: "Candy Pop", description: "Rosa, lilás e confeitos brilhantes" },
+  { id: "candy", icon: "🍭", name: "Candy Pop", description: "Interface clara e arredondada" },
   {
     id: "jungle",
     icon: "🦖",
     name: "Jungle Party",
-    description: "Verde, laranja e aventura tropical",
+    description: "Folhagem, madeira e aventura tropical",
   },
-  { id: "rainbow", icon: "🌈", name: "Rainbow Sky", description: "Um céu alegre cheio de cores" },
+  {
+    id: "rainbow",
+    icon: "🌈",
+    name: "Rainbow Sky",
+    description: "Céu, nuvens e cartões flutuantes",
+  },
 ];
 
 export function SettingsPanel() {

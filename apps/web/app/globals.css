@@ -16,40 +16,45 @@
   --danger: #ffb4ab;
 }
 html[data-theme="candy"] {
-  --bg: #27103f;
-  --bg-deep: #170724;
-  --surface: #3d1b55;
-  --surface-high: #55256b;
-  --text: #fff4fc;
-  --muted: #e7bfdc;
-  --primary: #ff5fa8;
-  --primary-light: #ffc1df;
-  --cyan: #5ce7ff;
-  --pink: #ffcf4a;
+  --bg: #fff1f8;
+  --bg-deep: #ffd7eb;
+  --surface: #fffafd;
+  --surface-high: #ffe2f0;
+  --text: #491540;
+  --muted: #76506d;
+  --primary: #f53f96;
+  --primary-light: #ff85c1;
+  --cyan: #008eae;
+  --pink: #ffb91f;
 }
 html[data-theme="jungle"] {
-  --bg: #082f2b;
-  --bg-deep: #041d1a;
-  --surface: #12483a;
-  --surface-high: #1d6148;
-  --text: #efffdc;
-  --muted: #b9ddb8;
-  --primary: #a8e63d;
-  --primary-light: #ddff83;
-  --cyan: #45d9cb;
-  --pink: #ff9f43;
+  --bg: #eef3c5;
+  --bg-deep: #d8e39b;
+  --surface: #fff9d9;
+  --surface-high: #e0edaa;
+  --text: #183b29;
+  --muted: #526c4b;
+  --primary: #5b9c28;
+  --primary-light: #94cf3e;
+  --cyan: #087f75;
+  --pink: #ed792e;
 }
 html[data-theme="rainbow"] {
-  --bg: #15245a;
-  --bg-deep: #0a1235;
-  --surface: #293b78;
-  --surface-high: #40549a;
-  --text: #f8f7ff;
-  --muted: #cbd4ff;
-  --primary: #b96cff;
-  --primary-light: #e4b8ff;
-  --cyan: #49e4ff;
-  --pink: #ff6fae;
+  --bg: #dff6ff;
+  --bg-deep: #b8e7ff;
+  --surface: #ffffff;
+  --surface-high: #eaf8ff;
+  --text: #263568;
+  --muted: #586994;
+  --primary: #9050e8;
+  --primary-light: #c184ff;
+  --cyan: #008fb7;
+  --pink: #ee4f98;
+}
+html[data-theme="candy"],
+html[data-theme="jungle"],
+html[data-theme="rainbow"] {
+  color-scheme: light;
 }
 
 * {
@@ -70,26 +75,38 @@ body {
 }
 html[data-theme="candy"] body {
   background:
-    radial-gradient(circle at 12% 18%, rgba(255, 95, 168, 0.38), transparent 18rem),
-    radial-gradient(circle at 88% 24%, rgba(92, 231, 255, 0.3), transparent 20rem),
-    radial-gradient(circle at 48% 92%, rgba(255, 207, 74, 0.22), transparent 18rem), var(--bg);
-  background-size: 115% 115%;
+    radial-gradient(circle at 12% 18%, rgba(255, 95, 168, 0.28), transparent 18rem),
+    radial-gradient(circle at 88% 24%, rgba(92, 231, 255, 0.22), transparent 20rem),
+    radial-gradient(circle at 48% 92%, rgba(255, 207, 74, 0.2), transparent 18rem),
+    radial-gradient(circle, rgba(245, 63, 150, 0.16) 2px, transparent 3px), var(--bg);
+  background-size:
+    115% 115%,
+    115% 115%,
+    115% 115%,
+    34px 34px,
+    auto;
   animation: playful-background 14s ease-in-out infinite alternate;
 }
 html[data-theme="jungle"] body {
   background:
-    radial-gradient(ellipse at 10% 12%, rgba(168, 230, 61, 0.3), transparent 22rem),
-    radial-gradient(ellipse at 92% 30%, rgba(255, 159, 67, 0.25), transparent 19rem),
-    radial-gradient(ellipse at 50% 100%, rgba(69, 217, 203, 0.24), transparent 24rem), var(--bg);
-  background-size: 118% 118%;
+    radial-gradient(ellipse at 10% 12%, rgba(91, 156, 40, 0.28), transparent 22rem),
+    radial-gradient(ellipse at 92% 30%, rgba(237, 121, 46, 0.22), transparent 19rem),
+    repeating-linear-gradient(125deg, transparent 0 42px, rgba(24, 59, 41, 0.045) 43px 47px),
+    var(--bg);
+  background-size:
+    118% 118%,
+    118% 118%,
+    auto,
+    auto;
   animation: playful-background 17s ease-in-out infinite alternate-reverse;
 }
 html[data-theme="rainbow"] body {
   background:
-    radial-gradient(circle at 8% 22%, rgba(255, 111, 174, 0.32), transparent 19rem),
-    radial-gradient(circle at 45% 5%, rgba(185, 108, 255, 0.3), transparent 22rem),
-    radial-gradient(circle at 90% 25%, rgba(73, 228, 255, 0.3), transparent 21rem),
-    radial-gradient(circle at 52% 100%, rgba(255, 216, 77, 0.2), transparent 20rem), var(--bg);
+    radial-gradient(ellipse at 14% 12%, rgba(255, 255, 255, 0.92) 0 6rem, transparent 6.2rem),
+    radial-gradient(ellipse at 84% 24%, rgba(255, 255, 255, 0.82) 0 8rem, transparent 8.2rem),
+    radial-gradient(circle at 8% 72%, rgba(255, 111, 174, 0.25), transparent 19rem),
+    radial-gradient(circle at 48% 10%, rgba(185, 108, 255, 0.22), transparent 22rem),
+    radial-gradient(circle at 90% 75%, rgba(73, 228, 255, 0.24), transparent 21rem), var(--bg);
   background-size: 116% 116%;
   animation: playful-background 12s ease-in-out infinite alternate;
 }
@@ -1513,6 +1530,203 @@ summary {
   background: #143f34;
   color: #8af0c9;
   box-shadow: 0 12px 50px rgba(0, 0, 0, 0.35);
+}
+
+/* Os temas infantis são skins completas, não apenas trocas de cor. */
+html[data-theme="candy"] body,
+html[data-theme="jungle"] body,
+html[data-theme="rainbow"] body {
+  font-family: ui-rounded, "Arial Rounded MT Bold", Nunito, system-ui, sans-serif;
+}
+html[data-theme="candy"] .hero-copy > p,
+html[data-theme="jungle"] .hero-copy > p,
+html[data-theme="rainbow"] .hero-copy > p {
+  color: var(--muted);
+}
+html[data-theme="candy"] .recent-puzzle-backdrop::after,
+html[data-theme="jungle"] .recent-puzzle-backdrop::after,
+html[data-theme="rainbow"] .recent-puzzle-backdrop::after {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 28%, transparent), var(--bg));
+}
+html[data-theme="candy"] .mobile-navigation nav,
+html[data-theme="jungle"] .mobile-navigation nav,
+html[data-theme="rainbow"] .mobile-navigation nav {
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+}
+html[data-theme="candy"] .game-toolbar,
+html[data-theme="rainbow"] .game-toolbar {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+html[data-theme="candy"] .game-dock,
+html[data-theme="rainbow"] .game-dock {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: color-mix(in srgb, var(--primary) 32%, transparent);
+}
+html[data-theme="candy"] .dock-tools button,
+html[data-theme="rainbow"] .dock-tools button,
+html[data-theme="candy"] .timer,
+html[data-theme="rainbow"] .timer,
+html[data-theme="candy"] .zoom-badge,
+html[data-theme="rainbow"] .zoom-badge {
+  background: color-mix(in srgb, var(--surface-high) 76%, white);
+}
+html[data-theme="candy"] .piece-tray,
+html[data-theme="rainbow"] .piece-tray {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+html[data-theme="candy"] .site-header {
+  border-bottom: 4px solid #ff94c7;
+  background: rgba(255, 248, 252, 0.93);
+  box-shadow: 0 7px 0 rgba(255, 185, 31, 0.45);
+}
+html[data-theme="candy"] .glass-card {
+  border: 3px solid #ff94c7;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(255, 185, 31, 0.16) 0 28px, transparent 29px),
+    rgba(255, 252, 254, 0.94);
+  box-shadow:
+    0 8px 0 #ffd0e5,
+    0 20px 45px rgba(196, 45, 119, 0.13);
+}
+html[data-theme="candy"] .hero h1,
+html[data-theme="candy"] .content-page > h1 {
+  font-weight: 950;
+  letter-spacing: -0.06em;
+  text-shadow: 3px 4px 0 rgba(255, 185, 31, 0.25);
+}
+html[data-theme="candy"] .primary-button,
+html[data-theme="candy"] .hint-button {
+  border: 2px solid #a91f67;
+  border-radius: 18px 30px 20px 30px;
+  background: linear-gradient(110deg, #ff5fa8, #ffbd32 56%, #63dcf4);
+  color: #491540;
+  box-shadow: 0 6px 0 #a91f67;
+}
+html[data-theme="candy"] .secondary-button,
+html[data-theme="candy"] .icon-button,
+html[data-theme="candy"] .mobile-navigation summary {
+  border: 2px solid #ff94c7;
+  background: #fffafd;
+}
+html[data-theme="candy"] .section-kicker,
+html[data-theme="candy"] .eyebrow {
+  color: #c72076;
+}
+html[data-theme="candy"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(255, 95, 168, 0.42), rgba(255, 189, 50, 0.38));
+}
+
+html[data-theme="jungle"] .site-header {
+  border-bottom: 6px solid #ed792e;
+  background:
+    repeating-linear-gradient(105deg, transparent 0 34px, rgba(255, 255, 255, 0.04) 35px 38px),
+    #174b37;
+  color: #fffbd9;
+  box-shadow: 0 7px 0 #83ae3e;
+}
+html[data-theme="jungle"] .site-header nav a,
+html[data-theme="jungle"] .site-header nav a.active,
+html[data-theme="jungle"] .site-header nav a:hover {
+  color: #fffbd9;
+}
+html[data-theme="jungle"] .site-header .icon-button,
+html[data-theme="jungle"] .mobile-navigation summary {
+  border-color: #b9d85d;
+  background: #2c6948;
+  color: #fffbd9;
+}
+html[data-theme="jungle"] .glass-card {
+  border: 3px solid #4f813b;
+  border-radius: 14px 36px 16px 34px;
+  background:
+    linear-gradient(135deg, rgba(148, 207, 62, 0.13), transparent 36%), rgba(255, 249, 217, 0.95);
+  box-shadow:
+    0 9px 0 #9fbd56,
+    0 22px 45px rgba(37, 85, 48, 0.16);
+}
+html[data-theme="jungle"] .hero h1,
+html[data-theme="jungle"] .content-page > h1 {
+  color: #174b37;
+  font-weight: 950;
+  text-shadow: 3px 4px 0 rgba(237, 121, 46, 0.25);
+}
+html[data-theme="jungle"] .primary-button,
+html[data-theme="jungle"] .hint-button {
+  border: 2px solid #275d36;
+  border-radius: 13px 28px 12px 26px;
+  background: linear-gradient(110deg, #9bd642, #ffd45a 55%, #ed792e);
+  color: #183b29;
+  box-shadow: 0 6px 0 #275d36;
+}
+html[data-theme="jungle"] .section-kicker,
+html[data-theme="jungle"] .eyebrow {
+  color: #ba4f1d;
+}
+html[data-theme="jungle"] .game-toolbar,
+html[data-theme="jungle"] .game-dock {
+  border-color: #9fbd56;
+  background: rgba(23, 75, 55, 0.94);
+  color: #fffbd9;
+}
+html[data-theme="jungle"] .game-toolbar::before {
+  background: linear-gradient(90deg, rgba(148, 207, 62, 0.52), rgba(237, 121, 46, 0.42));
+}
+html[data-theme="jungle"] .game-toolbar small,
+html[data-theme="jungle"] .game-dock span,
+html[data-theme="jungle"] .game-dock .save-state {
+  color: #e1edb6;
+}
+html[data-theme="jungle"] .piece-tray {
+  background: rgba(255, 249, 217, 0.95);
+}
+
+html[data-theme="rainbow"] .site-header {
+  border: 0;
+  border-bottom: 6px solid transparent;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(90deg, #ff629f, #ffcc48, #53d49c, #52c8ff, #a869ed) border-box;
+  box-shadow: 0 8px 24px rgba(82, 153, 211, 0.18);
+}
+html[data-theme="rainbow"] .glass-card {
+  border: 3px solid rgba(144, 80, 232, 0.55);
+  border-radius: 40px 20px 38px 22px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    -7px 8px 0 rgba(255, 98, 159, 0.22),
+    7px 12px 0 rgba(82, 200, 255, 0.2),
+    0 24px 50px rgba(87, 103, 177, 0.12);
+}
+html[data-theme="rainbow"] .hero h1,
+html[data-theme="rainbow"] .content-page > h1 {
+  color: transparent;
+  background: linear-gradient(90deg, #e53e8c, #e49417, #249d72, #188eb9, #8645d1);
+  background-clip: text;
+  font-weight: 950;
+}
+html[data-theme="rainbow"] .primary-button,
+html[data-theme="rainbow"] .hint-button {
+  border: 2px solid #6540ad;
+  background: linear-gradient(100deg, #ff6da8, #ffd44d 32%, #56d7a2 58%, #55c7ff 78%, #b16df0);
+  color: #263568;
+  box-shadow: 0 6px 0 #6540ad;
+}
+html[data-theme="rainbow"] .secondary-button,
+html[data-theme="rainbow"] .icon-button,
+html[data-theme="rainbow"] .mobile-navigation summary {
+  border: 2px solid #a96fed;
+  background: white;
+}
+html[data-theme="rainbow"] .game-toolbar::before {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 109, 168, 0.42),
+    rgba(255, 212, 77, 0.4),
+    rgba(85, 199, 255, 0.42)
+  );
 }
 
 @media (max-width: 850px) {
