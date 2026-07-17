@@ -15,6 +15,33 @@ interface Options {
   onProgress: (progress: number) => void;
 }
 
+export const MIN_TIMELAPSE_DURATION_SECONDS = 10;
+const MAX_TIMELAPSE_DURATION_SECONDS = 20;
+const FINAL_FRAME_HOLD_SECONDS = 1.5;
+
+export function timelapseDuration(frameCount: number): number {
+  return Math.min(
+    MAX_TIMELAPSE_DURATION_SECONDS,
+    Math.max(MIN_TIMELAPSE_DURATION_SECONDS, frameCount * 0.07),
+  );
+}
+
+export function completedTimelapseStates(pieces: PuzzlePiece[]): Map<string, PuzzleTimelapsePiece> {
+  return new Map(
+    pieces.map((piece) => [
+      piece.id,
+      {
+        id: piece.id,
+        x: piece.correctPosition.x,
+        y: piece.correctPosition.y,
+        rotation: piece.correctPosition.rotation,
+        isPlaced: true,
+        visible: true,
+      },
+    ]),
+  );
+}
+
 function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -165,15 +192,19 @@ export async function createTimelapse(options: Options): Promise<Blob> {
   const timeline = options.timelapse ?? { initial: fallbackInitial, frames: [] };
   const states = new Map(timeline.initial.map((piece) => [piece.id, { ...piece }]));
   const frames = timeline.frames;
-  const duration = Math.min(16, Math.max(7, frames.length * 0.07));
+  const duration = timelapseDuration(frames.length);
+  const assemblyDuration = duration - FINAL_FRAME_HOLD_SECONDS;
+  const finalStates = completedTimelapseStates(options.pieces);
   let appliedFrame = -1;
   recorder.start(500);
 
   await new Promise<void>((resolve) => {
     const startedAt = performance.now();
     const render = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / (duration * 1000));
-      const framePosition = progress * frames.length;
+      const elapsedSeconds = (now - startedAt) / 1000;
+      const recordingProgress = Math.min(1, elapsedSeconds / duration);
+      const assemblyProgress = Math.min(1, elapsedSeconds / assemblyDuration);
+      const framePosition = assemblyProgress * frames.length;
       const targetFrame = Math.floor(framePosition) - 1;
       while (appliedFrame < targetFrame) {
         appliedFrame += 1;
@@ -182,7 +213,7 @@ export async function createTimelapse(options: Options): Promise<Blob> {
       }
       let renderStates = states;
       const nextFrame = frames[targetFrame + 1];
-      if (nextFrame && progress < 1) {
+      if (nextFrame && assemblyProgress < 1) {
         const transition = framePosition - Math.floor(framePosition);
         renderStates = new Map(states);
         for (const change of nextFrame.changes) {
@@ -202,18 +233,7 @@ export async function createTimelapse(options: Options): Promise<Blob> {
           );
         }
       }
-      if (progress === 1) {
-        for (const piece of options.pieces) {
-          states.set(piece.id, {
-            id: piece.id,
-            x: piece.currentPosition.x,
-            y: piece.currentPosition.y,
-            rotation: piece.currentPosition.rotation,
-            isPlaced: piece.isPlaced,
-            visible: piece.trayId === null,
-          });
-        }
-      }
+      if (assemblyProgress === 1) renderStates = finalStates;
       drawFrame(
         canvas,
         image,
@@ -222,11 +242,11 @@ export async function createTimelapse(options: Options): Promise<Blob> {
         options.rows,
         options.columns,
         options.elapsed,
-        progress,
+        assemblyProgress,
       );
-      options.onProgress(Math.round(progress * 100));
-      if (progress < 1) requestAnimationFrame(render);
-      else window.setTimeout(resolve, 650);
+      options.onProgress(Math.round(recordingProgress * 100));
+      if (recordingProgress < 1) requestAnimationFrame(render);
+      else window.setTimeout(resolve, 120);
     };
     requestAnimationFrame(render);
   });
