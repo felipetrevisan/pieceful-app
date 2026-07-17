@@ -15,6 +15,42 @@
   --success: #22c55e;
   --danger: #ffb4ab;
 }
+html[data-theme="candy"] {
+  --bg: #27103f;
+  --bg-deep: #170724;
+  --surface: #3d1b55;
+  --surface-high: #55256b;
+  --text: #fff4fc;
+  --muted: #e7bfdc;
+  --primary: #ff5fa8;
+  --primary-light: #ffc1df;
+  --cyan: #5ce7ff;
+  --pink: #ffcf4a;
+}
+html[data-theme="jungle"] {
+  --bg: #082f2b;
+  --bg-deep: #041d1a;
+  --surface: #12483a;
+  --surface-high: #1d6148;
+  --text: #efffdc;
+  --muted: #b9ddb8;
+  --primary: #a8e63d;
+  --primary-light: #ddff83;
+  --cyan: #45d9cb;
+  --pink: #ff9f43;
+}
+html[data-theme="rainbow"] {
+  --bg: #15245a;
+  --bg-deep: #0a1235;
+  --surface: #293b78;
+  --surface-high: #40549a;
+  --text: #f8f7ff;
+  --muted: #cbd4ff;
+  --primary: #b96cff;
+  --primary-light: #e4b8ff;
+  --cyan: #49e4ff;
+  --pink: #ff6fae;
+}
 
 * {
   box-sizing: border-box;
@@ -31,6 +67,62 @@ body {
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100vh;
+}
+html[data-theme="candy"] body {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 95, 168, 0.38), transparent 18rem),
+    radial-gradient(circle at 88% 24%, rgba(92, 231, 255, 0.3), transparent 20rem),
+    radial-gradient(circle at 48% 92%, rgba(255, 207, 74, 0.22), transparent 18rem), var(--bg);
+  background-size: 115% 115%;
+  animation: playful-background 14s ease-in-out infinite alternate;
+}
+html[data-theme="jungle"] body {
+  background:
+    radial-gradient(ellipse at 10% 12%, rgba(168, 230, 61, 0.3), transparent 22rem),
+    radial-gradient(ellipse at 92% 30%, rgba(255, 159, 67, 0.25), transparent 19rem),
+    radial-gradient(ellipse at 50% 100%, rgba(69, 217, 203, 0.24), transparent 24rem), var(--bg);
+  background-size: 118% 118%;
+  animation: playful-background 17s ease-in-out infinite alternate-reverse;
+}
+html[data-theme="rainbow"] body {
+  background:
+    radial-gradient(circle at 8% 22%, rgba(255, 111, 174, 0.32), transparent 19rem),
+    radial-gradient(circle at 45% 5%, rgba(185, 108, 255, 0.3), transparent 22rem),
+    radial-gradient(circle at 90% 25%, rgba(73, 228, 255, 0.3), transparent 21rem),
+    radial-gradient(circle at 52% 100%, rgba(255, 216, 77, 0.2), transparent 20rem), var(--bg);
+  background-size: 116% 116%;
+  animation: playful-background 12s ease-in-out infinite alternate;
+}
+html[data-theme="candy"] .game-shell,
+html[data-theme="jungle"] .game-shell,
+html[data-theme="rainbow"] .game-shell {
+  background:
+    radial-gradient(
+      circle at 14% 18%,
+      color-mix(in srgb, var(--pink) 30%, transparent),
+      transparent 24rem
+    ),
+    radial-gradient(
+      circle at 88% 28%,
+      color-mix(in srgb, var(--cyan) 26%, transparent),
+      transparent 22rem
+    ),
+    radial-gradient(
+      circle at 50% 90%,
+      color-mix(in srgb, var(--primary) 22%, transparent),
+      transparent 24rem
+    ), var(--bg);
+  background-size: 118% 118%;
+  animation: playful-background 13s ease-in-out infinite alternate;
+}
+@keyframes playful-background {
+  to {
+    background-position:
+      8% 5%,
+      -7% 8%,
+      6% -5%,
+      -5% 4%;
+  }
 }
 button,
 input {
@@ -1112,6 +1204,108 @@ summary {
   font-size: 13px;
   margin: 0 0 20px;
 }
+.theme-settings {
+  grid-column: 1 / -1;
+}
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.theme-option {
+  display: grid;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid rgba(208, 188, 255, 0.15);
+  border-radius: 18px;
+  background: rgba(6, 14, 32, 0.3);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.theme-option:hover {
+  transform: translateY(-3px);
+}
+.theme-option.selected {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cyan) 22%, transparent);
+}
+.theme-option > span:last-child {
+  display: grid;
+  gap: 4px;
+  padding: 0 4px 4px;
+}
+.theme-option small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.theme-preview {
+  height: 92px;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  isolation: isolate;
+}
+.theme-preview strong {
+  z-index: 2;
+  font-size: 34px;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.28));
+  animation: theme-icon-float 2.4s ease-in-out infinite;
+}
+.theme-preview i {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  animation: theme-bubble 3.4s ease-in-out infinite alternate;
+}
+.theme-preview i:nth-of-type(1) {
+  top: 9px;
+  left: 12px;
+}
+.theme-preview i:nth-of-type(2) {
+  right: 15px;
+  bottom: 8px;
+  width: 20px;
+  height: 20px;
+  animation-delay: -1.1s;
+}
+.theme-preview i:nth-of-type(3) {
+  top: 14px;
+  right: 35%;
+  width: 11px;
+  height: 11px;
+  animation-delay: -2s;
+}
+.theme-preview-classic .theme-preview {
+  background: linear-gradient(145deg, #25184f, #0b1326 70%);
+}
+.theme-preview-candy .theme-preview {
+  background: linear-gradient(145deg, #ff5fa8, #8d54d8 55%, #5ce7ff);
+}
+.theme-preview-jungle .theme-preview {
+  background: linear-gradient(145deg, #a8e63d, #17885e 52%, #ff9f43);
+}
+.theme-preview-rainbow .theme-preview {
+  background: linear-gradient(145deg, #ff6fae, #b96cff 42%, #49e4ff 72%, #ffd84d);
+}
+@keyframes theme-icon-float {
+  50% {
+    transform: translateY(-6px) rotate(4deg) scale(1.06);
+  }
+}
+@keyframes theme-bubble {
+  to {
+    transform: translate(10px, -8px) scale(1.18);
+  }
+}
 .achievement-summary {
   display: flex;
   justify-content: space-between;
@@ -1386,6 +1580,9 @@ summary {
   .achievement-grid {
     grid-template-columns: 1fr;
   }
+  .theme-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .creator-layout {
     padding-top: 32px;
   }
@@ -1411,6 +1608,9 @@ summary {
   .achievement-summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .theme-grid {
+    grid-template-columns: 1fr;
   }
   .hero {
     padding-left: 16px;
@@ -1463,6 +1663,13 @@ summary {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  scroll-behavior: auto;
+  animation: none;
+  transition: none;
 }
 .high-contrast {
   --muted: #eef2ff;

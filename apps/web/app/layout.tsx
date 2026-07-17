@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PreferencesLoader } from "@/components/preferences-loader";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +24,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <PreferencesLoader />
+        {children}
+      </body>
     </html>
   );
 }

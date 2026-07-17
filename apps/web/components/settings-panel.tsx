@@ -1,44 +1,70 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  applyPreferences,
+  defaultPreferences,
+  PREFERENCES_KEY,
+  type Preferences,
+  readPreferences,
+  type ThemeId,
+} from "@/lib/preferences";
 
-interface Preferences {
-  sound: boolean;
-  music: boolean;
-  highContrast: boolean;
-  reducedMotion: boolean;
-  snapStrength: number;
-}
-const defaults: Preferences = {
-  sound: true,
-  music: false,
-  highContrast: false,
-  reducedMotion: false,
-  snapStrength: 38,
-};
+const themes: { id: ThemeId; icon: string; name: string; description: string }[] = [
+  { id: "classic", icon: "✦", name: "Cosmic Night", description: "O visual original do Pieceful" },
+  { id: "candy", icon: "🍭", name: "Candy Pop", description: "Rosa, lilás e confeitos brilhantes" },
+  {
+    id: "jungle",
+    icon: "🦖",
+    name: "Jungle Party",
+    description: "Verde, laranja e aventura tropical",
+  },
+  { id: "rainbow", icon: "🌈", name: "Rainbow Sky", description: "Um céu alegre cheio de cores" },
+];
 
 export function SettingsPanel() {
-  const [preferences, setPreferences] = useState(defaults);
+  const [preferences, setPreferences] = useState(defaultPreferences);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    const stored = localStorage.getItem("puzzled-preferences");
-    if (stored) {
-      try {
-        setPreferences({ ...defaults, ...(JSON.parse(stored) as Partial<Preferences>) });
-      } catch {
-        localStorage.removeItem("puzzled-preferences");
-      }
-    }
+    const stored = readPreferences(localStorage);
+    setPreferences(stored);
+    applyPreferences(stored);
   }, []);
   function update(next: Preferences) {
     setPreferences(next);
-    localStorage.setItem("puzzled-preferences", JSON.stringify(next));
-    document.documentElement.classList.toggle("high-contrast", next.highContrast);
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(next));
+    applyPreferences(next);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
   }
   return (
     <div className="settings-page-grid">
+      <section className="glass-card theme-settings">
+        <h2>Temas</h2>
+        <p>Escolha o clima do jogo. Os temas infantis têm cores vivas e movimento suave.</p>
+        <div className="theme-grid">
+          {themes.map((theme) => (
+            <button
+              key={theme.id}
+              type="button"
+              className={`theme-option theme-preview-${theme.id} ${preferences.theme === theme.id ? "selected" : ""}`}
+              aria-pressed={preferences.theme === theme.id}
+              onClick={() => update({ ...preferences, theme: theme.id })}
+            >
+              <span className="theme-preview" aria-hidden="true">
+                <strong>{theme.icon}</strong>
+                <i />
+                <i />
+                <i />
+              </span>
+              <span>
+                <strong>{theme.name}</strong>
+                <small>{theme.description}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
       <section className="glass-card">
         <h2>Som e ambiente</h2>
         <p>O áudio só começa depois da sua primeira interação.</p>

@@ -9,7 +9,7 @@ export default function SettingsPage() {
       <main className="content-page">
         <span className="section-kicker">SEU JEITO DE JOGAR</span>
         <h1>Configurações</h1>
-        <p>Personalize sons, movimento, contraste e encaixe das peças.</p>
+        <p>Personalize temas, sons, movimento, contraste e encaixe das peças.</p>
         <SettingsPanel />
       </main>
       <SiteFooter />
