@@ -508,10 +508,10 @@
   margin: 0 0 8px;
 }
 .controls-panel {
-  width: min(920px, calc(100% - 32px));
+  width: min(1040px, calc(100% - 32px));
   max-height: 88vh;
   overflow: auto;
-  padding: 26px;
+  padding: 30px;
   background: linear-gradient(145deg, rgba(34, 42, 61, 0.98), rgba(11, 19, 38, 0.98));
 }
 .controls-panel > header {
@@ -522,52 +522,55 @@
 }
 .controls-panel h2 {
   margin: 5px 0 0;
-  font-size: 30px;
+  font-size: 36px;
 }
 .controller-status {
   display: flex;
   align-items: center;
   gap: 9px;
   margin: 20px 0;
-  padding: 11px 14px;
+  padding: 13px 16px;
   border: 1px solid rgba(76, 215, 246, 0.22);
   border-radius: 13px;
   background: rgba(76, 215, 246, 0.07);
   color: var(--cyan);
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 700;
 }
 .controller-status > span {
-  font-size: 20px;
+  font-size: 24px;
 }
 .controls-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 .control-group {
-  padding: 17px;
+  padding: 20px;
   border: 1px solid rgba(208, 188, 255, 0.14);
-  border-radius: 16px;
-  background: rgba(6, 14, 32, 0.4);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(160, 120, 255, 0.09), transparent 45%),
+    rgba(6, 14, 32, 0.48);
 }
 .control-group h3 {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin: 0 0 14px;
-  font-size: 14px;
+  margin: 0 0 17px;
+  font-size: 18px;
 }
 .control-group h3 span {
-  min-width: 34px;
-  min-height: 30px;
+  min-width: 44px;
+  min-height: 40px;
   display: grid;
   place-items: center;
-  padding: 0 7px;
+  padding: 0 10px;
   border: 1px solid rgba(76, 215, 246, 0.3);
   border-radius: 9px;
   background: rgba(76, 215, 246, 0.08);
   color: var(--cyan);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 900;
 }
 .control-group dl {
@@ -575,27 +578,38 @@
 }
 .control-group dl > div {
   display: grid;
-  grid-template-columns: 68px 1fr;
+  grid-template-columns: 120px 1fr;
   align-items: center;
-  gap: 9px;
-  min-height: 38px;
+  gap: 14px;
+  min-height: 56px;
   border-top: 1px solid rgba(208, 188, 255, 0.08);
 }
 .control-group dt {
   width: fit-content;
-  max-width: 68px;
-  padding: 4px 7px;
-  border-radius: 7px;
-  background: rgba(160, 120, 255, 0.15);
+  max-width: 120px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(208, 188, 255, 0.24);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(160, 120, 255, 0.24), rgba(80, 55, 140, 0.24));
   color: var(--primary-light);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 850;
+  line-height: 1.15;
   text-align: center;
+  box-shadow:
+    inset 0 -3px 0 rgba(6, 14, 32, 0.35),
+    0 4px 12px rgba(6, 14, 32, 0.2);
 }
 .control-group dd {
   margin: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 .completion-dialog {
   position: fixed;
@@ -964,6 +978,24 @@
   .controls-panel {
     width: calc(100% - 20px);
     max-height: calc(100dvh - 20px);
-    padding: 18px;
+    padding: 18px 14px;
+  }
+  .controls-panel h2 {
+    font-size: 30px;
+  }
+  .control-group {
+    padding: 16px;
+  }
+  .control-group dl > div {
+    grid-template-columns: minmax(94px, 112px) 1fr;
+    gap: 10px;
+    min-height: 58px;
+  }
+  .control-group dt {
+    max-width: 112px;
+    font-size: 11px;
+  }
+  .control-group dd {
+    font-size: 12px;
   }
 }
