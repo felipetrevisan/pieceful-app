@@ -6,12 +6,36 @@ import { Icon } from "./icons";
 
 type HeaderRoute = "home" | "create" | "puzzles" | "achievements" | "settings";
 
-const navigation: { key: HeaderRoute; href: string; label: string }[] = [
-  { key: "home", href: "/", label: "Início" },
-  { key: "create", href: "/create", label: "Criar" },
-  { key: "puzzles", href: "/puzzles", label: "Meus quebra-cabeças" },
-  { key: "achievements", href: "/achievements", label: "Conquistas" },
-  { key: "settings", href: "/settings", label: "Configurações" },
+const navigation: {
+  key: HeaderRoute;
+  href: string;
+  label: string;
+  description: string;
+  icon: "puzzle" | "sparkle" | "folder" | "play" | "settings";
+}[] = [
+  { key: "home", href: "/", label: "Início", description: "Voltar ao começo", icon: "puzzle" },
+  { key: "create", href: "/create", label: "Criar", description: "Nova memória", icon: "sparkle" },
+  {
+    key: "puzzles",
+    href: "/puzzles",
+    label: "Meus quebra-cabeças",
+    description: "Sua coleção",
+    icon: "folder",
+  },
+  {
+    key: "achievements",
+    href: "/achievements",
+    label: "Conquistas",
+    description: "Veja seu progresso",
+    icon: "play",
+  },
+  {
+    key: "settings",
+    href: "/settings",
+    label: "Configurações",
+    description: "Deixe do seu jeito",
+    icon: "settings",
+  },
 ];
 
 interface HighlightPosition {
@@ -73,6 +97,12 @@ function NavigationMenu({
           transform: `translate3d(${highlight.x}px, ${highlight.y}px, 0)`,
         }}
       />
+      {mobile && (
+        <span className="mobile-menu-heading">
+          <small>EXPLORE</small>
+          <strong>Seu espaço Pieceful</strong>
+        </span>
+      )}
       {navigation.map((item) => (
         <Link
           key={item.key}
@@ -81,7 +111,22 @@ function NavigationMenu({
           onPointerEnter={reveal}
           onFocus={reveal}
         >
-          {item.label}
+          {mobile ? (
+            <>
+              <span className="mobile-menu-icon">
+                <Icon name={item.icon} size={19} />
+              </span>
+              <span className="mobile-menu-label">
+                <strong>{item.label}</strong>
+                <small>{item.description}</small>
+              </span>
+              <span className="mobile-menu-arrow" aria-hidden="true">
+                →
+              </span>
+            </>
+          ) : (
+            item.label
+          )}
         </Link>
       ))}
     </nav>
