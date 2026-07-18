@@ -3,17 +3,24 @@
 import { calculateProgress } from "@puzzled/puzzle-engine";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createTimelapse } from "@/lib/create-timelapse";
 import { useI18n } from "@/lib/i18n";
 import { deletePuzzle, listPuzzles, type SavedPuzzle } from "@/lib/puzzle-db";
 import { Icon } from "./icons";
 
 export function SavedPuzzles() {
-  const { locale, t } = useI18n();
+  const { language, locale, t } = useI18n();
   const [puzzles, setPuzzles] = useState<SavedPuzzle[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [processingVideo, setProcessingVideo] = useState<{ id: string; progress: number } | null>(
+    null,
+  );
+  const [generatedVideos, setGeneratedVideos] = useState<Map<string, Blob>>(() => new Map());
+  const [videoNotice, setVideoNotice] = useState<{
+    message: string;
+    status: "processing" | "success" | "error";
+  } | null>(null);
   const noticeTimer = useRef<number | null>(null);
   useEffect(() => {
     listPuzzles()
@@ -34,34 +41,85 @@ export function SavedPuzzles() {
     [],
   );
 
-  async function downloadPuzzleImage(puzzle: SavedPuzzle) {
-    if (downloadingId) return;
-    setDownloadingId(puzzle.id);
-    setDownloadNotice(
-      t(`Preparando o download de “${puzzle.name}”…`, `Preparing “${puzzle.name}” for download…`),
+  function safePuzzleName(puzzle: SavedPuzzle) {
+    return (
+      puzzle.name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9_-]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase() || "pieceful-puzzle"
     );
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    const extension = puzzle.image.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-    const safeName = puzzle.name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9_-]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .toLowerCase();
-    const url = URL.createObjectURL(puzzle.image);
+  }
+
+  async function generatePuzzleVideo(puzzle: SavedPuzzle) {
+    if (processingVideo) return;
+    if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+    setProcessingVideo({ id: puzzle.id, progress: 0 });
+    setVideoNotice({
+      message: t(
+        `Gerando o vídeo de “${puzzle.name}”…`,
+        `Generating the video for “${puzzle.name}”…`,
+      ),
+      status: "processing",
+    });
+    const imageUrl = URL.createObjectURL(puzzle.image);
+    try {
+      const video = await createTimelapse({
+        imageUrl,
+        rows: puzzle.configuration.rows,
+        columns: puzzle.configuration.columns,
+        pieces: puzzle.session.pieces,
+        timelapse: puzzle.session.timelapse,
+        elapsed: puzzle.session.elapsedTime,
+        language,
+        onProgress: (progress) =>
+          setProcessingVideo((current) =>
+            current?.id === puzzle.id ? { ...current, progress } : current,
+          ),
+      });
+      setGeneratedVideos((current) => new Map(current).set(puzzle.id, video));
+      setVideoNotice({
+        message: t(
+          `O vídeo de “${puzzle.name}” está pronto para baixar.`,
+          `The video for “${puzzle.name}” is ready to download.`,
+        ),
+        status: "success",
+      });
+    } catch (caught) {
+      setVideoNotice({
+        message:
+          caught instanceof Error
+            ? caught.message
+            : t("Não foi possível gerar o vídeo.", "Could not generate the video."),
+        status: "error",
+      });
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+      setProcessingVideo(null);
+    }
+  }
+
+  function downloadPuzzleVideo(puzzle: SavedPuzzle, video: Blob) {
+    const extension = video.type === "video/mp4" ? "mp4" : "webm";
+    const safeName = safePuzzleName(puzzle);
+    const url = URL.createObjectURL(video);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${safeName || "pieceful-puzzle"}.${extension}`;
+    link.download = `${safeName}-timelapse.${extension}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-    setDownloadingId(null);
-    setDownloadNotice(
-      t(`Download de “${puzzle.name}” iniciado.`, `Download of “${puzzle.name}” started.`),
-    );
+    setVideoNotice({
+      message: t(
+        `Download do vídeo de “${puzzle.name}” iniciado.`,
+        `Video download for “${puzzle.name}” started.`,
+      ),
+      status: "success",
+    });
     if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
-    noticeTimer.current = window.setTimeout(() => setDownloadNotice(null), 4_000);
+    noticeTimer.current = window.setTimeout(() => setVideoNotice(null), 4_000);
   }
   async function removePuzzle(puzzle: SavedPuzzle) {
     const confirmed = window.confirm(
@@ -123,15 +181,21 @@ export function SavedPuzzles() {
     );
   return (
     <>
-      {downloadNotice && (
-        <output className="collection-download-notice" aria-live="polite">
+      {videoNotice && (
+        <output className={`collection-video-notice ${videoNotice.status}`} aria-live="polite">
           <span
-            className={downloadingId ? "download-spinner" : "download-check"}
+            className={
+              videoNotice.status === "processing"
+                ? "video-spinner"
+                : videoNotice.status === "error"
+                  ? "video-error-icon"
+                  : "video-check"
+            }
             aria-hidden="true"
           >
-            {downloadingId ? "↓" : "✓"}
+            {videoNotice.status === "processing" ? "▶" : videoNotice.status === "error" ? "!" : "✓"}
           </span>
-          {downloadNotice}
+          {videoNotice.message}
         </output>
       )}
       <div className="saved-grid">
@@ -139,6 +203,8 @@ export function SavedPuzzles() {
           const placed = puzzle.session.pieces.filter((piece) => piece.isPlaced).length;
           const progress = calculateProgress(placed, puzzle.session.pieces.length);
           const completed = puzzle.session.completedAt !== null || progress === 100;
+          const generatedVideo = generatedVideos.get(puzzle.id);
+          const isGeneratingVideo = processingVideo?.id === puzzle.id;
           const url = URL.createObjectURL(puzzle.image);
           return (
             <article
@@ -164,7 +230,7 @@ export function SavedPuzzles() {
                   {progress}% {t("concluído", "completed")} · {t("salvo", "saved")}{" "}
                   {new Date(puzzle.updatedAt).toLocaleDateString(locale)}
                 </p>
-                <div className="saved-card-actions">
+                <div className={`saved-card-actions ${completed ? "" : "single-action"}`}>
                   <Link className="primary-button" href={`/puzzle?id=${puzzle.id}`}>
                     {completed
                       ? t("Finalizado", "Completed")
@@ -172,23 +238,34 @@ export function SavedPuzzles() {
                         ? t("Continuar montagem", "Continue puzzle")
                         : t("Abrir caixa", "Open box")}
                   </Link>
-                  <button
-                    type="button"
-                    className="secondary-button download-puzzle-button"
-                    disabled={downloadingId !== null || deletingId === puzzle.id}
-                    onClick={() => void downloadPuzzleImage(puzzle)}
-                  >
-                    <span className="download-icon" aria-hidden="true">
-                      ↓
-                    </span>
-                    {downloadingId === puzzle.id
-                      ? t("Baixando…", "Downloading…")
-                      : t("Baixar imagem", "Download image")}
-                  </button>
+                  {completed && (
+                    <button
+                      type="button"
+                      className="secondary-button puzzle-video-button"
+                      disabled={processingVideo !== null || deletingId === puzzle.id}
+                      onClick={() =>
+                        generatedVideo
+                          ? downloadPuzzleVideo(puzzle, generatedVideo)
+                          : void generatePuzzleVideo(puzzle)
+                      }
+                    >
+                      <span className="download-icon" aria-hidden="true">
+                        {generatedVideo ? "↓" : "▶"}
+                      </span>
+                      {isGeneratingVideo
+                        ? t(
+                            `Gerando… ${processingVideo.progress}%`,
+                            `Generating… ${processingVideo.progress}%`,
+                          )
+                        : generatedVideo
+                          ? t("Baixar vídeo", "Download video")
+                          : t("Gerar vídeo", "Generate video")}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="delete-puzzle-button"
-                    disabled={deletingId === puzzle.id}
+                    disabled={deletingId === puzzle.id || processingVideo?.id === puzzle.id}
                     onClick={() => void removePuzzle(puzzle)}
                     aria-label={t(
                       `Excluir quebra-cabeça ${puzzle.name}`,
