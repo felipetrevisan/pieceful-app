@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { PuzzlePiece } from "@puzzled/puzzle-engine";
 import {
   completedTimelapseStates,
+  interpolateRotation,
   MIN_TIMELAPSE_DURATION_SECONDS,
   timelapseDuration,
 } from "./create-timelapse";
@@ -33,5 +34,10 @@ describe("timelapse da montagem", () => {
       { id: "one", x: 0, y: 0, rotation: 0, isPlaced: true, visible: true },
       { id: "two", x: 3, y: 2, rotation: 0, isPlaced: true, visible: true },
     ]);
+  });
+
+  test("interpola rotações pelo caminho mais curto", () => {
+    expect(interpolateRotation(270, 0, 0.5)).toBe(315);
+    expect(interpolateRotation(0, 270, 0.5)).toBe(-45);
   });
 });

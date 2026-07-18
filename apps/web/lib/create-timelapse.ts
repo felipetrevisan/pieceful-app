@@ -61,6 +61,11 @@ function videoMime(): string {
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "video/webm";
 }
 
+export function interpolateRotation(from: number, to: number, progress: number): number {
+  const shortestTurn = ((to - from + 540) % 360) - 180;
+  return from + shortestTurn * progress;
+}
+
 function drawFrame(
   canvas: HTMLCanvasElement,
   image: HTMLImageElement,
@@ -109,7 +114,12 @@ function drawFrame(
   ctx.fill();
   ctx.stroke();
 
-  for (const piece of pieces) {
+  const orderedPieces = [...pieces].sort((left, right) => {
+    const leftPlaced = states.get(left.id)?.isPlaced === true ? 0 : 1;
+    const rightPlaced = states.get(right.id)?.isPlaced === true ? 0 : 1;
+    return leftPlaced - rightPlaced;
+  });
+  for (const piece of orderedPieces) {
     const state = states.get(piece.id);
     if (!state?.visible) continue;
     const x = originX + state.x * cell;
@@ -172,13 +182,34 @@ export async function createTimelapse(options: Options): Promise<Blob> {
   const mimeType = videoMime();
   const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
   const chunks: Blob[] = [];
+  let encodedMilliseconds = 0;
+  let hasEncoderTimecode = false;
   recorder.ondataavailable = (event) => {
     if (event.data.size > 0) chunks.push(event.data);
+    if (event.timecode > 0) {
+      hasEncoderTimecode = true;
+      encodedMilliseconds = Math.max(encodedMilliseconds, event.timecode);
+    }
   };
   const finished = new Promise<Blob>((resolve, reject) => {
-    recorder.onerror = () => reject(new Error("Não foi possível finalizar o vídeo."));
-    recorder.onstop = () =>
-      resolve(new Blob(chunks, { type: mimeType.split(";")[0] ?? "video/webm" }));
+    recorder.addEventListener(
+      "error",
+      () => reject(new Error("Não foi possível finalizar o vídeo.")),
+      { once: true },
+    );
+    recorder.addEventListener(
+      "stop",
+      () => resolve(new Blob(chunks, { type: mimeType.split(";")[0] ?? "video/webm" })),
+      { once: true },
+    );
+  });
+  const started = new Promise<void>((resolve, reject) => {
+    recorder.addEventListener("start", () => resolve(), { once: true });
+    recorder.addEventListener(
+      "error",
+      () => reject(new Error("O navegador não conseguiu iniciar o encoder de vídeo.")),
+      { once: true },
+    );
   });
 
   const fallbackInitial = options.pieces.map((piece) => ({
@@ -196,7 +227,18 @@ export async function createTimelapse(options: Options): Promise<Blob> {
   const assemblyDuration = duration - FINAL_FRAME_HOLD_SECONDS;
   const finalStates = completedTimelapseStates(options.pieces);
   let appliedFrame = -1;
+  drawFrame(
+    canvas,
+    image,
+    options.pieces,
+    states,
+    options.rows,
+    options.columns,
+    options.elapsed,
+    0,
+  );
   recorder.start(500);
+  await started;
 
   await new Promise<void>((resolve) => {
     const startedAt = performance.now();
@@ -225,7 +267,7 @@ export async function createTimelapse(options: Options): Promise<Blob> {
                   ...change,
                   x: before.x + (change.x - before.x) * transition,
                   y: before.y + (change.y - before.y) * transition,
-                  rotation: before.rotation + (change.rotation - before.rotation) * transition,
+                  rotation: interpolateRotation(before.rotation, change.rotation, transition),
                   isPlaced: transition > 0.82 ? change.isPlaced : before.isPlaced,
                   visible: change.visible || before.visible,
                 }
@@ -245,13 +287,18 @@ export async function createTimelapse(options: Options): Promise<Blob> {
         assemblyProgress,
       );
       options.onProgress(Math.round(recordingProgress * 100));
-      if (recordingProgress < 1) requestAnimationFrame(render);
+      const encoderReachedDuration =
+        !hasEncoderTimecode || encodedMilliseconds >= (duration - 0.25) * 1000;
+      if (recordingProgress < 1 || !encoderReachedDuration) requestAnimationFrame(render);
       else window.setTimeout(resolve, 120);
     };
     requestAnimationFrame(render);
   });
 
   recorder.stop();
-  for (const track of stream.getTracks()) track.stop();
-  return finished;
+  try {
+    return await finished;
+  } finally {
+    for (const track of stream.getTracks()) track.stop();
+  }
 }
