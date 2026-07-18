@@ -4,6 +4,13 @@ import {
   type PuzzleTimelapsePiece,
   tracePiecePath,
 } from "@puzzled/puzzle-engine";
+import {
+  BufferTarget,
+  CanvasSource,
+  getFirstEncodableVideoCodec,
+  Mp4OutputFormat,
+  Output,
+} from "mediabunny";
 
 interface Options {
   imageUrl: string;
@@ -16,14 +23,29 @@ interface Options {
 }
 
 export const MIN_TIMELAPSE_DURATION_SECONDS = 10;
+export const TIMELAPSE_FRAMES_PER_SECOND = 24;
 const MAX_TIMELAPSE_DURATION_SECONDS = 20;
 const FINAL_FRAME_HOLD_SECONDS = 1.5;
+const VIDEO_BITRATE = 5_000_000;
 
 export function timelapseDuration(frameCount: number): number {
   return Math.min(
     MAX_TIMELAPSE_DURATION_SECONDS,
     Math.max(MIN_TIMELAPSE_DURATION_SECONDS, frameCount * 0.07),
   );
+}
+
+export function timelapseFramePlan(frameCount: number) {
+  const duration = timelapseDuration(frameCount);
+  const totalFrames = Math.ceil(duration * TIMELAPSE_FRAMES_PER_SECOND);
+  const finalHoldFrames = Math.round(FINAL_FRAME_HOLD_SECONDS * TIMELAPSE_FRAMES_PER_SECOND);
+  return {
+    duration,
+    totalFrames,
+    finalHoldFrames,
+    assemblyFrames: totalFrames - finalHoldFrames,
+    frameDuration: 1 / TIMELAPSE_FRAMES_PER_SECOND,
+  };
 }
 
 export function completedTimelapseStates(pieces: PuzzlePiece[]): Map<string, PuzzleTimelapsePiece> {
@@ -49,16 +71,6 @@ function loadImage(source: string): Promise<HTMLImageElement> {
     image.onerror = () => reject(new Error("Não foi possível carregar a imagem do timelapse."));
     image.src = source;
   });
-}
-
-function videoMime(): string {
-  const candidates = [
-    "video/mp4;codecs=avc1.42E01E",
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
-  ];
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "video/webm";
 }
 
 export function interpolateRotation(from: number, to: number, progress: number): number {
@@ -171,46 +183,15 @@ function drawFrame(
 }
 
 export async function createTimelapse(options: Options): Promise<Blob> {
-  if (typeof MediaRecorder === "undefined") {
-    throw new Error("Este navegador não consegue gerar vídeos. Tente pelo celular.");
+  if (typeof VideoEncoder === "undefined") {
+    throw new Error(
+      "Este navegador não oferece a codificação de vídeo necessária. Atualize o navegador e tente novamente.",
+    );
   }
   const image = await loadImage(options.imageUrl);
   const canvas = document.createElement("canvas");
   canvas.width = 720;
   canvas.height = 1280;
-  const stream = canvas.captureStream(30);
-  const mimeType = videoMime();
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
-  const chunks: Blob[] = [];
-  let encodedMilliseconds = 0;
-  let hasEncoderTimecode = false;
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) chunks.push(event.data);
-    if (event.timecode > 0) {
-      hasEncoderTimecode = true;
-      encodedMilliseconds = Math.max(encodedMilliseconds, event.timecode);
-    }
-  };
-  const finished = new Promise<Blob>((resolve, reject) => {
-    recorder.addEventListener(
-      "error",
-      () => reject(new Error("Não foi possível finalizar o vídeo.")),
-      { once: true },
-    );
-    recorder.addEventListener(
-      "stop",
-      () => resolve(new Blob(chunks, { type: mimeType.split(";")[0] ?? "video/webm" })),
-      { once: true },
-    );
-  });
-  const started = new Promise<void>((resolve, reject) => {
-    recorder.addEventListener("start", () => resolve(), { once: true });
-    recorder.addEventListener(
-      "error",
-      () => reject(new Error("O navegador não conseguiu iniciar o encoder de vídeo.")),
-      { once: true },
-    );
-  });
 
   const fallbackInitial = options.pieces.map((piece) => ({
     id: piece.id,
@@ -223,29 +204,32 @@ export async function createTimelapse(options: Options): Promise<Blob> {
   const timeline = options.timelapse ?? { initial: fallbackInitial, frames: [] };
   const states = new Map(timeline.initial.map((piece) => [piece.id, { ...piece }]));
   const frames = timeline.frames;
-  const duration = timelapseDuration(frames.length);
-  const assemblyDuration = duration - FINAL_FRAME_HOLD_SECONDS;
+  const plan = timelapseFramePlan(frames.length);
   const finalStates = completedTimelapseStates(options.pieces);
   let appliedFrame = -1;
-  drawFrame(
-    canvas,
-    image,
-    options.pieces,
-    states,
-    options.rows,
-    options.columns,
-    options.elapsed,
-    0,
-  );
-  recorder.start(500);
-  await started;
 
-  await new Promise<void>((resolve) => {
-    const startedAt = performance.now();
-    const render = (now: number) => {
-      const elapsedSeconds = (now - startedAt) / 1000;
-      const recordingProgress = Math.min(1, elapsedSeconds / duration);
-      const assemblyProgress = Math.min(1, elapsedSeconds / assemblyDuration);
+  const format = new Mp4OutputFormat({ fastStart: "in-memory" });
+  const codec = await getFirstEncodableVideoCodec(["avc"], {
+    width: canvas.width,
+    height: canvas.height,
+    bitrate: VIDEO_BITRATE,
+  });
+  if (!codec) {
+    throw new Error("Este navegador não consegue codificar o timelapse em MP4.");
+  }
+  const target = new BufferTarget();
+  const output = new Output({ format, target });
+  const videoSource = new CanvasSource(canvas, {
+    codec,
+    bitrate: VIDEO_BITRATE,
+    keyFrameInterval: 2,
+  });
+  output.addVideoTrack(videoSource, { frameRate: TIMELAPSE_FRAMES_PER_SECOND });
+
+  try {
+    await output.start();
+    for (let videoFrame = 0; videoFrame < plan.totalFrames; videoFrame += 1) {
+      const assemblyProgress = Math.min(1, videoFrame / Math.max(1, plan.assemblyFrames - 1));
       const framePosition = assemblyProgress * frames.length;
       const targetFrame = Math.floor(framePosition) - 1;
       while (appliedFrame < targetFrame) {
@@ -253,6 +237,7 @@ export async function createTimelapse(options: Options): Promise<Blob> {
         const frame = frames[appliedFrame];
         if (frame) for (const change of frame.changes) states.set(change.id, { ...change });
       }
+
       let renderStates = states;
       const nextFrame = frames[targetFrame + 1];
       if (nextFrame && assemblyProgress < 1) {
@@ -276,6 +261,7 @@ export async function createTimelapse(options: Options): Promise<Blob> {
         }
       }
       if (assemblyProgress === 1) renderStates = finalStates;
+
       drawFrame(
         canvas,
         image,
@@ -286,19 +272,21 @@ export async function createTimelapse(options: Options): Promise<Blob> {
         options.elapsed,
         assemblyProgress,
       );
-      options.onProgress(Math.round(recordingProgress * 100));
-      const encoderReachedDuration =
-        !hasEncoderTimecode || encodedMilliseconds >= (duration - 0.25) * 1000;
-      if (recordingProgress < 1 || !encoderReachedDuration) requestAnimationFrame(render);
-      else window.setTimeout(resolve, 120);
-    };
-    requestAnimationFrame(render);
-  });
+      await videoSource.add(videoFrame * plan.frameDuration, plan.frameDuration);
+      options.onProgress(Math.round(((videoFrame + 1) / plan.totalFrames) * 100));
 
-  recorder.stop();
-  try {
-    return await finished;
-  } finally {
-    for (const track of stream.getTracks()) track.stop();
+      if (videoFrame > 0 && videoFrame % 12 === 0) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+    }
+    await output.finalize();
+  } catch (error) {
+    await output.cancel();
+    throw error;
   }
+
+  if (!target.buffer) {
+    throw new Error("Não foi possível finalizar o arquivo do timelapse.");
+  }
+  return new Blob([target.buffer], { type: format.mimeType });
 }
