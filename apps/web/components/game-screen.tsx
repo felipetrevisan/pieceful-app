@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import { type Achievement, unlockAchievements } from "@/lib/achievements";
+import { useI18n } from "@/lib/i18n";
 import { savePuzzle } from "@/lib/puzzle-db";
 import type { PhotoCredit } from "@/lib/unsplash";
 import { AchievementToast } from "./achievement-toast";
@@ -76,6 +77,7 @@ export function GameScreen({
   photoCredit,
   initialSession,
 }: Props) {
+  const { t } = useI18n();
   const [session, setSession] = useState(initialSession);
   const [paused, setPaused] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
@@ -279,15 +281,17 @@ export function GameScreen({
         style={{ "--game-progress": `${progress}%` } as CSSProperties}
       >
         <div>
-          <a href="/" className="back-button" aria-label="Voltar ao início">
+          <a href="/" className="back-button" aria-label={t("Voltar ao início", "Back to home")}>
             ←
           </a>
           <span>
             <strong>{name}</strong>
-            <small>Dificuldade: {difficulty}</small>
+            <small>
+              {t("Dificuldade", "Difficulty")}: {difficulty}
+            </small>
             {photoCredit && (
               <small className="game-photo-credit">
-                Foto por{" "}
+                {t("Foto por", "Photo by")}{" "}
                 <a href={photoCredit.photographerUrl} target="_blank" rel="noreferrer">
                   {photoCredit.photographer}
                 </a>{" "}
@@ -300,9 +304,11 @@ export function GameScreen({
           </span>
         </div>
         <div className="progress-cluster">
-          <span>{progress}% concluído</span>
+          <span>
+            {progress}% {t("concluído", "completed")}
+          </span>
           <small>
-            {placedPieces} de {session.pieces.length}
+            {placedPieces} {t("de", "of")} {session.pieces.length}
           </small>
         </div>
         <div className="timer">
@@ -312,8 +318,8 @@ export function GameScreen({
           <a
             href="/settings"
             className="icon-button"
-            aria-label="Abrir configurações"
-            title="Configurações"
+            aria-label={t("Abrir configurações", "Open settings")}
+            title={t("Configurações", "Settings")}
           >
             <Icon name="settings" />
           </a>
@@ -321,11 +327,11 @@ export function GameScreen({
             type="button"
             className="icon-button"
             onClick={() => setPaused(true)}
-            aria-label="Pausar"
+            aria-label={t("Pausar", "Pause")}
           >
             <Icon name="pause" />
           </button>
-          <button type="button" className="icon-button" aria-label="Som">
+          <button type="button" className="icon-button" aria-label={t("Som", "Sound")}>
             <Icon name="volume" />
           </button>
         </div>
@@ -348,7 +354,7 @@ export function GameScreen({
         {configuration.totalPieces >= 500 && (
           <aside className="minimap glass-card">
             <div>
-              <strong>Mapa do tabuleiro</strong>
+              <strong>{t("Mapa do tabuleiro", "Board map")}</strong>
               <span>{activeRegion.replaceAll("-", " ")}</span>
             </div>
             <div className="region-grid">
@@ -361,7 +367,10 @@ export function GameScreen({
                     setActiveRegion(region);
                     setSession((current) => ({ ...current, activeRegion: region }));
                   }}
-                  aria-label={`Focar região ${region.replaceAll("-", " ")}`}
+                  aria-label={t(
+                    `Focar região ${region.replaceAll("-", " ")}`,
+                    `Focus region ${region.replaceAll("-", " ")}`,
+                  )}
                 />
               ))}
             </div>
@@ -373,9 +382,9 @@ export function GameScreen({
           <button type="button">
             <Icon name="puzzle" />
             <span>
-              Alternar
+              {t("Alternar", "Switch")}
               <br />
-              peças
+              {t("peças", "pieces")}
             </span>
           </button>
           <button type="button" onClick={() => setControlsOpen(true)}>
@@ -383,17 +392,17 @@ export function GameScreen({
               ⌨
             </span>
             <span>
-              Ver
+              {t("Ver", "View")}
               <br />
-              controles
+              {t("controles", "controls")}
             </span>
           </button>
           <button type="button">
             <Icon name="grid" />
             <span>
-              Organizar
+              {t("Organizar", "Organize")}
               <br />
-              bordas
+              {t("bordas", "edges")}
             </span>
           </button>
           {configuration.referenceEnabled && (
@@ -404,32 +413,34 @@ export function GameScreen({
             >
               <Icon name="folder" />
               <span>
-                Mostrar
+                {t("Mostrar", "Show")}
                 <br />
-                referência
+                {t("referência", "reference")}
               </span>
             </button>
           )}
         </div>
         {configuration.hintsEnabled && (
           <button type="button" className="hint-button" onClick={useHint}>
-            ♧ Dar uma dica
+            ♧ {t("Dar uma dica", "Give a hint")}
           </button>
         )}
         <div className="save-state" aria-live="polite">
           {saveStatus === "saving"
-            ? "Salvando…"
+            ? t("Salvando…", "Saving…")
             : saveStatus === "saved"
-              ? "Progresso salvo"
-              : "Não foi possível salvar"}
+              ? t("Progresso salvo", "Progress saved")
+              : t("Não foi possível salvar", "Could not save")}
         </div>
       </section>
       {session.pieces.some((piece) => piece.trayId !== null && !piece.isPlaced) && (
         <aside className="piece-tray glass-card">
           <div className="tray-header">
             <div>
-              <strong>Bandejas</strong>
-              <span>{trayPieces.length} peças</span>
+              <strong>{t("Bandejas", "Trays")}</strong>
+              <span>
+                {trayPieces.length} {t("peças", "pieces")}
+              </span>
             </div>
             <div>
               {(["todas", "bordas", "centro", "grupos"] as const).map((value) => (
@@ -439,7 +450,12 @@ export function GameScreen({
                   className={tray === value ? "active" : ""}
                   onClick={() => setTray(value)}
                 >
-                  {value}
+                  {t(
+                    value,
+                    (
+                      { todas: "all", bordas: "edges", centro: "center", grupos: "groups" } as const
+                    )[value],
+                  )}
                 </button>
               ))}
             </div>
@@ -450,12 +466,17 @@ export function GameScreen({
                 <span className="mini-piece">
                   {piece.row + 1}:{piece.column + 1}
                 </span>
-                <small>Levar ao tabuleiro</small>
+                <small>{t("Levar ao tabuleiro", "Move to board")}</small>
               </button>
             ))}
           </div>
           {trayPieces.length > 60 && (
-            <p>Mostrando 60 peças por vez para manter a partida fluida.</p>
+            <p>
+              {t(
+                "Mostrando 60 peças por vez para manter a partida fluida.",
+                "Showing 60 pieces at a time to keep the game smooth.",
+              )}
+            </p>
           )}
         </aside>
       )}
@@ -470,13 +491,18 @@ export function GameScreen({
             <span className="card-icon">
               <Icon name="pause" />
             </span>
-            <h2 id={pauseTitleId}>Partida pausada</h2>
-            <p>Seu progresso está seguro neste dispositivo.</p>
+            <h2 id={pauseTitleId}>{t("Partida pausada", "Game paused")}</h2>
+            <p>
+              {t(
+                "Seu progresso está seguro neste dispositivo.",
+                "Your progress is safe on this device.",
+              )}
+            </p>
             <button type="button" className="primary-button" onClick={() => setPaused(false)}>
-              Continuar montagem
+              {t("Continuar montagem", "Continue puzzle")}
             </button>
             <a href="/" className="secondary-button">
-              Sair para o início
+              {t("Sair para o início", "Exit to home")}
             </a>
           </div>
         </div>
@@ -487,18 +513,18 @@ export function GameScreen({
             className="controls-panel glass-card"
             role="dialog"
             aria-modal="true"
-            aria-label="Controles do jogo"
+            aria-label={t("Controles do jogo", "Game controls")}
           >
             <header>
               <div>
-                <span className="section-kicker">COMO JOGAR</span>
-                <h2>Controles</h2>
+                <span className="section-kicker">{t("COMO JOGAR", "HOW TO PLAY")}</span>
+                <h2>{t("Controles", "Controls")}</h2>
               </div>
               <button
                 type="button"
                 className="icon-button"
                 onClick={() => setControlsOpen(false)}
-                aria-label="Fechar controles"
+                aria-label={t("Fechar controles", "Close controls")}
               >
                 ×
               </button>
@@ -506,53 +532,56 @@ export function GameScreen({
             <div className="controller-status" aria-live="polite">
               <span aria-hidden="true">🎮</span>
               {controllerName
-                ? `${controllerName} conectado`
-                : "Conecte um controle e pressione um botão"}
+                ? t(`${controllerName} conectado`, `${controllerName} connected`)
+                : t(
+                    "Conecte um controle e pressione um botão",
+                    "Connect a controller and press a button",
+                  )}
             </div>
             <div className="controls-grid">
               <ControlGroup
                 icon="☝"
-                title="Celular e tablet"
+                title={t("Celular e tablet", "Phone and tablet")}
                 rows={[
-                  ["1 dedo", "Mover peça ou tabuleiro"],
-                  ["2 dedos", "Zoom e navegação"],
-                  ["Selecionar + ↻", "Rotacionar 90°"],
+                  [t("1 dedo", "1 finger"), t("Mover peça ou tabuleiro", "Move piece or board")],
+                  [t("2 dedos", "2 fingers"), t("Zoom e navegação", "Zoom and navigate")],
+                  [t("Selecionar + ↻", "Select + ↻"), t("Rotacionar 90°", "Rotate 90°")],
                 ]}
               />
               <ControlGroup
                 icon="⌨"
-                title="Teclado e mouse"
+                title={t("Teclado e mouse", "Keyboard and mouse")}
                 rows={[
-                  ["Arrastar", "Mover peça ou grupo"],
-                  ["↑ ↓ ← →", "Mover peça selecionada"],
-                  ["R", "Rotacionar 90°"],
-                  ["[  ]", "Peça anterior / próxima"],
+                  [t("Arrastar", "Drag"), t("Mover peça ou grupo", "Move piece or group")],
+                  ["↑ ↓ ← →", t("Mover peça selecionada", "Move selected piece")],
+                  ["R", t("Rotacionar 90°", "Rotate 90°")],
+                  ["[  ]", t("Peça anterior / próxima", "Previous / next piece")],
                   ["+  −", "Zoom"],
-                  ["0", "Centralizar tabuleiro"],
+                  ["0", t("Centralizar tabuleiro", "Center board")],
                 ]}
               />
               <ControlGroup
                 icon="XBOX"
                 title="Xbox"
                 rows={[
-                  ["L", "Mover peça"],
-                  ["A", "Próxima peça"],
-                  ["B", "Rotacionar"],
-                  ["LB / RB", "Alternar peça"],
+                  ["L", t("Mover peça", "Move piece")],
+                  ["A", t("Próxima peça", "Next piece")],
+                  ["B", t("Rotacionar", "Rotate")],
+                  ["LB / RB", t("Alternar peça", "Switch piece")],
                   ["LT / RT", "Zoom"],
-                  ["MENU", "Pausar"],
+                  ["MENU", t("Pausar", "Pause")],
                 ]}
               />
               <ControlGroup
                 icon="PS"
                 title="PlayStation"
                 rows={[
-                  ["L", "Mover peça"],
-                  ["×", "Próxima peça"],
-                  ["○", "Rotacionar"],
-                  ["L1 / R1", "Alternar peça"],
+                  ["L", t("Mover peça", "Move piece")],
+                  ["×", t("Próxima peça", "Next piece")],
+                  ["○", t("Rotacionar", "Rotate")],
+                  ["L1 / R1", t("Alternar peça", "Switch piece")],
                   ["L2 / R2", "Zoom"],
-                  ["OPTIONS", "Pausar"],
+                  ["OPTIONS", t("Pausar", "Pause")],
                 ]}
               />
             </div>

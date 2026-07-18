@@ -13,6 +13,7 @@ export const themeIds = [
   "space",
 ] as const;
 export type ThemeId = (typeof themeIds)[number];
+export type Language = "pt-BR" | "en";
 
 export interface Preferences {
   sound: boolean;
@@ -21,6 +22,7 @@ export interface Preferences {
   reducedMotion: boolean;
   snapStrength: number;
   theme: ThemeId;
+  language: Language;
 }
 
 export const defaultPreferences: Preferences = {
@@ -30,6 +32,7 @@ export const defaultPreferences: Preferences = {
   reducedMotion: false,
   snapStrength: 38,
   theme: "classic",
+  language: "pt-BR",
 };
 
 export function readPreferences(storage: Pick<Storage, "getItem" | "removeItem">): Preferences {
@@ -41,6 +44,7 @@ export function readPreferences(storage: Pick<Storage, "getItem" | "removeItem">
       ...defaultPreferences,
       ...parsed,
       theme: themeIds.includes(parsed.theme as ThemeId) ? (parsed.theme as ThemeId) : "classic",
+      language: parsed.language === "en" ? "en" : "pt-BR",
     };
   } catch {
     storage.removeItem(PREFERENCES_KEY);
@@ -50,6 +54,9 @@ export function readPreferences(storage: Pick<Storage, "getItem" | "removeItem">
 
 export function applyPreferences(preferences: Preferences, root = document.documentElement) {
   root.dataset.theme = preferences.theme;
+  root.dataset.language = preferences.language;
+  root.lang = preferences.language;
   root.classList.toggle("high-contrast", preferences.highContrast);
   root.classList.toggle("reduced-motion", preferences.reducedMotion);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("pieceful:language-changed"));
 }

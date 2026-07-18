@@ -44,6 +44,15 @@ describe("preferências visuais", () => {
     expect(readPreferences(storage).theme).toBe("classic");
   });
 
+  test("mantém o idioma inglês e ignora idiomas desconhecidos", () => {
+    expect(readPreferences(storageWith(JSON.stringify({ language: "en" })).storage).language).toBe(
+      "en",
+    );
+    expect(readPreferences(storageWith(JSON.stringify({ language: "fr" })).storage).language).toBe(
+      "pt-BR",
+    );
+  });
+
   test("remove preferências corrompidas", () => {
     const mock = storageWith("{invalid");
     expect(readPreferences(mock.storage)).toEqual(defaultPreferences);

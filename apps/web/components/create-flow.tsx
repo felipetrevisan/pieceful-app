@@ -4,6 +4,7 @@ import type { PuzzleSession } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
 import { useEffect, useMemo, useState } from "react";
 import { generateSession } from "@/lib/generate-session";
+import { useI18n } from "@/lib/i18n";
 import { processImage, retainImageFile, validateImage } from "@/lib/image-processing";
 import { savePuzzle } from "@/lib/puzzle-db";
 import type { PhotoCredit } from "@/lib/unsplash";
@@ -24,6 +25,7 @@ const initialConfiguration: PuzzleConfiguration = {
 };
 
 export function CreateFlow() {
+  const { t } = useI18n();
   const [stage, setStage] = useState<Stage>("create");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export function CreateFlow() {
         if (current) URL.revokeObjectURL(current);
         return null;
       });
-      setError(caught instanceof Error ? caught.message : "Foto inválida.");
+      setError(caught instanceof Error ? caught.message : t("Foto inválida.", "Invalid photo."));
     }
   }
 
@@ -115,7 +117,9 @@ export function CreateFlow() {
       setStage("box");
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Não foi possível criar o quebra-cabeça.",
+        caught instanceof Error
+          ? caught.message
+          : t("Não foi possível criar o quebra-cabeça.", "Could not create the puzzle."),
       );
       setStage("create");
     }
@@ -135,7 +139,7 @@ export function CreateFlow() {
   if (stage === "game" && session && processedImage && imageUrl)
     return (
       <GameScreen
-        name={file?.name.replace(/\.[^.]+$/, "") ?? "Minha memória"}
+        name={file?.name.replace(/\.[^.]+$/, "") ?? t("Minha memória", "My memory")}
         image={processedImage}
         imageUrl={imageUrl}
         difficulty={difficulty}
@@ -170,8 +174,13 @@ export function CreateFlow() {
         {stage === "generating" && (
           <section className="generating">
             <div className="spinner-piece">✦</div>
-            <h1>Cortando sua memória em peças…</h1>
-            <p>Gerando encaixes complementares e organizando as bandejas sem enviar sua foto.</p>
+            <h1>{t("Cortando sua memória em peças…", "Cutting your memory into pieces…")}</h1>
+            <p>
+              {t(
+                "Gerando encaixes complementares e organizando as bandejas sem enviar sua foto.",
+                "Creating matching edges and organizing trays without uploading your photo.",
+              )}
+            </p>
             <div className="generation-bar">
               <i />
             </div>

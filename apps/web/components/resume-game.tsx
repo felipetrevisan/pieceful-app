@@ -2,10 +2,12 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { getPuzzle, type SavedPuzzle } from "@/lib/puzzle-db";
 import { GameScreen } from "./game-screen";
 
 export function ResumeGame() {
+  const { t } = useI18n();
   const id = useSearchParams().get("id");
   const [puzzle, setPuzzle] = useState<SavedPuzzle | null | undefined>(undefined);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -31,16 +33,21 @@ export function ResumeGame() {
     return (
       <div className="generating fullscreen">
         <div className="spinner-piece">✦</div>
-        <h1>Restaurando sua montagem…</h1>
+        <h1>{t("Restaurando sua montagem…", "Restoring your puzzle…")}</h1>
       </div>
     );
   if (!puzzle || !imageUrl)
     return (
       <div className="empty-state fullscreen">
-        <h1>Partida não encontrada</h1>
-        <p>Esta partida pode ter sido removida ou pertencer a outro dispositivo.</p>
+        <h1>{t("Partida não encontrada", "Game not found")}</h1>
+        <p>
+          {t(
+            "Esta partida pode ter sido removida ou pertencer a outro dispositivo.",
+            "This game may have been removed or belong to another device.",
+          )}
+        </p>
         <a className="primary-button" href="/puzzles">
-          Voltar à coleção
+          {t("Voltar à coleção", "Back to collection")}
         </a>
       </div>
     );

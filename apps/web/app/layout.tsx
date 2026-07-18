@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PreferencesLoader } from "@/components/preferences-loader";
+import { LanguageProvider } from "@/lib/i18n";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,8 +26,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="pt-BR">
       <body>
-        <PreferencesLoader />
-        {children}
+        <LanguageProvider>
+          <PreferencesLoader />
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

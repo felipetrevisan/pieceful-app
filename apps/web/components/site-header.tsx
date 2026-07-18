@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FocusEvent, type PointerEvent, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { Icon } from "./icons";
 
 type HeaderRoute = "home" | "create" | "puzzles" | "achievements" | "settings";
@@ -10,30 +11,54 @@ const navigation: {
   key: HeaderRoute;
   href: string;
   label: string;
+  englishLabel: string;
   description: string;
+  englishDescription: string;
   icon: "puzzle" | "sparkle" | "folder" | "play" | "settings";
 }[] = [
-  { key: "home", href: "/", label: "Início", description: "Voltar ao começo", icon: "puzzle" },
-  { key: "create", href: "/create", label: "Criar", description: "Nova memória", icon: "sparkle" },
+  {
+    key: "home",
+    href: "/",
+    label: "Início",
+    englishLabel: "Home",
+    description: "Voltar ao começo",
+    englishDescription: "Back to the beginning",
+    icon: "puzzle",
+  },
+  {
+    key: "create",
+    href: "/create",
+    label: "Criar",
+    englishLabel: "Create",
+    description: "Nova memória",
+    englishDescription: "New memory",
+    icon: "sparkle",
+  },
   {
     key: "puzzles",
     href: "/puzzles",
     label: "Meus quebra-cabeças",
+    englishLabel: "My puzzles",
     description: "Sua coleção",
+    englishDescription: "Your collection",
     icon: "folder",
   },
   {
     key: "achievements",
     href: "/achievements",
     label: "Conquistas",
+    englishLabel: "Achievements",
     description: "Veja seu progresso",
+    englishDescription: "See your progress",
     icon: "play",
   },
   {
     key: "settings",
     href: "/settings",
     label: "Configurações",
+    englishLabel: "Settings",
     description: "Deixe do seu jeito",
+    englishDescription: "Make it yours",
     icon: "settings",
   },
 ];
@@ -53,6 +78,7 @@ function NavigationMenu({
   active?: HeaderRoute | undefined;
   mobile?: boolean | undefined;
 }) {
+  const { language, t } = useI18n();
   const [highlight, setHighlight] = useState<HighlightPosition>({
     x: 0,
     y: 0,
@@ -80,7 +106,11 @@ function NavigationMenu({
   return (
     <nav
       className={mobile ? "mobile-navigation-links" : "desktop-navigation"}
-      aria-label={mobile ? "Navegação mobile" : "Navegação principal"}
+      aria-label={
+        mobile
+          ? t("Navegação mobile", "Mobile navigation")
+          : t("Navegação principal", "Main navigation")
+      }
       onPointerLeave={(event) => {
         if (!event.currentTarget.contains(document.activeElement)) hide();
       }}
@@ -99,8 +129,8 @@ function NavigationMenu({
       />
       {mobile && (
         <span className="mobile-menu-heading">
-          <small>EXPLORE</small>
-          <strong>Seu espaço Pieceful</strong>
+          <small>{t("EXPLORE", "EXPLORE")}</small>
+          <strong>{t("Seu espaço Pieceful", "Your Pieceful space")}</strong>
         </span>
       )}
       {navigation.map((item) => (
@@ -117,13 +147,15 @@ function NavigationMenu({
                 <Icon name={item.icon} size={19} />
               </span>
               <span className="mobile-menu-label">
-                <strong>{item.label}</strong>
-                <small>{item.description}</small>
+                <strong>{language === "en" ? item.englishLabel : item.label}</strong>
+                <small>{language === "en" ? item.englishDescription : item.description}</small>
               </span>
               <span className="mobile-menu-arrow" aria-hidden="true">
                 →
               </span>
             </>
+          ) : language === "en" ? (
+            item.englishLabel
           ) : (
             item.label
           )}
@@ -134,6 +166,7 @@ function NavigationMenu({
 }
 
 export function SiteHeader({ active }: { active?: HeaderRoute }) {
+  const { t } = useI18n();
   return (
     <header className="site-header">
       <Link href="/" className="brand">
@@ -144,7 +177,7 @@ export function SiteHeader({ active }: { active?: HeaderRoute }) {
       </Link>
       <NavigationMenu active={active} />
       <details className="mobile-navigation">
-        <summary aria-label="Abrir menu de navegação">
+        <summary aria-label={t("Abrir menu de navegação", "Open navigation menu")}>
           <span aria-hidden="true" className="menu-lines">
             <i />
             <i />
@@ -156,8 +189,8 @@ export function SiteHeader({ active }: { active?: HeaderRoute }) {
       <a
         className="icon-button"
         href="/settings"
-        aria-label="Abrir configurações"
-        title="Configurações"
+        aria-label={t("Abrir configurações", "Open settings")}
+        title={t("Configurações", "Settings")}
       >
         <Icon name="settings" size={18} />
       </a>

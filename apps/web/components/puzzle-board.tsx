@@ -9,6 +9,7 @@ import {
 } from "@puzzled/puzzle-engine";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { controllerLabel, gamepadButtonCommand, gamepadDirections } from "@/lib/gamepad-controls";
+import { useI18n } from "@/lib/i18n";
 import { orderPiecesForDisplay } from "@/lib/puzzle-layer";
 
 interface Props {
@@ -90,6 +91,7 @@ export function PuzzleBoard({
   rotationEnabled,
   focusRegion,
 }: Props) {
+  const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const piecesRef = useRef(pieces);
@@ -643,7 +645,10 @@ export function PuzzleBoard({
         onWheel={wheel}
         onKeyDown={keyDown}
         tabIndex={0}
-        aria-label="Tabuleiro do quebra-cabeça. Arraste peças com um dedo, use dois dedos para aplicar zoom e selecione uma peça para girá-la."
+        aria-label={t(
+          "Tabuleiro do quebra-cabeça. Arraste peças com um dedo, use dois dedos para aplicar zoom e selecione uma peça para girá-la.",
+          "Puzzle board. Drag pieces with one finger, use two fingers to zoom, and select a piece to rotate it.",
+        )}
       />
       {rotationEnabled &&
         selectedId &&
@@ -654,7 +659,7 @@ export function PuzzleBoard({
             type="button"
             className="mobile-rotate-button"
             onClick={rotateSelectedPiece}
-            aria-label="Girar peça selecionada 90 graus"
+            aria-label={t("Girar peça selecionada 90 graus", "Rotate selected piece 90 degrees")}
           >
             <strong aria-hidden="true">↻</strong>
             Girar peça

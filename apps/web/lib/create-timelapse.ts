@@ -20,6 +20,7 @@ interface Options {
   timelapse: PuzzleTimelapse | undefined;
   elapsed: number;
   onProgress: (progress: number) => void;
+  language?: "pt-BR" | "en";
 }
 
 export const TIMELAPSE_FRAMES_PER_SECOND = 24;
@@ -83,6 +84,7 @@ function drawFrame(
   elapsed: number,
   progress: number,
   displayedPlaced: number,
+  language: "pt-BR" | "en",
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -101,10 +103,14 @@ function drawFrame(
   ctx.fillText("PIECEFUL", width / 2, 66);
   ctx.fillStyle = "#f5f6ff";
   ctx.font = "700 42px Inter, sans-serif";
-  ctx.fillText("Uma memória, peça por peça", width / 2, 122);
+  ctx.fillText(
+    language === "en" ? "A memory, piece by piece" : "Uma memória, peça por peça",
+    width / 2,
+    122,
+  );
   ctx.fillStyle = "#9ea8c5";
   ctx.font = "500 19px Inter, sans-serif";
-  ctx.fillText("TIMELAPSE DA MONTAGEM", width / 2, 158);
+  ctx.fillText(language === "en" ? "ASSEMBLY TIMELAPSE" : "TIMELAPSE DA MONTAGEM", width / 2, 158);
 
   const maxBoardWidth = 620;
   const maxBoardHeight = 760;
@@ -160,10 +166,16 @@ function drawFrame(
   ctx.textAlign = "left";
   ctx.fillStyle = "#f5f6ff";
   ctx.font = "750 34px Inter, sans-serif";
-  ctx.fillText(`${completed}% concluído`, 82, 1093);
+  ctx.fillText(`${completed}% ${language === "en" ? "completed" : "concluído"}`, 82, 1093);
   ctx.fillStyle = "#9ea8c5";
   ctx.font = "500 18px Inter, sans-serif";
-  ctx.fillText(`${placed} de ${pieces.length} peças`, 82, 1128);
+  ctx.fillText(
+    language === "en"
+      ? `${placed} of ${pieces.length} pieces`
+      : `${placed} de ${pieces.length} peças`,
+    82,
+    1128,
+  );
   ctx.textAlign = "right";
   ctx.fillStyle = "#4cd7f6";
   ctx.font = "700 26px Inter, sans-serif";
@@ -175,7 +187,11 @@ function drawFrame(
   ctx.textAlign = "center";
   ctx.fillStyle = "#d9ddf5";
   ctx.font = "600 16px Inter, sans-serif";
-  ctx.fillText("Criado com Pieceful", width / 2, 1250);
+  ctx.fillText(
+    language === "en" ? "Created with Pieceful" : "Criado com Pieceful",
+    width / 2,
+    1250,
+  );
 }
 
 export async function createTimelapse(options: Options): Promise<Blob> {
@@ -315,6 +331,7 @@ export async function createTimelapse(options: Options): Promise<Blob> {
         options.elapsed,
         assemblyProgress,
         displayedPlaced,
+        options.language ?? "pt-BR",
       );
       await videoSource.add(videoFrame * plan.frameDuration, plan.frameDuration);
       options.onProgress(Math.round(((videoFrame + 1) / plan.totalFrames) * 100));

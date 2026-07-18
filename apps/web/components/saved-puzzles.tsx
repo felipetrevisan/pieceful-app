@@ -3,10 +3,12 @@
 import { calculateProgress } from "@puzzled/puzzle-engine";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { deletePuzzle, listPuzzles, type SavedPuzzle } from "@/lib/puzzle-db";
 import { Icon } from "./icons";
 
 export function SavedPuzzles() {
+  const { locale, t } = useI18n();
   const [puzzles, setPuzzles] = useState<SavedPuzzle[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -17,9 +19,14 @@ export function SavedPuzzles() {
     listPuzzles()
       .then(setPuzzles)
       .catch(() =>
-        setError("Não foi possível abrir suas partidas. Verifique o armazenamento do navegador."),
+        setError(
+          t(
+            "Não foi possível abrir suas partidas. Verifique o armazenamento do navegador.",
+            "Could not open your games. Check your browser storage.",
+          ),
+        ),
       );
-  }, []);
+  }, [t]);
   useEffect(
     () => () => {
       if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
@@ -30,7 +37,9 @@ export function SavedPuzzles() {
   async function downloadPuzzleImage(puzzle: SavedPuzzle) {
     if (downloadingId) return;
     setDownloadingId(puzzle.id);
-    setDownloadNotice(`Preparando o download de “${puzzle.name}”…`);
+    setDownloadNotice(
+      t(`Preparando o download de “${puzzle.name}”…`, `Preparing “${puzzle.name}” for download…`),
+    );
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const extension = puzzle.image.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
     const safeName = puzzle.name
@@ -48,13 +57,18 @@ export function SavedPuzzles() {
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
     setDownloadingId(null);
-    setDownloadNotice(`Download de “${puzzle.name}” iniciado.`);
+    setDownloadNotice(
+      t(`Download de “${puzzle.name}” iniciado.`, `Download of “${puzzle.name}” started.`),
+    );
     if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
     noticeTimer.current = window.setTimeout(() => setDownloadNotice(null), 4_000);
   }
   async function removePuzzle(puzzle: SavedPuzzle) {
     const confirmed = window.confirm(
-      `Excluir “${puzzle.name}”? A imagem e todo o progresso serão apagados deste dispositivo.`,
+      t(
+        `Excluir “${puzzle.name}”? A imagem e todo o progresso serão apagados deste dispositivo.`,
+        `Delete “${puzzle.name}”? The image and all progress will be removed from this device.`,
+      ),
     );
     if (!confirmed) return;
     setDeletingId(puzzle.id);
@@ -62,7 +76,12 @@ export function SavedPuzzles() {
       await deletePuzzle(puzzle.id);
       setPuzzles((current) => current?.filter(({ id }) => id !== puzzle.id) ?? []);
     } catch {
-      setError("Não foi possível excluir o quebra-cabeça. Tente novamente.");
+      setError(
+        t(
+          "Não foi possível excluir o quebra-cabeça. Tente novamente.",
+          "Could not delete the puzzle. Try again.",
+        ),
+      );
     } finally {
       setDeletingId(null);
     }
@@ -70,10 +89,10 @@ export function SavedPuzzles() {
   if (error)
     return (
       <div className="empty-state">
-        <h2>Não conseguimos carregar suas partidas</h2>
+        <h2>{t("Não conseguimos carregar suas partidas", "We couldn't load your games")}</h2>
         <p>{error}</p>
         <button type="button" className="secondary-button" onClick={() => window.location.reload()}>
-          Tentar novamente
+          {t("Tentar novamente", "Try again")}
         </button>
       </div>
     );
@@ -81,7 +100,7 @@ export function SavedPuzzles() {
     return (
       <div className="generating compact">
         <div className="spinner-piece">✦</div>
-        <p>Carregando suas memórias…</p>
+        <p>{t("Carregando suas memórias…", "Loading your memories…")}</p>
       </div>
     );
   if (puzzles.length === 0)
@@ -90,10 +109,15 @@ export function SavedPuzzles() {
         <span className="card-icon">
           <Icon name="folder" size={28} />
         </span>
-        <h2>Sua estante está esperando</h2>
-        <p>Crie o primeiro quebra-cabeça e ele ficará salvo aqui, neste dispositivo.</p>
+        <h2>{t("Sua estante está esperando", "Your shelf is waiting")}</h2>
+        <p>
+          {t(
+            "Crie o primeiro quebra-cabeça e ele ficará salvo aqui, neste dispositivo.",
+            "Create your first puzzle and it will be saved here on this device.",
+          )}
+        </p>
         <Link className="primary-button" href="/create">
-          Criar agora
+          {t("Criar agora", "Create now")}
         </Link>
       </div>
     );
@@ -129,20 +153,24 @@ export function SavedPuzzles() {
               <div>
                 <span>
                   {completed
-                    ? "Finalizado"
-                    : `${puzzle.configuration.totalPieces.toLocaleString("pt-BR")} peças`}
+                    ? t("Finalizado", "Completed")
+                    : `${puzzle.configuration.totalPieces.toLocaleString(locale)} ${t("peças", "pieces")}`}
                 </span>
                 <h2>{puzzle.name}</h2>
                 <div className="progress-track">
                   <i style={{ width: `${progress}%` }} />
                 </div>
                 <p>
-                  {progress}% concluído · salvo{" "}
-                  {new Date(puzzle.updatedAt).toLocaleDateString("pt-BR")}
+                  {progress}% {t("concluído", "completed")} · {t("salvo", "saved")}{" "}
+                  {new Date(puzzle.updatedAt).toLocaleDateString(locale)}
                 </p>
                 <div className="saved-card-actions">
                   <Link className="primary-button" href={`/puzzle?id=${puzzle.id}`}>
-                    {completed ? "Finalizado" : progress > 0 ? "Continuar montagem" : "Abrir caixa"}
+                    {completed
+                      ? t("Finalizado", "Completed")
+                      : progress > 0
+                        ? t("Continuar montagem", "Continue puzzle")
+                        : t("Abrir caixa", "Open box")}
                   </Link>
                   <button
                     type="button"
@@ -153,16 +181,23 @@ export function SavedPuzzles() {
                     <span className="download-icon" aria-hidden="true">
                       ↓
                     </span>
-                    {downloadingId === puzzle.id ? "Baixando…" : "Baixar imagem"}
+                    {downloadingId === puzzle.id
+                      ? t("Baixando…", "Downloading…")
+                      : t("Baixar imagem", "Download image")}
                   </button>
                   <button
                     type="button"
                     className="delete-puzzle-button"
                     disabled={deletingId === puzzle.id}
                     onClick={() => void removePuzzle(puzzle)}
-                    aria-label={`Excluir quebra-cabeça ${puzzle.name}`}
+                    aria-label={t(
+                      `Excluir quebra-cabeça ${puzzle.name}`,
+                      `Delete puzzle ${puzzle.name}`,
+                    )}
                   >
-                    {deletingId === puzzle.id ? "Excluindo…" : "Excluir"}
+                    {deletingId === puzzle.id
+                      ? t("Excluindo…", "Deleting…")
+                      : t("Excluir", "Delete")}
                   </button>
                 </div>
               </div>

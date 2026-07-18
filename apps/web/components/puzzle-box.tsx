@@ -2,6 +2,7 @@
 
 import { gsap } from "gsap";
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { Icon } from "./icons";
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
+  const { locale, t } = useI18n();
   const sceneRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLButtonElement>(null);
   const lidRef = useRef<HTMLDivElement>(null);
@@ -67,14 +69,22 @@ export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
     <section className="box-scene" ref={sceneRef}>
       <div className="box-copy">
         <span className="eyebrow">
-          <Icon name="sparkle" size={14} /> SUA EXPERIÊNCIA ESTÁ PRONTA
+          <Icon name="sparkle" size={14} />{" "}
+          {t("SUA EXPERIÊNCIA ESTÁ PRONTA", "YOUR EXPERIENCE IS READY")}
         </span>
         <h1>
           Uma memória.
           <br />
-          <span>{pieces.toLocaleString("pt-BR")} novas peças.</span>
+          <span>
+            {pieces.toLocaleString(locale)} {t("novas peças.", "new pieces.")}
+          </span>
         </h1>
-        <p>Abra a caixa para espalhar as peças e começar a montagem.</p>
+        <p>
+          {t(
+            "Abra a caixa para espalhar as peças e começar a montagem.",
+            "Open the box to spread out the pieces and start playing.",
+          )}
+        </p>
       </div>
       <div className="box-stage">
         <div ref={particlesRef} className="box-particles">
@@ -87,7 +97,7 @@ export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
           type="button"
           className="puzzle-box"
           onClick={open}
-          aria-label="Abrir a caixa do quebra-cabeça"
+          aria-label={t("Abrir a caixa do quebra-cabeça", "Open the puzzle box")}
         >
           <span className="box-floor" />
           <div className="box-depth" aria-hidden="true">
@@ -97,25 +107,28 @@ export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
           <div ref={lidRef} className="box-lid">
             <img src={imageUrl} alt="" />
             <span className="box-lid-shade" />
-            <span className="box-edition">EDIÇÃO ÚNICA</span>
+            <span className="box-edition">{t("EDIÇÃO ÚNICA", "ONE-OF-A-KIND")}</span>
             <span className="box-brand">
               <Icon name="puzzle" size={22} />
               <strong>PIECEFUL</strong>
-              <small>feito com a sua memória</small>
+              <small>{t("feito com a sua memória", "made from your memory")}</small>
             </span>
           </div>
           <div className="box-base">
             <span className="box-base-rim" />
             <span className="box-base-copy">
-              <strong>Minha memória especial</strong>
+              <strong>{t("Minha memória especial", "My special memory")}</strong>
               <span>
-                {pieces.toLocaleString("pt-BR")} peças · {difficulty}
+                {pieces.toLocaleString(locale)} {t("peças", "pieces")} · {difficulty}
               </span>
             </span>
             <small className="box-open-label">
               {opening
-                ? `Organizando suas ${pieces.toLocaleString("pt-BR")} peças…`
-                : "Clique para abrir"}
+                ? t(
+                    `Organizando suas ${pieces.toLocaleString(locale)} peças…`,
+                    `Organizing your ${pieces.toLocaleString(locale)} pieces…`,
+                  )
+                : t("Clique para abrir", "Click to open")}
             </small>
           </div>
         </button>

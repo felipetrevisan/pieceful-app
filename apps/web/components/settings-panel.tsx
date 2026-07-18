@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import {
   applyPreferences,
   defaultPreferences,
@@ -10,66 +11,89 @@ import {
   type ThemeId,
 } from "@/lib/preferences";
 
-const themes: { id: ThemeId; icon: string; name: string; description: string }[] = [
-  { id: "classic", icon: "✦", name: "Cosmic Night", description: "O visual original do Pieceful" },
-  { id: "candy", icon: "🍭", name: "Candy Pop", description: "Interface clara e arredondada" },
+const themes: { id: ThemeId; icon: string; name: string; description: [string, string] }[] = [
+  {
+    id: "classic",
+    icon: "✦",
+    name: "Cosmic Night",
+    description: ["O visual original do Pieceful", "The original Pieceful look"],
+  },
+  {
+    id: "candy",
+    icon: "🍭",
+    name: "Candy Pop",
+    description: ["Interface clara e arredondada", "Bright and rounded interface"],
+  },
   {
     id: "jungle",
     icon: "🦖",
     name: "Jungle Party",
-    description: "Folhagem, madeira e aventura tropical",
+    description: ["Folhagem, madeira e aventura tropical", "Foliage, wood and tropical adventure"],
   },
   {
     id: "rainbow",
     icon: "🌈",
     name: "Rainbow Sky",
-    description: "Céu, nuvens e cartões flutuantes",
+    description: ["Céu, nuvens e cartões flutuantes", "Sky, clouds and floating cards"],
   },
   {
     id: "ocean",
     icon: "🐳",
     name: "Ocean Splash",
-    description: "Ondas, bolhas e aventura submarina",
+    description: [
+      "Ondas, bolhas e aventura submarina",
+      "Waves, bubbles and an underwater adventure",
+    ],
   },
   {
     id: "arcade",
     icon: "👾",
     name: "Pixel Arcade",
-    description: "Pixels, neon e energia retrô",
+    description: ["Pixels, neon e energia retrô", "Pixels, neon and retro energy"],
   },
   {
     id: "castle",
     icon: "🏰",
     name: "Magic Castle",
-    description: "Estrelas, ouro e fantasia encantada",
+    description: ["Estrelas, ouro e fantasia encantada", "Stars, gold and enchanted fantasy"],
   },
   {
     id: "storybook",
     icon: "📖",
     name: "Storybook",
-    description: "Papel, tinta e livro de histórias",
+    description: ["Papel, tinta e livro de histórias", "Paper, ink and storybook charm"],
   },
   {
     id: "cyberpunk",
     icon: "🌆",
     name: "Cyberpunk City",
-    description: "Neon intenso, painéis angulares e cidade digital",
+    description: [
+      "Neon intenso, painéis angulares e cidade digital",
+      "Intense neon, angular panels and a digital city",
+    ],
   },
   {
     id: "hologram",
     icon: "◈",
     name: "Holographic UI",
-    description: "Vidro translúcido, scanners e luz holográfica",
+    description: [
+      "Vidro translúcido, scanners e luz holográfica",
+      "Translucent glass, scanners and holographic light",
+    ],
   },
   {
     id: "space",
     icon: "🛰️",
     name: "Space Station",
-    description: "Metal, estrelas e interface de nave espacial",
+    description: [
+      "Metal, estrelas e interface de nave espacial",
+      "Metal, stars and a spaceship interface",
+    ],
   },
 ];
 
 export function SettingsPanel() {
+  const { language, t } = useI18n();
   const [preferences, setPreferences] = useState(defaultPreferences);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
@@ -86,9 +110,45 @@ export function SettingsPanel() {
   }
   return (
     <div className="settings-page-grid">
+      <section className="glass-card language-settings">
+        <h2>{t("Idioma", "Language")}</h2>
+        <p>
+          {t(
+            "Escolha o idioma usado em toda a interface.",
+            "Choose the language used throughout the interface.",
+          )}
+        </p>
+        <div className="language-options" role="radiogroup" aria-label={t("Idioma", "Language")}>
+          <button
+            type="button"
+            className={preferences.language === "pt-BR" ? "selected" : ""}
+            aria-pressed={preferences.language === "pt-BR"}
+            onClick={() => update({ ...preferences, language: "pt-BR" })}
+          >
+            <span>🇧🇷</span>
+            <strong>Português</strong>
+            <small>Brasil</small>
+          </button>
+          <button
+            type="button"
+            className={preferences.language === "en" ? "selected" : ""}
+            aria-pressed={preferences.language === "en"}
+            onClick={() => update({ ...preferences, language: "en" })}
+          >
+            <span>🇺🇸</span>
+            <strong>English</strong>
+            <small>United States</small>
+          </button>
+        </div>
+      </section>
       <section className="glass-card theme-settings">
-        <h2>Temas</h2>
-        <p>Escolha o clima do jogo. Os temas infantis têm cores vivas e movimento suave.</p>
+        <h2>{t("Temas", "Themes")}</h2>
+        <p>
+          {t(
+            "Escolha o clima do jogo. Os temas infantis têm cores vivas e movimento suave.",
+            "Choose the game's mood. Kids' themes feature bright colors and gentle motion.",
+          )}
+        </p>
         <div className="theme-grid">
           {themes.map((theme) => (
             <button
@@ -106,19 +166,24 @@ export function SettingsPanel() {
               </span>
               <span>
                 <strong>{theme.name}</strong>
-                <small>{theme.description}</small>
+                <small>{language === "en" ? theme.description[1] : theme.description[0]}</small>
               </span>
             </button>
           ))}
         </div>
       </section>
       <section className="glass-card">
-        <h2>Som e ambiente</h2>
-        <p>O áudio só começa depois da sua primeira interação.</p>
+        <h2>{t("Som e ambiente", "Sound and ambience")}</h2>
+        <p>
+          {t(
+            "O áudio só começa depois da sua primeira interação.",
+            "Audio starts only after your first interaction.",
+          )}
+        </p>
         <label className="setting-row">
           <span>
-            <strong>Efeitos sonoros</strong>
-            <small>Encaixes, grupos e conquistas</small>
+            <strong>{t("Efeitos sonoros", "Sound effects")}</strong>
+            <small>{t("Encaixes, grupos e conquistas", "Snaps, groups and achievements")}</small>
           </span>
           <input
             type="checkbox"
@@ -128,8 +193,8 @@ export function SettingsPanel() {
         </label>
         <label className="setting-row">
           <span>
-            <strong>Música ambiente</strong>
-            <small>Trilha suave durante a montagem</small>
+            <strong>{t("Música ambiente", "Background music")}</strong>
+            <small>{t("Trilha suave durante a montagem", "Gentle music while you assemble")}</small>
           </span>
           <input
             type="checkbox"
@@ -139,12 +204,19 @@ export function SettingsPanel() {
         </label>
       </section>
       <section className="glass-card">
-        <h2>Acessibilidade</h2>
-        <p>Ajustes aplicados à interface e às animações.</p>
+        <h2>{t("Acessibilidade", "Accessibility")}</h2>
+        <p>
+          {t(
+            "Ajustes aplicados à interface e às animações.",
+            "Settings applied to the interface and animations.",
+          )}
+        </p>
         <label className="setting-row">
           <span>
-            <strong>Alto contraste</strong>
-            <small>Realça bordas e estados de foco</small>
+            <strong>{t("Alto contraste", "High contrast")}</strong>
+            <small>
+              {t("Realça bordas e estados de foco", "Emphasizes borders and focus states")}
+            </small>
           </span>
           <input
             type="checkbox"
@@ -154,8 +226,10 @@ export function SettingsPanel() {
         </label>
         <label className="setting-row">
           <span>
-            <strong>Movimento reduzido</strong>
-            <small>Encurta animações cinematográficas</small>
+            <strong>{t("Movimento reduzido", "Reduced motion")}</strong>
+            <small>
+              {t("Encurta animações cinematográficas", "Shortens cinematic animations")}
+            </small>
           </span>
           <input
             type="checkbox"
@@ -165,10 +239,15 @@ export function SettingsPanel() {
         </label>
       </section>
       <section className="glass-card">
-        <h2>Montagem</h2>
-        <p>Defina quão perto uma peça precisa estar para encaixar.</p>
+        <h2>{t("Montagem", "Assembly")}</h2>
+        <p>
+          {t(
+            "Defina quão perto uma peça precisa estar para encaixar.",
+            "Set how close a piece must be before it snaps into place.",
+          )}
+        </p>
         <label className="range-setting">
-          Força do encaixe <strong>{preferences.snapStrength}%</strong>
+          {t("Força do encaixe", "Snap strength")} <strong>{preferences.snapStrength}%</strong>
           <input
             type="range"
             min="20"
@@ -180,7 +259,7 @@ export function SettingsPanel() {
           />
         </label>
       </section>
-      {saved && <output className="toast">Preferências salvas</output>}
+      {saved && <output className="toast">{t("Preferências salvas", "Preferences saved")}</output>}
     </div>
   );
 }

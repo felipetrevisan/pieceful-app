@@ -1,7 +1,8 @@
 "use client";
 
 import { DIFFICULTIES, type PuzzleConfiguration, type PuzzleDifficulty } from "@puzzled/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import {
   type PhotoCredit,
   searchUnsplashPhotos,
@@ -29,6 +30,8 @@ interface Props {
 }
 
 export function UploadConfigurator(props: Props) {
+  const { language, locale, t } = useI18n();
+  const advancedOptionsId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [source, setSource] = useState<"device" | "unsplash">("device");
@@ -77,7 +80,11 @@ export function UploadConfigurator(props: Props) {
     try {
       setPhotos(await searchUnsplashPhotos(query.trim()));
     } catch (error) {
-      setPhotoError(error instanceof Error ? error.message : "Não foi possível buscar fotos.");
+      setPhotoError(
+        error instanceof Error
+          ? error.message
+          : t("Não foi possível buscar fotos.", "Could not search for photos."),
+      );
     } finally {
       setSearching(false);
     }
@@ -90,7 +97,11 @@ export function UploadConfigurator(props: Props) {
       const file = await selectUnsplashPhoto(photo);
       props.onUnsplashPhoto(file, photo);
     } catch (error) {
-      setPhotoError(error instanceof Error ? error.message : "Não foi possível escolher a foto.");
+      setPhotoError(
+        error instanceof Error
+          ? error.message
+          : t("Não foi possível escolher a foto.", "Could not select this photo."),
+      );
     } finally {
       setSearching(false);
     }
@@ -99,10 +110,14 @@ export function UploadConfigurator(props: Props) {
   return (
     <div className="creator-layout">
       <section className="photo-panel">
-        <span className="section-kicker">NOVO DESAFIO</span>
+        <span className="section-kicker">{t("NOVO DESAFIO", "NEW CHALLENGE")}</span>
         {!props.previewUrl ? (
           <div className="photo-source-picker">
-            <div className="photo-source-tabs" role="tablist" aria-label="Origem da foto">
+            <div
+              className="photo-source-tabs"
+              role="tablist"
+              aria-label={t("Origem da foto", "Photo source")}
+            >
               <button
                 type="button"
                 role="tab"
@@ -110,7 +125,7 @@ export function UploadConfigurator(props: Props) {
                 className={source === "device" ? "active" : ""}
                 onClick={() => setSource("device")}
               >
-                Meu dispositivo
+                {t("Meu dispositivo", "My device")}
               </button>
               <button
                 type="button"
@@ -137,9 +152,16 @@ export function UploadConfigurator(props: Props) {
                 <span className="upload-orb">
                   <Icon name="upload" size={26} />
                 </span>
-                <strong>Arraste uma foto para cá</strong>
-                <span>ou clique para procurar no seu dispositivo</span>
-                <small>JPG, PNG ou WEBP · máximo 20 MB</small>
+                <strong>{t("Arraste uma foto para cá", "Drag a photo here")}</strong>
+                <span>
+                  {t(
+                    "ou clique para procurar no seu dispositivo",
+                    "or click to browse your device",
+                  )}
+                </span>
+                <small>
+                  {t("JPG, PNG ou WEBP · máximo 20 MB", "JPG, PNG or WEBP · maximum 20 MB")}
+                </small>
               </button>
             ) : (
               <div className="unsplash-picker">
@@ -148,11 +170,14 @@ export function UploadConfigurator(props: Props) {
                     type="search"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Busque natureza, cidades, animais…"
-                    aria-label="Buscar fotos no Unsplash"
+                    placeholder={t(
+                      "Busque natureza, cidades, animais…",
+                      "Search nature, cities, animals…",
+                    )}
+                    aria-label={t("Buscar fotos no Unsplash", "Search Unsplash photos")}
                   />
                   <button type="submit" disabled={searching || query.trim().length < 2}>
-                    {searching ? "Buscando…" : "Buscar"}
+                    {searching ? t("Buscando…", "Searching…") : t("Buscar", "Search")}
                   </button>
                 </form>
                 {photos.length > 0 ? (
@@ -167,7 +192,7 @@ export function UploadConfigurator(props: Props) {
                           <img src={photo.thumbnailUrl} alt={photo.description} />
                         </button>
                         <small>
-                          Foto por{" "}
+                          {t("Foto por", "Photo by")}{" "}
                           <a href={photo.photographerUrl} target="_blank" rel="noreferrer">
                             {photo.photographer}
                           </a>{" "}
@@ -181,8 +206,18 @@ export function UploadConfigurator(props: Props) {
                   </div>
                 ) : (
                   <div className="unsplash-empty">
-                    <strong>Encontre uma imagem para sua próxima montagem</strong>
-                    <span>As fotos incluem crédito aos seus criadores.</span>
+                    <strong>
+                      {t(
+                        "Encontre uma imagem para sua próxima montagem",
+                        "Find an image for your next puzzle",
+                      )}
+                    </strong>
+                    <span>
+                      {t(
+                        "As fotos incluem crédito aos seus criadores.",
+                        "Photos include credit for their creators.",
+                      )}
+                    </span>
                   </div>
                 )}
                 {photoError && <p className="error-message">{photoError}</p>}
@@ -194,7 +229,7 @@ export function UploadConfigurator(props: Props) {
             <div className="crop-frame">
               <img
                 src={props.previewUrl}
-                alt="Prévia da foto escolhida"
+                alt={t("Prévia da foto escolhida", "Selected photo preview")}
                 style={{ transform: `scale(${props.zoom}) rotate(${props.rotation}deg)` }}
               />
               <div
@@ -226,19 +261,19 @@ export function UploadConfigurator(props: Props) {
                 className="secondary-button"
                 onClick={() => props.onRotation((props.rotation + 90) % 360)}
               >
-                Girar 90°
+                {t("Girar 90°", "Rotate 90°")}
               </button>
               <button
                 type="button"
                 className="text-button danger"
                 onClick={() => void props.onFile(null)}
               >
-                Excluir foto
+                {t("Excluir foto", "Remove photo")}
               </button>
             </div>
             {props.photoCredit && (
               <small className="selected-photo-credit">
-                Foto por{" "}
+                {t("Foto por", "Photo by")}{" "}
                 <a href={props.photoCredit.photographerUrl} target="_blank" rel="noreferrer">
                   {props.photoCredit.photographer}
                 </a>{" "}
@@ -267,8 +302,8 @@ export function UploadConfigurator(props: Props) {
         <div className="settings-title">
           <span className="number-badge">1</span>
           <div>
-            <h2>Escolha o nível do desafio</h2>
-            <p>Quanto mais peças, maior a diversão.</p>
+            <h2>{t("Escolha o nível do desafio", "Choose your challenge level")}</h2>
+            <p>{t("Quanto mais peças, maior a diversão.", "More pieces, more fun.")}</p>
           </div>
         </div>
         <div className="difficulty-grid">
@@ -279,19 +314,46 @@ export function UploadConfigurator(props: Props) {
               className={props.difficulty === preset.id ? "selected" : ""}
               onClick={() => props.onDifficulty(preset.id, preset.rows, preset.columns)}
             >
-              <strong>{preset.pieces.toLocaleString("pt-BR")}</strong>
-              <span>{preset.label}</span>
+              <strong>{preset.pieces.toLocaleString(locale)}</strong>
+              <span>
+                {language === "en"
+                  ? (
+                      {
+                        beginner: "Beginner",
+                        easy: "Easy",
+                        normal: "Normal",
+                        medium: "Medium",
+                        hard: "Hard",
+                        advanced: "Advanced",
+                        master: "Master",
+                        legendary: "Legendary",
+                        custom: "Custom",
+                      } as const
+                    )[preset.id]
+                  : preset.label}
+              </span>
               <small>
                 {preset.rows} × {preset.columns}
               </small>
             </button>
           ))}
         </div>
-        <details>
-          <summary>Opções avançadas e grade personalizada</summary>
+        <section className="advanced-options" aria-labelledby={advancedOptionsId}>
+          <div className="advanced-options-heading">
+            <span className="number-badge">2</span>
+            <div>
+              <h3 id={advancedOptionsId}>{t("Opções da partida", "Game options")}</h3>
+              <p>
+                {t(
+                  "Personalize a grade e escolha como você quer jogar.",
+                  "Customize the grid and choose how you want to play.",
+                )}
+              </p>
+            </div>
+          </div>
           <div className="advanced-grid">
             <label>
-              Linhas
+              {t("Linhas", "Rows")}
               <input
                 type="number"
                 min="2"
@@ -308,7 +370,7 @@ export function UploadConfigurator(props: Props) {
               />
             </label>
             <label>
-              Colunas
+              {t("Colunas", "Columns")}
               <input
                 type="number"
                 min="2"
@@ -325,16 +387,16 @@ export function UploadConfigurator(props: Props) {
               />
             </label>
             <div className={`total-pill ${validTotal ? "" : "invalid"}`}>
-              {props.configuration.totalPieces.toLocaleString("pt-BR")} peças
+              {props.configuration.totalPieces.toLocaleString(locale)} {t("peças", "pieces")}
             </div>
           </div>
           <div className="toggle-list">
             {(
               [
-                ["rotationEnabled", "Rotação das peças"],
-                ["hintsEnabled", "Dicas"],
-                ["referenceEnabled", "Imagem de referência"],
-                ["timerEnabled", "Cronômetro"],
+                ["rotationEnabled", t("Rotação das peças", "Piece rotation")],
+                ["hintsEnabled", t("Dicas", "Hints")],
+                ["referenceEnabled", t("Imagem de referência", "Reference image")],
+                ["timerEnabled", t("Cronômetro", "Timer")],
               ] as const
             ).map(([key, label]) => (
               <label key={key}>
@@ -349,9 +411,14 @@ export function UploadConfigurator(props: Props) {
               </label>
             ))}
           </div>
-        </details>
+        </section>
         {!validTotal && (
-          <p className="error-message">A grade personalizada deve ter de 6 a 1.000 peças.</p>
+          <p className="error-message">
+            {t(
+              "A grade personalizada deve ter de 6 a 1.000 peças.",
+              "The custom grid must contain between 6 and 1,000 pieces.",
+            )}
+          </p>
         )}
         <button
           type="button"
@@ -359,7 +426,7 @@ export function UploadConfigurator(props: Props) {
           disabled={!props.file || !validTotal}
           onClick={props.onSubmit}
         >
-          <Icon name="play" size={16} /> Criar quebra-cabeça
+          <Icon name="play" size={16} /> {t("Criar quebra-cabeça", "Create puzzle")}
         </button>
       </section>
     </div>
