@@ -3,8 +3,8 @@ import type { PuzzlePiece } from "@puzzled/puzzle-engine";
 import {
   completedTimelapseStates,
   interpolateRotation,
-  MIN_TIMELAPSE_DURATION_SECONDS,
   TIMELAPSE_FRAMES_PER_SECOND,
+  TIMELAPSE_PLAYBACK_SPEED,
   timelapseDuration,
   timelapseFramePlan,
 } from "./create-timelapse";
@@ -24,13 +24,13 @@ function piece(id: string, row: number, column: number): PuzzlePiece {
 }
 
 describe("timelapse da montagem", () => {
-  test("gera pelo menos dez segundos de vídeo", () => {
-    expect(timelapseDuration(0)).toBe(MIN_TIMELAPSE_DURATION_SECONDS);
-    expect(timelapseDuration(20)).toBe(MIN_TIMELAPSE_DURATION_SECONDS);
-    const plan = timelapseFramePlan(0);
-    expect(plan.totalFrames).toBe(240);
-    expect(plan.totalFrames * plan.frameDuration).toBe(MIN_TIMELAPSE_DURATION_SECONDS);
-    expect(plan.finalHoldFrames / TIMELAPSE_FRAMES_PER_SECOND).toBe(1.5);
+  test("acelera a duração original sem impor dez segundos", () => {
+    expect(TIMELAPSE_PLAYBACK_SPEED).toBe(60);
+    expect(timelapseDuration(60)).toBe(1);
+    expect(timelapseDuration(780)).toBe(13);
+    const plan = timelapseFramePlan(780);
+    expect(plan.totalFrames).toBe(13 * TIMELAPSE_FRAMES_PER_SECOND);
+    expect(plan.totalFrames * plan.frameDuration).toBe(13);
   });
 
   test("força todas as peças para a posição final no encerramento", () => {

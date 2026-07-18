@@ -22,28 +22,23 @@ interface Options {
   onProgress: (progress: number) => void;
 }
 
-export const MIN_TIMELAPSE_DURATION_SECONDS = 10;
 export const TIMELAPSE_FRAMES_PER_SECOND = 24;
-const MAX_TIMELAPSE_DURATION_SECONDS = 20;
-const FINAL_FRAME_HOLD_SECONDS = 1.5;
+export const TIMELAPSE_PLAYBACK_SPEED = 60;
 const VIDEO_BITRATE = 5_000_000;
 
-export function timelapseDuration(frameCount: number): number {
-  return Math.min(
-    MAX_TIMELAPSE_DURATION_SECONDS,
-    Math.max(MIN_TIMELAPSE_DURATION_SECONDS, frameCount * 0.07),
+export function timelapseDuration(sourceDurationSeconds: number): number {
+  return Math.max(
+    1 / TIMELAPSE_FRAMES_PER_SECOND,
+    sourceDurationSeconds / TIMELAPSE_PLAYBACK_SPEED,
   );
 }
 
-export function timelapseFramePlan(frameCount: number) {
-  const duration = timelapseDuration(frameCount);
-  const totalFrames = Math.ceil(duration * TIMELAPSE_FRAMES_PER_SECOND);
-  const finalHoldFrames = Math.round(FINAL_FRAME_HOLD_SECONDS * TIMELAPSE_FRAMES_PER_SECOND);
+export function timelapseFramePlan(sourceDurationSeconds: number) {
+  const requestedDuration = timelapseDuration(sourceDurationSeconds);
+  const totalFrames = Math.max(2, Math.ceil(requestedDuration * TIMELAPSE_FRAMES_PER_SECOND));
   return {
-    duration,
+    duration: totalFrames / TIMELAPSE_FRAMES_PER_SECOND,
     totalFrames,
-    finalHoldFrames,
-    assemblyFrames: totalFrames - finalHoldFrames,
     frameDuration: 1 / TIMELAPSE_FRAMES_PER_SECOND,
   };
 }
@@ -87,6 +82,7 @@ function drawFrame(
   columns: number,
   elapsed: number,
   progress: number,
+  displayedPlaced: number,
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -154,8 +150,8 @@ function drawFrame(
     ctx.restore();
   }
 
-  const placed = [...states.values()].filter((piece) => piece.isPlaced).length;
-  const completed = Math.round((placed / pieces.length) * 100);
+  const placed = Math.min(pieces.length, Math.max(0, Math.round(displayedPlaced)));
+  const completed = Math.round((displayedPlaced / pieces.length) * 100);
   const displayTime = new Date(elapsed * 1000 * progress).toISOString().slice(11, 19);
   ctx.fillStyle = "rgba(7, 13, 31, .78)";
   ctx.beginPath();
@@ -203,9 +199,39 @@ export async function createTimelapse(options: Options): Promise<Blob> {
   }));
   const timeline = options.timelapse ?? { initial: fallbackInitial, frames: [] };
   const states = new Map(timeline.initial.map((piece) => [piece.id, { ...piece }]));
-  const frames = timeline.frames;
-  const plan = timelapseFramePlan(frames.length);
   const finalStates = completedTimelapseStates(options.pieces);
+  const frames = timeline.frames.map((frame) => ({
+    ...frame,
+    changes: frame.changes.map((change) => ({ ...change })),
+  }));
+  const recordedEndStates = new Map(states);
+  for (const frame of frames) {
+    for (const change of frame.changes) recordedEndStates.set(change.id, { ...change });
+  }
+  const missingFinalChanges = [...finalStates.values()].filter((finalState) => {
+    const recorded = recordedEndStates.get(finalState.id);
+    return (
+      !recorded ||
+      !recorded.isPlaced ||
+      recorded.x !== finalState.x ||
+      recorded.y !== finalState.y ||
+      recorded.rotation % 360 !== finalState.rotation % 360
+    );
+  });
+  const sourceDuration = Math.max(1, options.elapsed, frames.at(-1)?.at ?? 0);
+  if (missingFinalChanges.length > 0) {
+    const lastFrame = frames.at(-1);
+    if (lastFrame) {
+      const replacements = new Set(missingFinalChanges.map((change) => change.id));
+      lastFrame.changes = [
+        ...lastFrame.changes.filter((change) => !replacements.has(change.id)),
+        ...missingFinalChanges,
+      ];
+    } else {
+      frames.push({ at: sourceDuration, changes: missingFinalChanges });
+    }
+  }
+  const plan = timelapseFramePlan(sourceDuration);
   let appliedFrame = -1;
 
   const format = new Mp4OutputFormat({ fastStart: "in-memory" });
@@ -229,19 +255,26 @@ export async function createTimelapse(options: Options): Promise<Blob> {
   try {
     await output.start();
     for (let videoFrame = 0; videoFrame < plan.totalFrames; videoFrame += 1) {
-      const assemblyProgress = Math.min(1, videoFrame / Math.max(1, plan.assemblyFrames - 1));
-      const framePosition = assemblyProgress * frames.length;
-      const targetFrame = Math.floor(framePosition) - 1;
-      while (appliedFrame < targetFrame) {
+      const assemblyProgress = videoFrame / (plan.totalFrames - 1);
+      const sourceTime = assemblyProgress * sourceDuration;
+      while (true) {
+        const frame = frames[appliedFrame + 1];
+        if (!frame || frame.at > sourceTime) break;
         appliedFrame += 1;
-        const frame = frames[appliedFrame];
-        if (frame) for (const change of frame.changes) states.set(change.id, { ...change });
+        for (const change of frame.changes) states.set(change.id, { ...change });
       }
 
       let renderStates = states;
-      const nextFrame = frames[targetFrame + 1];
+      const placedBeforeTransition = [...states.values()].filter((piece) => piece.isPlaced).length;
+      let displayedPlaced = placedBeforeTransition;
+      const nextFrame = frames[appliedFrame + 1];
       if (nextFrame && assemblyProgress < 1) {
-        const transition = framePosition - Math.floor(framePosition);
+        const previousTime = appliedFrame >= 0 ? (frames[appliedFrame]?.at ?? 0) : 0;
+        const transitionDuration = Math.max(0.001, nextFrame.at - previousTime);
+        const transition = Math.min(
+          1,
+          Math.max(0, (sourceTime - previousTime) / transitionDuration),
+        );
         renderStates = new Map(states);
         for (const change of nextFrame.changes) {
           const before = states.get(change.id);
@@ -259,8 +292,18 @@ export async function createTimelapse(options: Options): Promise<Blob> {
               : change,
           );
         }
+        const afterTransition = new Map(states);
+        for (const change of nextFrame.changes) afterTransition.set(change.id, change);
+        const placedAfterTransition = [...afterTransition.values()].filter(
+          (piece) => piece.isPlaced,
+        ).length;
+        displayedPlaced =
+          placedBeforeTransition + (placedAfterTransition - placedBeforeTransition) * transition;
       }
-      if (assemblyProgress === 1) renderStates = finalStates;
+      if (assemblyProgress === 1) {
+        renderStates = finalStates;
+        displayedPlaced = options.pieces.length;
+      }
 
       drawFrame(
         canvas,
@@ -271,6 +314,7 @@ export async function createTimelapse(options: Options): Promise<Blob> {
         options.columns,
         options.elapsed,
         assemblyProgress,
+        displayedPlaced,
       );
       await videoSource.add(videoFrame * plan.frameDuration, plan.frameDuration);
       options.onProgress(Math.round(((videoFrame + 1) / plan.totalFrames) * 100));
