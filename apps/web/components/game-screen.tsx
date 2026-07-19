@@ -357,7 +357,10 @@ export function GameScreen({
               <strong>{t("Mapa do tabuleiro", "Board map")}</strong>
               <span>{activeRegion.replaceAll("-", " ")}</span>
             </div>
-            <div className="region-grid">
+            <div
+              className="region-grid"
+              style={{ aspectRatio: configuration.columns / configuration.rows }}
+            >
               {regions.map((region) => (
                 <button
                   key={region}

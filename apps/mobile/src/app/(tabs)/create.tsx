@@ -9,7 +9,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import { DIFFICULTIES, type PuzzleConfiguration, type PuzzleDifficulty } from "@puzzled/shared";
+import {
+  DIFFICULTIES,
+  orientPuzzleGrid,
+  resolvePuzzleOrientation,
+  type PuzzleConfiguration,
+  type PuzzleDifficulty,
+  type PuzzleOrientation,
+} from "@puzzled/shared";
 import { AppHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
@@ -29,10 +36,12 @@ const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
 };
 
 export default function CreateScreen() {
-  const { createPuzzle, t, theme } = useApp();
+  const { createPuzzle, preferences, t, theme } = useApp();
   const colors = mobileThemes[theme];
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [orientation, setOrientation] = useState<PuzzleOrientation>("automatic");
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [difficulty, setDifficulty] = useState<PuzzleDifficulty>("normal");
   const [configuration, setConfiguration] = useState<PuzzleConfiguration>({
     rows: 6,
@@ -45,8 +54,13 @@ export default function CreateScreen() {
   });
 
   const selectedPreset = useMemo(
-    () => presets.find((preset) => preset.rows === configuration.rows && preset.columns === configuration.columns),
-    [configuration.columns, configuration.rows],
+    () => presets.find((preset) => preset.pieces === configuration.totalPieces),
+    [configuration.totalPieces],
+  );
+  const resolvedOrientation = resolvePuzzleOrientation(
+    orientation,
+    imageDimensions?.width,
+    imageDimensions?.height,
   );
 
   async function choosePhoto() {
@@ -60,9 +74,14 @@ export default function CreateScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.9,
+      allowsEditing: false,
+      quality: 1,
+      preferredAssetRepresentationMode:
+        Platform.OS === "ios"
+          ? ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current
+          : undefined,
+      presentationStyle:
+        Platform.OS === "ios" ? ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN : undefined,
     });
     if (result.canceled) return;
     const asset = result.assets[0];
@@ -78,8 +97,19 @@ export default function CreateScreen() {
         permanentUri = destination.uri;
       }
       setImageUri(permanentUri);
+      const dimensions = { width: asset.width, height: asset.height };
+      setImageDimensions(dimensions);
+      const nextOrientation = resolvePuzzleOrientation(
+        orientation,
+        dimensions.width,
+        dimensions.height,
+      );
+      setConfiguration((current) => {
+        const grid = orientPuzzleGrid(current.rows, current.columns, nextOrientation);
+        return { ...current, ...grid, totalPieces: grid.rows * grid.columns };
+      });
       setName(asset.fileName?.replace(/\.[^.]+$/, "") ?? t("Minha memória", "My memory"));
-      await Haptics.selectionAsync();
+      if (preferences.haptics) await Haptics.selectionAsync();
     } catch {
       Alert.alert(
         t("Não foi possível salvar a foto", "Could not save the photo"),
@@ -89,19 +119,29 @@ export default function CreateScreen() {
   }
 
   function selectPreset(preset: (typeof presets)[number]) {
+    const grid = orientPuzzleGrid(preset.rows, preset.columns, resolvedOrientation);
     setDifficulty(preset.id);
     setConfiguration((current) => ({
       ...current,
-      rows: preset.rows,
-      columns: preset.columns,
+      ...grid,
       totalPieces: preset.pieces,
     }));
-    void Haptics.selectionAsync();
+    if (preferences.haptics) void Haptics.selectionAsync();
+  }
+
+  function selectOrientation(next: PuzzleOrientation) {
+    setOrientation(next);
+    const resolved = resolvePuzzleOrientation(next, imageDimensions?.width, imageDimensions?.height);
+    setConfiguration((current) => {
+      const grid = orientPuzzleGrid(current.rows, current.columns, resolved);
+      return { ...current, ...grid, totalPieces: grid.rows * grid.columns };
+    });
+    if (preferences.haptics) void Haptics.selectionAsync();
   }
 
   function toggle(key: keyof Pick<PuzzleConfiguration, "rotationEnabled" | "hintsEnabled" | "referenceEnabled" | "timerEnabled">) {
     setConfiguration((current) => ({ ...current, [key]: !current[key] }));
-    void Haptics.selectionAsync();
+    if (preferences.haptics) void Haptics.selectionAsync();
   }
 
   function startPuzzle() {
@@ -112,7 +152,7 @@ export default function CreateScreen() {
       difficulty,
       configuration,
     });
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (preferences.haptics) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.push(`/puzzle/${puzzle.id}`);
   }
 
@@ -133,7 +173,7 @@ export default function CreateScreen() {
 
         {imageUri ? (
           <View className="gap-3">
-            <Image source={{ uri: imageUri }} style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 18 }} contentFit="cover" />
+            <Image source={{ uri: imageUri }} style={{ width: "100%", aspectRatio: configuration.columns / configuration.rows, borderRadius: 18, backgroundColor: colors.panelAlt }} contentFit="cover" transition={220} />
             <TextInput
               value={name}
               onChangeText={setName}
@@ -150,7 +190,7 @@ export default function CreateScreen() {
               <Ionicons name="image-outline" size={30} color={colors.accent} />
             </View>
             <Text className="text-center text-lg font-black" style={{ color: colors.text }}>{t("Abrir galeria", "Open photo library")}</Text>
-            <MutedText className="text-center">{t("Selecione e recorte sua imagem", "Select and crop your image")}</MutedText>
+            <MutedText className="text-center">{t("A orientação original será detectada", "The original orientation will be detected")}</MutedText>
           </Pressable>
         )}
       </Card>
@@ -159,19 +199,31 @@ export default function CreateScreen() {
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>2</Text></View>
           <View className="flex-1">
+            <Text className="text-lg font-black" style={{ color: colors.text }}>{t("Formato do puzzle", "Puzzle orientation")}</Text>
+            <MutedText>{resolvedOrientation === "portrait" ? t("Tabuleiro vertical", "Portrait board") : t("Tabuleiro horizontal", "Landscape board")}</MutedText>
+          </View>
+        </View>
+        <OrientationPicker value={orientation} resolved={resolvedOrientation} hasImage={imageDimensions !== null} onSelect={selectOrientation} />
+      </Card>
+
+      <Card className="mb-4 gap-4">
+        <View className="flex-row items-center gap-3">
+          <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>3</Text></View>
+          <View className="flex-1">
             <Text className="text-lg font-black" style={{ color: colors.text }}>{t("Escolha a dificuldade", "Choose difficulty")}</Text>
             <MutedText>{configuration.totalPieces} {t("peças", "pieces")}</MutedText>
           </View>
         </View>
         <DifficultySlider
           selectedIndex={Math.max(0, presets.findIndex((preset) => preset.id === selectedPreset?.id))}
+          orientation={resolvedOrientation}
           onSelect={(index) => selectPreset(presets[index] ?? presets[0])}
         />
       </Card>
 
       <Card className="mb-5 gap-1">
         <View className="mb-3 flex-row items-center gap-3">
-          <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>3</Text></View>
+          <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>4</Text></View>
           <View className="flex-1">
             <Text className="text-lg font-black" style={{ color: colors.text }}>{t("Opções da partida", "Game options")}</Text>
             <MutedText>{t("Tudo pronto e visível de cara.", "Everything ready and visible right away.")}</MutedText>
@@ -189,6 +241,12 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
+  orientationRow: { flexDirection: "row", gap: 9 },
+  orientationOption: { flex: 1, minHeight: 104, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 6 },
+  orientationShape: { width: 36, height: 27, borderWidth: 2, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  orientationShapePortrait: { width: 23, height: 34 },
+  orientationLabel: { fontFamily: "Inter_700Bold", fontSize: 10, textAlign: "center" },
+  orientationMeta: { fontFamily: "Inter_600SemiBold", fontSize: 8, textAlign: "center" },
   difficultyHero: { minHeight: 112, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 16, flexDirection: "row", alignItems: "center", overflow: "hidden" },
   difficultyHeroIcon: { width: 45, height: 45, borderRadius: 15, backgroundColor: "rgba(5,12,28,.28)", alignItems: "center", justifyContent: "center", marginRight: 13 },
   difficultyHeroCopy: { flex: 1, minWidth: 0 },
@@ -207,10 +265,73 @@ const styles = StyleSheet.create({
   sliderHint: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
 });
 
-function DifficultySlider({ selectedIndex, onSelect }: { selectedIndex: number; onSelect: (index: number) => void }) {
+function OrientationPicker({
+  value,
+  resolved,
+  hasImage,
+  onSelect,
+}: {
+  value: PuzzleOrientation;
+  resolved: ReturnType<typeof resolvePuzzleOrientation>;
+  hasImage: boolean;
+  onSelect: (value: PuzzleOrientation) => void;
+}) {
+  const { t, theme } = useApp();
+  const colors = mobileThemes[theme];
+  const options: readonly [PuzzleOrientation, string, keyof typeof Ionicons.glyphMap][] = [
+    ["automatic", t("Automático", "Automatic"), "sparkles"],
+    ["portrait", t("Vertical", "Portrait"), "phone-portrait-outline"],
+    ["landscape", t("Horizontal", "Landscape"), "phone-landscape-outline"],
+  ];
+  return (
+    <View style={styles.orientationRow} accessibilityRole="radiogroup">
+      {options.map(([option, label, icon]) => {
+        const selected = value === option;
+        const shape = option === "automatic" ? resolved : option;
+        return (
+          <Pressable
+            key={option}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            onPress={() => onSelect(option)}
+            style={({ pressed }) => [
+              styles.orientationOption,
+              {
+                backgroundColor: selected ? `${colors.accent}18` : colors.panelAlt,
+                borderColor: selected ? colors.accent : `${colors.muted}25`,
+                borderRadius: Math.max(10, colors.radius - 2),
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.orientationShape,
+                shape === "portrait" && styles.orientationShapePortrait,
+                { borderColor: selected ? colors.accent : colors.muted },
+              ]}
+            >
+              <Ionicons name={icon} size={13} color={selected ? colors.accent : colors.muted} />
+            </View>
+            <Text numberOfLines={1} style={[styles.orientationLabel, { color: selected ? colors.text : colors.muted }]}>{label}</Text>
+            <Text numberOfLines={1} style={[styles.orientationMeta, { color: colors.muted }]}>
+              {option === "automatic"
+                ? !hasImage ? t("após a foto", "after photo") : resolved === "portrait" ? t("detectado: vertical", "detected: portrait") : t("detectado: horizontal", "detected: landscape")
+                : option === "portrait" ? "3:4" : "4:3"}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function DifficultySlider({ selectedIndex, orientation, onSelect }: { selectedIndex: number; orientation: ReturnType<typeof resolvePuzzleOrientation>; onSelect: (index: number) => void }) {
   const { t, theme } = useApp();
   const colors = mobileThemes[theme];
   const preset = presets[selectedIndex] ?? presets[0];
+  const displayGrid = orientPuzzleGrid(preset.rows, preset.columns, orientation);
   const [ptLabel, enLabel] = difficultyLabels[preset.id];
   const [sliderWidth, setSliderWidth] = useState(0);
   const thumbX = useSharedValue(0);
@@ -255,7 +376,7 @@ function DifficultySlider({ selectedIndex, onSelect }: { selectedIndex: number; 
         <View style={styles.difficultyHeroIcon}><Ionicons name="speedometer-outline" size={25} color="#08111f" /></View>
         <View style={styles.difficultyHeroCopy}>
           <Text numberOfLines={1} style={styles.difficultyHeroLabel}>{t(ptLabel, enLabel)}</Text>
-          <Text style={styles.difficultyHeroMeta}>{preset.rows} × {preset.columns} · {String(selectedIndex + 1).padStart(2, "0")}/{String(presets.length).padStart(2, "0")}</Text>
+          <Text style={styles.difficultyHeroMeta}>{displayGrid.rows} × {displayGrid.columns} · {String(selectedIndex + 1).padStart(2, "0")}/{String(presets.length).padStart(2, "0")}</Text>
         </View>
         <View><Text style={styles.difficultyHeroCount}>{preset.pieces}</Text><Text style={styles.difficultyHeroUnit}>{t("PEÇAS", "PIECES")}</Text></View>
       </LinearGradient>

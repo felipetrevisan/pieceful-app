@@ -9,6 +9,30 @@ export type PuzzleDifficulty =
   | "legendary"
   | "custom";
 
+export type PuzzleOrientation = "automatic" | "portrait" | "landscape";
+export type ResolvedPuzzleOrientation = Exclude<PuzzleOrientation, "automatic">;
+
+export function resolvePuzzleOrientation(
+  orientation: PuzzleOrientation,
+  imageWidth?: number,
+  imageHeight?: number,
+): ResolvedPuzzleOrientation {
+  if (orientation !== "automatic") return orientation;
+  return imageHeight && imageWidth && imageHeight > imageWidth ? "portrait" : "landscape";
+}
+
+export function orientPuzzleGrid(
+  rows: number,
+  columns: number,
+  orientation: ResolvedPuzzleOrientation,
+) {
+  const shortSide = Math.min(rows, columns);
+  const longSide = Math.max(rows, columns);
+  return orientation === "portrait"
+    ? { rows: longSide, columns: shortSide }
+    : { rows: shortSide, columns: longSide };
+}
+
 export interface DifficultyPreset {
   id: PuzzleDifficulty;
   label: string;

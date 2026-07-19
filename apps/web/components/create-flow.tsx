@@ -1,11 +1,22 @@
 "use client";
 
 import type { PuzzleSession } from "@puzzled/puzzle-engine";
-import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
+import {
+  orientPuzzleGrid,
+  type PuzzleConfiguration,
+  type PuzzleDifficulty,
+  type PuzzleOrientation,
+  resolvePuzzleOrientation,
+} from "@puzzled/shared";
 import { useEffect, useMemo, useState } from "react";
 import { generateSession } from "@/lib/generate-session";
 import { useI18n } from "@/lib/i18n";
-import { processImage, retainImageFile, validateImage } from "@/lib/image-processing";
+import {
+  processImage,
+  readImageDimensions,
+  retainImageFile,
+  validateImage,
+} from "@/lib/image-processing";
 import { savePuzzle } from "@/lib/puzzle-db";
 import type { PhotoCredit } from "@/lib/unsplash";
 import { GameScreen } from "./game-screen";
@@ -32,11 +43,36 @@ export function CreateFlow() {
   const [processedImage, setProcessedImage] = useState<Blob | null>(null);
   const [difficulty, setDifficulty] = useState<PuzzleDifficulty>("normal");
   const [configuration, setConfiguration] = useState(initialConfiguration);
+  const [orientation, setOrientation] = useState<PuzzleOrientation>("automatic");
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(
+    null,
+  );
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [photoCredit, setPhotoCredit] = useState<PhotoCredit | null>(null);
   const [session, setSession] = useState<PuzzleSession | null>(null);
+
+  const effectiveImageDimensions = useMemo(() => {
+    if (!imageDimensions) return null;
+    const quarterTurn = Math.abs(Math.round(rotation / 90)) % 2 === 1;
+    return quarterTurn
+      ? { width: imageDimensions.height, height: imageDimensions.width }
+      : imageDimensions;
+  }, [imageDimensions, rotation]);
+  const resolvedOrientation = resolvePuzzleOrientation(
+    orientation,
+    effectiveImageDimensions?.width,
+    effectiveImageDimensions?.height,
+  );
+
+  function configurationForOrientation(
+    current: PuzzleConfiguration,
+    nextOrientation: ReturnType<typeof resolvePuzzleOrientation>,
+  ) {
+    const grid = orientPuzzleGrid(current.rows, current.columns, nextOrientation);
+    return { ...current, ...grid, totalPieces: grid.rows * grid.columns };
+  }
 
   useEffect(
     () => () => {
@@ -54,13 +90,24 @@ export function CreateFlow() {
         return null;
       });
       setPhotoCredit(null);
+      setImageDimensions(null);
       return;
     }
     try {
       const retainedFile = await retainImageFile(next);
       await validateImage(retainedFile);
+      const dimensions = await readImageDimensions(retainedFile);
       const nextPreviewUrl = URL.createObjectURL(retainedFile);
       setFile(retainedFile);
+      setZoom(1);
+      setRotation(0);
+      setImageDimensions(dimensions);
+      const nextOrientation = resolvePuzzleOrientation(
+        orientation,
+        dimensions.width,
+        dimensions.height,
+      );
+      setConfiguration((current) => configurationForOrientation(current, nextOrientation));
       setPreviewUrl((current) => {
         if (current) URL.revokeObjectURL(current);
         return nextPreviewUrl;
@@ -83,8 +130,35 @@ export function CreateFlow() {
 
   function chooseDifficulty(value: PuzzleDifficulty, rows: number, columns: number) {
     setDifficulty(value);
-    if (value !== "custom")
-      setConfiguration((current) => ({ ...current, rows, columns, totalPieces: rows * columns }));
+    if (value !== "custom") {
+      const grid = orientPuzzleGrid(rows, columns, resolvedOrientation);
+      setConfiguration((current) => ({
+        ...current,
+        ...grid,
+        totalPieces: grid.rows * grid.columns,
+      }));
+    }
+  }
+
+  function chooseOrientation(next: PuzzleOrientation) {
+    setOrientation(next);
+    const resolved = resolvePuzzleOrientation(
+      next,
+      effectiveImageDimensions?.width,
+      effectiveImageDimensions?.height,
+    );
+    setConfiguration((current) => configurationForOrientation(current, resolved));
+  }
+
+  function rotateImage(nextRotation: number) {
+    setRotation(nextRotation);
+    if (orientation !== "automatic" || !imageDimensions) return;
+    const quarterTurn = Math.abs(Math.round(nextRotation / 90)) % 2 === 1;
+    const width = quarterTurn ? imageDimensions.height : imageDimensions.width;
+    const height = quarterTurn ? imageDimensions.width : imageDimensions.height;
+    setConfiguration((current) =>
+      configurationForOrientation(current, resolvePuzzleOrientation("automatic", width, height)),
+    );
   }
 
   async function create() {
@@ -92,7 +166,12 @@ export function CreateFlow() {
     setError(null);
     setStage("generating");
     try {
-      const image = await processImage(file, zoom, rotation);
+      const image = await processImage(
+        file,
+        zoom,
+        rotation,
+        configuration.columns / configuration.rows,
+      );
       const puzzleId = crypto.randomUUID();
       const seed = crypto.getRandomValues(new Uint32Array(1))[0] ?? Date.now();
       const nextSession = await generateSession(
@@ -158,6 +237,8 @@ export function CreateFlow() {
             previewUrl={previewUrl}
             difficulty={difficulty}
             configuration={configuration}
+            orientation={orientation}
+            resolvedOrientation={resolvedOrientation}
             zoom={zoom}
             rotation={rotation}
             error={error}
@@ -166,8 +247,9 @@ export function CreateFlow() {
             onUnsplashPhoto={chooseUnsplashPhoto}
             onDifficulty={chooseDifficulty}
             onConfiguration={setConfiguration}
+            onOrientation={chooseOrientation}
             onZoom={setZoom}
-            onRotation={setRotation}
+            onRotation={rotateImage}
             onSubmit={create}
           />
         )}
@@ -191,6 +273,7 @@ export function CreateFlow() {
             imageUrl={imageUrl}
             pieces={configuration.totalPieces}
             difficulty={difficulty}
+            aspectRatio={configuration.columns / configuration.rows}
             onOpened={() => setStage("game")}
           />
         )}

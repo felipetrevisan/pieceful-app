@@ -9,10 +9,11 @@ interface Props {
   imageUrl: string;
   pieces: number;
   difficulty: string;
+  aspectRatio: number;
   onOpened: () => void;
 }
 
-export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
+export function PuzzleBox({ imageUrl, pieces, difficulty, aspectRatio, onOpened }: Props) {
   const { locale, t } = useI18n();
   const sceneRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLButtonElement>(null);
@@ -95,7 +96,7 @@ export function PuzzleBox({ imageUrl, pieces, difficulty, onOpened }: Props) {
         <button
           ref={boxRef}
           type="button"
-          className="puzzle-box"
+          className={`puzzle-box ${aspectRatio < 1 ? "portrait" : "landscape"}`}
           onClick={open}
           aria-label={t("Abrir a caixa do quebra-cabeça", "Open the puzzle box")}
         >

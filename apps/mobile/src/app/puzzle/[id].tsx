@@ -87,7 +87,12 @@ export default function PuzzleScreen() {
 
       <Modal visible={showReference} transparent animationType="fade" onRequestClose={() => setShowReference(false)}>
         <Pressable className="flex-1 items-center justify-center bg-black/90 px-5" onPress={() => setShowReference(false)}>
-          <Image source={{ uri: puzzle.imageUri }} style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 22 }} contentFit="contain" />
+          <Image
+            source={{ uri: puzzle.imageUri }}
+            style={{ width: "100%", aspectRatio: puzzle.configuration.columns / puzzle.configuration.rows, maxHeight: "72%", borderRadius: 22 }}
+            contentFit="contain"
+            transition={180}
+          />
           <Text className="mt-5 text-base font-bold text-white">{t("Toque para fechar", "Tap to close")}</Text>
         </Pressable>
       </Modal>

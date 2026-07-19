@@ -1,6 +1,13 @@
 "use client";
 
-import { DIFFICULTIES, type PuzzleConfiguration, type PuzzleDifficulty } from "@puzzled/shared";
+import {
+  DIFFICULTIES,
+  orientPuzzleGrid,
+  type PuzzleConfiguration,
+  type PuzzleDifficulty,
+  type PuzzleOrientation,
+  type ResolvedPuzzleOrientation,
+} from "@puzzled/shared";
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -16,6 +23,8 @@ interface Props {
   previewUrl: string | null;
   difficulty: PuzzleDifficulty;
   configuration: PuzzleConfiguration;
+  orientation: PuzzleOrientation;
+  resolvedOrientation: ResolvedPuzzleOrientation;
   zoom: number;
   rotation: number;
   error: string | null;
@@ -24,6 +33,7 @@ interface Props {
   onUnsplashPhoto: (file: File, credit: PhotoCredit) => void;
   onDifficulty: (value: PuzzleDifficulty, rows: number, columns: number) => void;
   onConfiguration: (configuration: PuzzleConfiguration) => void;
+  onOrientation: (orientation: PuzzleOrientation) => void;
   onZoom: (value: number) => void;
   onRotation: (value: number) => void;
   onSubmit: () => void;
@@ -226,7 +236,10 @@ export function UploadConfigurator(props: Props) {
           </div>
         ) : (
           <div className="photo-editor">
-            <div className="crop-frame">
+            <div
+              className={`crop-frame ${props.resolvedOrientation}`}
+              style={{ aspectRatio: props.configuration.columns / props.configuration.rows }}
+            >
               <img
                 src={props.previewUrl}
                 alt={t("Prévia da foto escolhida", "Selected photo preview")}
@@ -299,48 +312,103 @@ export function UploadConfigurator(props: Props) {
         )}
       </section>
       <section className="settings-card glass-card">
+        <div className="orientation-section">
+          <div className="settings-title compact">
+            <span className="number-badge">1</span>
+            <div>
+              <h2>{t("Formato do quebra-cabeça", "Puzzle orientation")}</h2>
+              <p>
+                {t(
+                  "Detectamos a foto, mas você continua no controle.",
+                  "We detect the photo, but you stay in control.",
+                )}
+              </p>
+            </div>
+          </div>
+          <fieldset className="orientation-picker">
+            <legend className="sr-only">{t("Orientação", "Orientation")}</legend>
+            {(
+              [
+                ["automatic", t("Automático", "Automatic"), "auto"],
+                ["portrait", t("Vertical", "Portrait"), "portrait"],
+                ["landscape", t("Horizontal", "Landscape"), "landscape"],
+              ] as const
+            ).map(([value, label, preview]) => (
+              <button
+                type="button"
+                aria-pressed={props.orientation === value}
+                className={props.orientation === value ? "selected" : ""}
+                key={value}
+                onClick={() => props.onOrientation(value)}
+              >
+                <span className={`orientation-shape ${preview}`} aria-hidden="true">
+                  {preview === "auto" ? "✦" : ""}
+                </span>
+                <strong>{label}</strong>
+                <small>
+                  {value === "automatic"
+                    ? !props.file
+                      ? t("Após escolher a foto", "After choosing a photo")
+                      : props.resolvedOrientation === "portrait"
+                        ? t("Detectado: vertical", "Detected: portrait")
+                        : t("Detectado: horizontal", "Detected: landscape")
+                    : value === "portrait"
+                      ? "3:4"
+                      : "4:3"}
+                </small>
+              </button>
+            ))}
+          </fieldset>
+        </div>
         <div className="settings-title">
-          <span className="number-badge">1</span>
+          <span className="number-badge">2</span>
           <div>
             <h2>{t("Escolha o nível do desafio", "Choose your challenge level")}</h2>
             <p>{t("Quanto mais peças, maior a diversão.", "More pieces, more fun.")}</p>
           </div>
         </div>
         <div className="difficulty-grid">
-          {DIFFICULTIES.map((preset) => (
-            <button
-              type="button"
-              key={preset.id}
-              className={props.difficulty === preset.id ? "selected" : ""}
-              onClick={() => props.onDifficulty(preset.id, preset.rows, preset.columns)}
-            >
-              <strong>{preset.pieces.toLocaleString(locale)}</strong>
-              <span>
-                {language === "en"
-                  ? (
-                      {
-                        beginner: "Beginner",
-                        easy: "Easy",
-                        normal: "Normal",
-                        medium: "Medium",
-                        hard: "Hard",
-                        advanced: "Advanced",
-                        master: "Master",
-                        legendary: "Legendary",
-                        custom: "Custom",
-                      } as const
-                    )[preset.id]
-                  : preset.label}
-              </span>
-              <small>
-                {preset.rows} × {preset.columns}
-              </small>
-            </button>
-          ))}
+          {DIFFICULTIES.map((preset) => {
+            const displayGrid = orientPuzzleGrid(
+              preset.rows,
+              preset.columns,
+              props.resolvedOrientation,
+            );
+            return (
+              <button
+                type="button"
+                key={preset.id}
+                className={props.difficulty === preset.id ? "selected" : ""}
+                onClick={() => props.onDifficulty(preset.id, preset.rows, preset.columns)}
+              >
+                <strong>{preset.pieces.toLocaleString(locale)}</strong>
+                <span>
+                  {language === "en"
+                    ? (
+                        {
+                          beginner: "Beginner",
+                          easy: "Easy",
+                          normal: "Normal",
+                          medium: "Medium",
+                          hard: "Hard",
+                          advanced: "Advanced",
+                          master: "Master",
+                          legendary: "Legendary",
+                          custom: "Custom",
+                        } as const
+                      )[preset.id]
+                    : preset.label}
+                </span>
+                <small>
+                  {displayGrid.rows} × {displayGrid.columns}
+                </small>
+              </button>
+            );
+          })}
         </div>
         <section className="advanced-options" aria-labelledby={advancedOptionsId}>
           <div className="advanced-options-heading">
-            <span className="number-badge">2</span>
+            <span className="number-badge">3</span>
             <div>
               <h3 id={advancedOptionsId}>{t("Opções da partida", "Game options")}</h3>
               <p>

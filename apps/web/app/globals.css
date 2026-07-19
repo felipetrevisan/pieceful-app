@@ -1147,6 +1147,76 @@ canvas:focus-visible {
   font-size: 12px;
   margin: 4px 0 0;
 }
+.orientation-section {
+  margin-bottom: 26px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary-light) 14%, transparent);
+}
+.orientation-picker {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+.orientation-picker button {
+  min-height: 104px;
+  padding: 12px 8px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--primary-light) 14%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-deep) 58%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+.orientation-picker button:hover {
+  transform: translateY(-2px);
+}
+.orientation-picker button.selected {
+  border-color: var(--cyan);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--cyan) 16%, transparent),
+    color-mix(in srgb, var(--primary) 18%, transparent)
+  );
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--cyan) 12%, transparent);
+}
+.orientation-picker strong {
+  font-size: 11px;
+}
+.orientation-picker small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.orientation-shape {
+  width: 36px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--muted);
+  border-radius: 6px;
+  color: var(--cyan);
+  font-size: 12px;
+}
+.orientation-shape.portrait {
+  width: 23px;
+  height: 32px;
+}
+.orientation-shape.auto {
+  border-style: dashed;
+}
+.orientation-picker button.selected .orientation-shape {
+  border-color: var(--cyan);
+}
 .difficulty-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1280,7 +1350,8 @@ summary {
   gap: 14px;
 }
 .crop-frame {
-  aspect-ratio: 4 / 3;
+  width: 100%;
+  max-height: 72vh;
   overflow: hidden;
   border-radius: 26px;
   position: relative;
@@ -1434,7 +1505,8 @@ summary {
   width: 100%;
   height: 100%;
   min-height: 240px;
-  object-fit: cover;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--bg-deep) 82%, black);
 }
 .saved-card > div {
   padding: 24px;

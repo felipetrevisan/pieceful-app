@@ -35,6 +35,10 @@
     transform 280ms ease,
     filter 280ms ease;
 }
+.puzzle-box.portrait {
+  width: min(390px, 72vw);
+  height: min(520px, 68vh);
+}
 .puzzle-box:hover {
   transform: translateY(-8px) rotateX(1deg) rotateY(-5deg) rotateZ(0deg);
   filter: brightness(1.04);
@@ -635,7 +639,7 @@
 .completion-dialog > img {
   width: 100%;
   max-height: 310px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 18px;
 }
 .achievement {
@@ -924,6 +928,10 @@
   .puzzle-box {
     height: 280px;
     width: 88vw;
+  }
+  .puzzle-box.portrait {
+    width: min(70vw, 300px);
+    height: 380px;
   }
   .game-toolbar > div:first-child small {
     display: none;

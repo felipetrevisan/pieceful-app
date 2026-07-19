@@ -36,11 +36,25 @@ export async function validateImage(file: File): Promise<void> {
     throw new Error("Use uma imagem JPG, PNG ou WEBP válida.");
 }
 
-export async function processImage(file: File, zoom: number, rotation: number): Promise<Blob> {
+export async function readImageDimensions(file: File) {
   await validateImage(file);
   const bitmap = await createImageBitmap(file);
-  const width = 1600;
-  const height = 1200;
+  const dimensions = { width: bitmap.width, height: bitmap.height };
+  bitmap.close();
+  return dimensions;
+}
+
+export async function processImage(
+  file: File,
+  zoom: number,
+  rotation: number,
+  aspectRatio = 4 / 3,
+): Promise<Blob> {
+  await validateImage(file);
+  const bitmap = await createImageBitmap(file);
+  const safeAspectRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 4 / 3;
+  const width = safeAspectRatio >= 1 ? 1600 : Math.round(1600 * safeAspectRatio);
+  const height = safeAspectRatio >= 1 ? Math.round(1600 / safeAspectRatio) : 1600;
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -48,7 +62,10 @@ export async function processImage(file: File, zoom: number, rotation: number): 
   if (!context) throw new Error("Seu navegador não conseguiu processar esta foto.");
   context.translate(width / 2, height / 2);
   context.rotate((rotation * Math.PI) / 180);
-  const cover = Math.max(width / bitmap.width, height / bitmap.height) * zoom;
+  const quarterTurn = Math.abs(Math.round(rotation / 90)) % 2 === 1;
+  const rotatedWidth = quarterTurn ? bitmap.height : bitmap.width;
+  const rotatedHeight = quarterTurn ? bitmap.width : bitmap.height;
+  const cover = Math.max(width / rotatedWidth, height / rotatedHeight) * zoom;
   context.drawImage(
     bitmap,
     -(bitmap.width * cover) / 2,
