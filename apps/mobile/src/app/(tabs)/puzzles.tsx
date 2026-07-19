@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Alert, Pressable, Text, View } from "react-native";
-import { BrandHeader, Card, MutedText, PrimaryButton, Screen } from "@/components/pieceful-ui";
+import { Alert, Text, View } from "react-native";
+import { BrandHeader, Card, IconButton, MutedText, PrimaryButton, Screen } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
@@ -53,9 +53,7 @@ export default function PuzzlesScreen() {
                       <Text className="text-xs font-black tracking-[2px]" style={{ color: completed ? colors.accent : colors.primary }}>{completed ? t("FINALIZADO", "COMPLETED") : `${puzzle.configuration.totalPieces} ${t("PEÇAS", "PIECES")}`}</Text>
                       <Text numberOfLines={1} className="mt-1 text-xl font-black" style={{ color: colors.text }}>{puzzle.name}</Text>
                     </View>
-                    <Pressable className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.panelAlt }} onPress={() => confirmDelete(puzzle.id, puzzle.name)}>
-                      <Ionicons name="trash-outline" size={20} color={colors.danger} />
-                    </Pressable>
+                    <IconButton icon="trash-outline" label={t("Excluir", "Delete")} tone="danger" onPress={() => confirmDelete(puzzle.id, puzzle.name)} />
                   </View>
                   <View className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: colors.panelAlt }}><View className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: colors.accent }} /></View>
                   <View className="flex-row items-center justify-between">

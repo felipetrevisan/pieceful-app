@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { BrandHeader, Card, MutedText, PrimaryButton, Screen } from "@/components/pieceful-ui";
+import { ActionButton, BrandHeader, Card, MutedText, PrimaryButton, Screen } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
@@ -39,13 +39,9 @@ export default function HomeScreen() {
         <Text className="mb-5 mt-2 text-sm font-semibold leading-5 text-[#251443]/75">
           {t("Escolha a dificuldade, rotação, dicas e comece.", "Choose difficulty, rotation, hints and start playing.")}
         </Text>
-        <Pressable
-          className="min-h-14 flex-row items-center justify-center gap-2 rounded-2xl bg-[#11152d] px-5 active:scale-[0.98]"
-          onPress={() => router.push("/(tabs)/create")}
-        >
-          <Ionicons name="sparkles" size={18} color="#ffffff" />
-          <Text className="text-base font-black text-white">{t("Criar novo puzzle", "Create new puzzle")}</Text>
-        </Pressable>
+        <ActionButton variant="secondary" icon="sparkles" onPress={() => router.push("/(tabs)/create")}>
+          {t("Criar novo puzzle", "Create new puzzle")}
+        </ActionButton>
       </LinearGradient>
 
       <View className="mb-3 flex-row items-end justify-between">

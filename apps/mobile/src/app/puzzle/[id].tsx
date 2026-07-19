@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativePuzzleBoard } from "@/components/native-puzzle-board";
-import { PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
+import { IconButton, PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
@@ -63,17 +63,13 @@ export default function PuzzleScreen() {
     <SafeAreaView className="flex-1" edges={["top", "bottom"]} style={{ backgroundColor: colors.background }}>
       <View className="border-b px-4 pb-3 pt-2" style={{ borderBottomColor: `${colors.accent}25`, backgroundColor: colors.panel }}>
         <View className="flex-row items-center gap-3">
-          <Pressable className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.panelAlt }} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
+          <IconButton icon="chevron-back" label={t("Voltar", "Back")} onPress={() => router.back()} />
           <View className="flex-1">
             <Text className="text-lg font-black" numberOfLines={1} style={{ color: colors.text }}>{puzzle.name}</Text>
             <Text className="text-base font-extrabold" style={{ color: colors.accent }}>{progress}% · {placed} {t("de", "of")} {pieces.length}</Text>
           </View>
           {puzzle.configuration.referenceEnabled ? (
-            <Pressable className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.panelAlt }} onPress={() => setShowReference(true)}>
-              <Ionicons name="image-outline" size={21} color={colors.accent} />
-            </Pressable>
+            <IconButton icon="image-outline" label={t("Ver referência", "View reference")} onPress={() => setShowReference(true)} />
           ) : null}
         </View>
         <View className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: colors.panelAlt }}>
@@ -92,10 +88,7 @@ export default function PuzzleScreen() {
           onZoomChange={(zoom) => updatePuzzleCamera(puzzle.id, { ...puzzle.session.camera, zoom })}
         />
         {puzzle.configuration.hintsEnabled && progress < 100 ? (
-          <SecondaryButton className="mt-4 w-full" onPress={useHint}>
-            <Ionicons name="bulb-outline" size={20} color={colors.accent} />
-            <Text className="font-bold" style={{ color: colors.text }}>{t("Encaixar uma peça", "Place one piece")}</Text>
-          </SecondaryButton>
+          <SecondaryButton className="mt-4" icon="bulb-outline" onPress={useHint}>{t("Encaixar uma peça", "Place one piece")}</SecondaryButton>
         ) : null}
       </ScrollView>
 

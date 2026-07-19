@@ -136,10 +136,7 @@ export default function CreateScreen() {
               className="min-h-14 rounded-2xl border px-4 text-base font-bold"
               style={{ color: colors.text, backgroundColor: colors.panelAlt, borderColor: `${colors.accent}38` }}
             />
-            <SecondaryButton onPress={choosePhoto}>
-              <Ionicons name="images-outline" size={19} color={colors.accent} />
-              <Text className="font-bold" style={{ color: colors.text }}>{t("Trocar foto", "Change photo")}</Text>
-            </SecondaryButton>
+            <SecondaryButton icon="images-outline" onPress={choosePhoto}>{t("Trocar foto", "Change photo")}</SecondaryButton>
           </View>
         ) : (
           <Pressable className="min-h-52 items-center justify-center gap-3 rounded-[22px] border border-dashed px-5 active:scale-[0.99]" style={{ borderColor: `${colors.accent}66`, backgroundColor: colors.panelAlt }} onPress={choosePhoto}>
@@ -187,10 +184,7 @@ export default function CreateScreen() {
         <OptionRow icon="timer-outline" title={t("Cronômetro", "Timer")} subtitle={t("Acompanhe seu tempo", "Track your time")} value={configuration.timerEnabled} onChange={() => toggle("timerEnabled")} />
       </Card>
 
-      <PrimaryButton onPress={startPuzzle} disabled={!imageUri} style={{ opacity: imageUri ? 1 : 0.45 }}>
-        <Ionicons name="play" size={18} color="#17102d" />
-        <Text className="text-base font-black text-[#17102d]">{t("Criar e começar", "Create and start")}</Text>
-      </PrimaryButton>
+      <PrimaryButton icon="play" onPress={startPuzzle} disabled={!imageUri}>{t("Criar e começar", "Create and start")}</PrimaryButton>
     </Screen>
   );
 }

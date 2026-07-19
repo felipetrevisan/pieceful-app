@@ -1,10 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
+import {
+  GlassView,
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import {
+  Platform,
   Pressable,
   type PressableProps,
   ScrollView,
+  StyleSheet,
   Text,
   type TextProps,
   View,
@@ -68,30 +75,143 @@ export function Card({ children, className = "", style, ...props }: ViewProps & 
   );
 }
 
-export function PrimaryButton({ children, className = "", ...props }: PressableProps & { children: ReactNode; className?: string }) {
+export function PrimaryButton({ children, className = "", ...props }: Omit<ActionButtonProps, "variant">) {
+  return <ActionButton variant="primary" className={className} {...props}>{children}</ActionButton>;
+}
+
+export function SecondaryButton({ children, className = "", ...props }: Omit<ActionButtonProps, "variant">) {
+  return <ActionButton variant="secondary" className={className} {...props}>{children}</ActionButton>;
+}
+
+type ActionButtonProps = PressableProps & {
+  children: ReactNode;
+  className?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  variant?: "primary" | "secondary" | "danger";
+};
+
+export function ActionButton({
+  children,
+  className = "",
+  disabled,
+  icon,
+  style,
+  variant = "primary",
+  ...props
+}: ActionButtonProps) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
+  const glass = hasLiquidGlass() && !disabled;
+  const labelColor = variant === "primary" && !glass ? "#17102d" : variant === "danger" ? colors.danger : colors.text;
+  const content = (
+    <>
+      {icon ? <Ionicons name={icon} size={20} color={labelColor} /> : null}
+      {typeof children === "string" ? (
+        <Text numberOfLines={1} style={[styles.buttonLabel, { color: labelColor }]}>{children}</Text>
+      ) : children}
+    </>
+  );
+
   return (
-    <Pressable className={`overflow-hidden rounded-2xl active:scale-[0.98] ${className}`} {...props}>
-      <LinearGradient colors={[...colors.gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="min-h-14 flex-row items-center justify-center gap-2 px-5">
-        {typeof children === "string" ? <Text className="text-base font-black text-[#17102d]">{children}</Text> : children}
-      </LinearGradient>
+    <Pressable
+      accessibilityRole="button"
+      className={className}
+      disabled={disabled}
+      android_ripple={Platform.OS === "android" ? { color: `${colors.text}24`, borderless: false, foreground: true } : undefined}
+      style={(state) => [
+        styles.buttonShell,
+        !glass && disabled ? styles.disabled : null,
+        state.pressed ? styles.pressed : null,
+        typeof style === "function" ? style(state) : style,
+      ]}
+      {...props}
+    >
+      {glass ? (
+        <GlassView
+          glassEffectStyle={variant === "primary" ? "regular" : "clear"}
+          isInteractive
+          colorScheme={theme === "candy" ? "light" : "dark"}
+          tintColor={variant === "danger" ? `${colors.danger}55` : variant === "primary" ? `${colors.primary}72` : `${colors.panelAlt}66`}
+          style={styles.buttonContent}
+        >
+          {content}
+        </GlassView>
+      ) : variant === "primary" ? (
+        <LinearGradient
+          colors={[...colors.gradient]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.buttonContent}
+        >
+          {content}
+        </LinearGradient>
+      ) : (
+        <View
+          style={[
+            styles.buttonContent,
+            styles.outlinedButton,
+            {
+              backgroundColor: variant === "danger" ? `${colors.danger}14` : colors.panelAlt,
+              borderColor: variant === "danger" ? `${colors.danger}66` : `${colors.accent}45`,
+            },
+          ]}
+        >
+          {content}
+        </View>
+      )}
     </Pressable>
   );
 }
 
-export function SecondaryButton({ children, className = "", ...props }: PressableProps & { children: ReactNode; className?: string }) {
+export function IconButton({
+  icon,
+  label,
+  tone = "default",
+  style,
+  ...props
+}: Omit<PressableProps, "children"> & {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  tone?: "default" | "danger";
+}) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
+  const glass = hasLiquidGlass() && !props.disabled;
+  const iconColor = tone === "danger" ? colors.danger : colors.accent;
   return (
     <Pressable
-      className={`min-h-14 flex-row items-center justify-center gap-2 rounded-2xl border px-5 active:scale-[0.98] ${className}`}
-      style={{ backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45` }}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      android_ripple={Platform.OS === "android" ? { color: `${colors.text}24`, borderless: false, foreground: true } : undefined}
+      style={(state) => [styles.iconButtonShell, state.pressed ? styles.pressed : null, typeof style === "function" ? style(state) : style]}
       {...props}
     >
-      {typeof children === "string" ? <Text className="text-base font-bold" style={{ color: colors.text }}>{children}</Text> : children}
+      {glass ? (
+        <GlassView
+          glassEffectStyle="clear"
+          isInteractive
+          colorScheme={theme === "candy" ? "light" : "dark"}
+          tintColor={tone === "danger" ? `${colors.danger}45` : `${colors.panelAlt}66`}
+          style={styles.iconButtonContent}
+        >
+          <Ionicons name={icon} size={21} color={iconColor} />
+        </GlassView>
+      ) : (
+        <View style={[styles.iconButtonContent, { backgroundColor: colors.panelAlt, borderColor: tone === "danger" ? `${colors.danger}55` : `${colors.accent}38` }]}>
+          <Ionicons name={icon} size={21} color={iconColor} />
+        </View>
+      )}
     </Pressable>
   );
+}
+
+function hasLiquidGlass() {
+  if (Platform.OS !== "ios") return false;
+  try {
+    return isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
+  } catch {
+    return false;
+  }
 }
 
 export function Label({ children, className = "", ...props }: TextProps & { className?: string }) {
@@ -111,3 +231,52 @@ export function MutedText({ children, className = "", ...props }: TextProps & { 
     </Text>
   );
 }
+
+const styles = StyleSheet.create({
+  buttonShell: {
+    alignSelf: "stretch",
+    borderRadius: 18,
+    minHeight: 58,
+    overflow: "hidden",
+    width: "100%",
+  },
+  buttonContent: {
+    alignItems: "center",
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: 9,
+    justifyContent: "center",
+    minHeight: 58,
+    paddingHorizontal: 20,
+    width: "100%",
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+    textAlign: "center",
+  },
+  outlinedButton: {
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  pressed: {
+    transform: [{ scale: 0.975 }],
+  },
+  disabled: {
+    opacity: 0.42,
+  },
+  iconButtonShell: {
+    borderRadius: 16,
+    height: 48,
+    overflow: "hidden",
+    width: 48,
+  },
+  iconButtonContent: {
+    alignItems: "center",
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+});

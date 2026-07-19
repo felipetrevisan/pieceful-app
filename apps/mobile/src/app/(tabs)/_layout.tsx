@@ -1,11 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
+import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
+import { Platform, StyleSheet } from "react-native";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export default function TabsLayout() {
   const { t, theme } = useApp();
   const colors = mobileThemes[theme];
+  const glass = Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   return (
     <Tabs
       screenOptions={{
@@ -18,8 +21,18 @@ export default function TabsLayout() {
           paddingTop: 8,
           paddingBottom: 12,
           borderTopColor: `${colors.accent}24`,
-          backgroundColor: `${colors.panel}f2`,
+          backgroundColor: glass ? "transparent" : `${colors.panel}f2`,
         },
+        tabBarBackground: glass
+          ? () => (
+              <GlassView
+                glassEffectStyle="regular"
+                colorScheme={theme === "candy" ? "light" : "dark"}
+                tintColor={`${colors.panel}72`}
+                style={StyleSheet.absoluteFill}
+              />
+            )
+          : undefined,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700" },
       }}
     >
