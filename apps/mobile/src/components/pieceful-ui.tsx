@@ -24,9 +24,10 @@ import { useApp } from "@/state/app-provider";
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
-  const content = <View className="px-5 pb-32 pt-3">{children}</View>;
+  const content = <View style={{ paddingHorizontal: 20, paddingBottom: 126, paddingTop: 8, flexGrow: 1 }}>{children}</View>;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+      <LinearGradient colors={[`${colors.primary}12`, "transparent", `${colors.accent}08`]} style={StyleSheet.absoluteFill} />
       {scroll ? (
         <ScrollView showsVerticalScrollIndicator={false}>{content}</ScrollView>
       ) : (
@@ -34,6 +35,37 @@ export function Screen({ children, scroll = true }: { children: ReactNode; scrol
       )}
     </SafeAreaView>
   );
+}
+
+export function AppHeader({ title, showTitle = false }: { title?: string; showTitle?: boolean }) {
+  const { setDrawerOpen, t, theme } = useApp();
+  const colors = mobileThemes[theme];
+  return (
+    <View style={styles.appHeader}>
+      <Pressable accessibilityLabel={t("Abrir menu", "Open menu")} onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.headerAvatar, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45`, opacity: pressed ? 0.7 : 1 }]}>
+        <Ionicons name="extension-puzzle" size={23} color={colors.accent} />
+      </Pressable>
+      <Text numberOfLines={1} style={[showTitle ? styles.headerTitle : styles.headerGreeting, { color: colors.text }]}>{title ?? t("Boa noite", "Good evening")}</Text>
+      <IconButton icon="notifications-outline" label={t("Notificações", "Notifications")} />
+    </View>
+  );
+}
+
+export function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  const { theme } = useApp();
+  const colors = mobileThemes[theme];
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+      {action ? <Pressable onPress={onAction}><Text style={[styles.sectionAction, { color: colors.accent }]}>{action}</Text></Pressable> : null}
+    </View>
+  );
+}
+
+export function ProgressBar({ value }: { value: number }) {
+  const { theme } = useApp();
+  const colors = mobileThemes[theme];
+  return <View style={[styles.progressTrack, { backgroundColor: colors.panelAlt }]}><LinearGradient colors={[colors.accent, colors.primary]} style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, value))}%` }]} /></View>;
 }
 
 export function BrandHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description?: string }) {
@@ -49,11 +81,11 @@ export function BrandHeader({ eyebrow, title, description }: { eyebrow: string; 
           {eyebrow}
         </Text>
       </View>
-      <Text className="text-4xl font-black tracking-tight" style={{ color: colors.text }}>
+      <Text className="text-4xl tracking-tight" style={{ color: colors.text, fontFamily: "BricolageGrotesque_800ExtraBold" }}>
         {title}
       </Text>
       {description ? (
-        <Text className="text-base leading-6" style={{ color: colors.muted }}>
+        <Text className="text-base leading-6" style={{ color: colors.muted, fontFamily: "Inter_400Regular" }}>
           {description}
         </Text>
       ) : null}
@@ -67,7 +99,7 @@ export function Card({ children, className = "", style, ...props }: ViewProps & 
   return (
     <View
       className={`rounded-[24px] border p-5 ${className}`}
-      style={[{ backgroundColor: colors.panel, borderColor: `${colors.accent}26` }, style]}
+      style={[{ backgroundColor: `${colors.panel}e8`, borderColor: `${colors.accent}26` }, style]}
       {...props}
     >
       {children}
@@ -251,6 +283,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   buttonLabel: {
+    fontFamily: "Inter_700Bold",
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: -0.2,
@@ -279,4 +312,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 48,
   },
+  appHeader: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 22 },
+  headerAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  headerGreeting: { flex: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
+  headerTitle: { flex: 1, fontFamily: "BricolageGrotesque_800ExtraBold", fontSize: 27, textAlign: "center" },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  sectionTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 22 },
+  sectionAction: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 1 },
+  progressTrack: { height: 7, borderRadius: 99, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 99 },
 });

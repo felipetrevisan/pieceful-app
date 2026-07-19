@@ -1,72 +1,41 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Alert, Text, View } from "react-native";
-import { BrandHeader, Card, IconButton, MutedText, PrimaryButton, Screen } from "@/components/pieceful-ui";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppHeader, IconButton, PrimaryButton, ProgressBar, Screen } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export default function PuzzlesScreen() {
   const { deletePuzzle, puzzles, t, theme } = useApp();
   const colors = mobileThemes[theme];
-
-  function confirmDelete(id: string, name: string) {
-    Alert.alert(
-      t("Excluir quebra-cabeça?", "Delete puzzle?"),
-      t(`“${name}” e todo o progresso serão apagados.`, `“${name}” and all progress will be deleted.`),
-      [
-        { text: t("Cancelar", "Cancel"), style: "cancel" },
-        { text: t("Excluir", "Delete"), style: "destructive", onPress: () => deletePuzzle(id) },
-      ],
-    );
-  }
-
+  function remove(id: string, name: string) { Alert.alert(t("Excluir puzzle?", "Delete puzzle?"), t(`“${name}” e seu progresso serão apagados.`, `“${name}” and its progress will be deleted.`), [{ text: t("Cancelar", "Cancel"), style: "cancel" }, { text: t("Excluir", "Delete"), style: "destructive", onPress: () => deletePuzzle(id) }]); }
   return (
     <Screen>
-      <BrandHeader
-        eyebrow={t("SUA COLEÇÃO", "YOUR COLLECTION")}
-        title={t("Meus puzzles", "My puzzles")}
-        description={t("Continue de onde parou ou revisite uma memória finalizada.", "Continue where you left off or revisit a completed memory.")}
-      />
-
-      {puzzles.length === 0 ? (
-        <Card className="items-center gap-3 py-10">
-          <View className="h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.panelAlt }}>
-            <Ionicons name="albums-outline" size={30} color={colors.accent} />
-          </View>
-          <Text className="text-center text-xl font-black" style={{ color: colors.text }}>{t("Sua estante está vazia", "Your shelf is empty")}</Text>
-          <MutedText className="text-center">{t("Crie seu primeiro desafio e ele aparecerá aqui.", "Create your first challenge and it will appear here.")}</MutedText>
-          <PrimaryButton className="mt-3 w-full" onPress={() => router.push("/(tabs)/create")}>{t("Criar agora", "Create now")}</PrimaryButton>
-        </Card>
-      ) : (
-        <View className="gap-4">
-          {puzzles.map((puzzle) => {
-            const placed = puzzle.session.pieces.filter((piece) => piece.isPlaced).length;
-            const progress = Math.round((placed / puzzle.session.pieces.length) * 100);
-            const completed = progress === 100 || puzzle.session.completedAt !== null;
-            return (
-              <Card key={puzzle.id} className="overflow-hidden p-0">
-                <Image source={{ uri: puzzle.imageUri }} style={{ width: "100%", height: 190 }} contentFit="cover" />
-                <View className="gap-3 p-5">
-                  <View className="flex-row items-start justify-between gap-3">
-                    <View className="flex-1">
-                      <Text className="text-xs font-black tracking-[2px]" style={{ color: completed ? colors.accent : colors.primary }}>{completed ? t("FINALIZADO", "COMPLETED") : `${puzzle.configuration.totalPieces} ${t("PEÇAS", "PIECES")}`}</Text>
-                      <Text numberOfLines={1} className="mt-1 text-xl font-black" style={{ color: colors.text }}>{puzzle.name}</Text>
-                    </View>
-                    <IconButton icon="trash-outline" label={t("Excluir", "Delete")} tone="danger" onPress={() => confirmDelete(puzzle.id, puzzle.name)} />
-                  </View>
-                  <View className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: colors.panelAlt }}><View className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: colors.accent }} /></View>
-                  <View className="flex-row items-center justify-between">
-                    <MutedText>{progress}% {t("concluído", "completed")}</MutedText>
-                    <MutedText>{new Date(puzzle.updatedAt).toLocaleDateString()}</MutedText>
-                  </View>
-                  <PrimaryButton onPress={() => router.push(`/puzzle/${puzzle.id}`)}>{completed ? t("Ver resultado", "View result") : t("Continuar montagem", "Continue puzzle")}</PrimaryButton>
-                </View>
-              </Card>
-            );
-          })}
-        </View>
+      <AppHeader title={t("Coleção", "Collection")} showTitle />
+      <View style={styles.filterRow}><Text style={[styles.count, { color: colors.muted }]}>{puzzles.length} {t("puzzles", "puzzles")}</Text><Pressable style={styles.sort}><Ionicons name="options-outline" size={19} color={colors.accent} /><Text style={[styles.sortText, { color: colors.accent }]}>{t("ORDENAR", "SORT")}</Text></Pressable></View>
+      {puzzles.length === 0 ? <View style={[styles.empty, { borderColor: `${colors.accent}30` }]}><Ionicons name="albums-outline" size={45} color={colors.accent} /><Text style={[styles.title, { color: colors.text }]}>{t("Sua coleção está vazia", "Your collection is empty")}</Text><PrimaryButton onPress={() => router.push("/(tabs)/create")}>{t("Criar primeiro puzzle", "Create first puzzle")}</PrimaryButton></View> : (
+        <View style={{ gap: 18 }}>{puzzles.map((puzzle) => {
+          const placed = puzzle.session.pieces.filter((piece) => piece.isPlaced).length;
+          const progress = Math.round((placed / puzzle.session.pieces.length) * 100);
+          const done = progress === 100 || !!puzzle.session.completedAt;
+          return <Pressable key={puzzle.id} onPress={() => router.push((done ? `/result/${puzzle.id}` : `/puzzle/${puzzle.id}`) as never)} style={({ pressed }) => [styles.card, { backgroundColor: colors.panel, borderColor: done ? `${colors.accent}55` : `${colors.primary}38`, opacity: pressed ? .86 : 1 }]}>
+            <Image source={{ uri: puzzle.imageUri }} style={styles.image} contentFit="cover" />
+            <LinearGradient colors={["transparent", colors.panel]} style={styles.imageFade} />
+            <View style={styles.content}>
+              <View style={styles.titleRow}><View style={{ flex: 1 }}><Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>{puzzle.name}</Text><Text style={[styles.status, { color: done ? colors.accent : colors.muted }]}>{done ? t("✓ CONCLUÍDO", "✓ COMPLETED") : t("EM ANDAMENTO", "IN PROGRESS")}</Text></View><IconButton icon="trash-outline" label={t("Excluir", "Delete")} tone="danger" onPress={() => remove(puzzle.id, puzzle.name)} /></View>
+              {!done ? <><View style={styles.progressLabel}><Text style={[styles.meta, { color: colors.muted }]}>{placed}/{puzzle.session.pieces.length}</Text><Text style={[styles.percent, { color: colors.accent }]}>{progress}%</Text></View><ProgressBar value={progress} /></> : <View style={styles.doneRow}><Ionicons name="play-circle-outline" size={27} color={colors.accent} /><Text style={[styles.meta, { color: colors.muted }]}>{t("Ver resultado e timelapse", "View result and timelapse")}</Text></View>}
+            </View>
+          </Pressable>;
+        })}</View>
       )}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  filterRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }, count: { fontFamily: "Inter_400Regular", fontSize: 14 }, sort: { flexDirection: "row", gap: 6, alignItems: "center", minHeight: 44 }, sortText: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 1 },
+  empty: { borderWidth: 1, borderRadius: 28, padding: 28, alignItems: "center", gap: 14 },
+  card: { borderRadius: 25, borderWidth: 1, overflow: "hidden" }, image: { width: "100%", height: 205 }, imageFade: { position: "absolute", left: 0, right: 0, top: 125, height: 82 }, content: { padding: 18, gap: 11 }, titleRow: { flexDirection: "row", gap: 12, alignItems: "center" }, title: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 23 }, status: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.1, marginTop: 4 }, progressLabel: { flexDirection: "row", justifyContent: "space-between" }, meta: { fontFamily: "Inter_600SemiBold", fontSize: 13 }, percent: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 }, doneRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+});

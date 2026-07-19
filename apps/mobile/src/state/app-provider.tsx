@@ -39,11 +39,13 @@ interface CreatePuzzleInput {
 
 interface AppState {
   ready: boolean;
+  drawerOpen: boolean;
   language: AppLanguage;
   theme: MobileTheme;
   puzzles: MobilePuzzle[];
   setLanguage: (language: AppLanguage) => void;
   setTheme: (theme: MobileTheme) => void;
+  setDrawerOpen: (open: boolean) => void;
   createPuzzle: (input: CreatePuzzleInput) => MobilePuzzle;
   updatePuzzlePieces: (id: string, pieces: PuzzlePiece[]) => void;
   updatePuzzleCamera: (id: string, camera: Camera) => void;
@@ -57,6 +59,7 @@ const AppContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [language, setLanguageState] = useState<AppLanguage>("pt-BR");
   const [theme, setThemeState] = useState<MobileTheme>("cosmic");
   const [puzzles, setPuzzles] = useState<MobilePuzzle[]>([]);
@@ -181,11 +184,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(
     () => ({
       ready,
+      drawerOpen,
       language,
       theme,
       puzzles,
       setLanguage,
       setTheme,
+      setDrawerOpen,
       createPuzzle,
       updatePuzzlePieces,
       updatePuzzleCamera,
@@ -195,6 +200,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [
       createPuzzle,
       deletePuzzle,
+      drawerOpen,
       language,
       puzzles,
       ready,

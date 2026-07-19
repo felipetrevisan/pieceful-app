@@ -4,7 +4,8 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativePuzzleBoard } from "@/components/native-puzzle-board";
 import { IconButton, PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
@@ -26,13 +27,7 @@ export default function PuzzleScreen() {
     setPieces(next);
     updatePuzzlePieces(id, next);
     if (next.length > 0 && next.every((piece) => piece.isPlaced)) {
-      setTimeout(() => {
-        Alert.alert(
-          t("Memória reconstruída!", "Memory reconstructed!"),
-          t("Você completou este quebra-cabeça.", "You completed this puzzle."),
-          [{ text: t("Ver coleção", "View collection"), onPress: () => router.replace("/(tabs)/puzzles") }],
-        );
-      }, 350);
+      setTimeout(() => router.replace(`/result/${id}` as never), 500);
     }
   }
 
@@ -61,7 +56,8 @@ export default function PuzzleScreen() {
 
   return (
     <SafeAreaView className="flex-1" edges={["top", "bottom"]} style={{ backgroundColor: colors.background }}>
-      <View className="border-b px-4 pb-3 pt-2" style={{ borderBottomColor: `${colors.accent}25`, backgroundColor: colors.panel }}>
+      <View style={[styles.toolbar, { borderColor: `${colors.accent}35`, backgroundColor: colors.panel }]}>
+        <LinearGradient colors={[`${colors.accent}35`, "transparent"]} style={[StyleSheet.absoluteFill, { width: `${progress}%` }]} />
         <View className="flex-row items-center gap-3">
           <IconButton icon="chevron-back" label={t("Voltar", "Back")} onPress={() => router.back()} />
           <View className="flex-1">
@@ -71,9 +67,6 @@ export default function PuzzleScreen() {
           {puzzle.configuration.referenceEnabled ? (
             <IconButton icon="image-outline" label={t("Ver referência", "View reference")} onPress={() => setShowReference(true)} />
           ) : null}
-        </View>
-        <View className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: colors.panelAlt }}>
-          <View className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: colors.accent }} />
         </View>
       </View>
 
@@ -101,3 +94,5 @@ export default function PuzzleScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({ toolbar: { marginHorizontal: 12, marginTop: 6, borderRadius: 25, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, overflow: "hidden" } });

@@ -1,83 +1,28 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Pressable, Text, View } from "react-native";
-import { BrandHeader, Card, MutedText, Screen } from "@/components/pieceful-ui";
+import { useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { AppHeader, Screen } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { type AppLanguage, type MobileTheme, useApp } from "@/state/app-provider";
 
-const themeOptions: { id: MobileTheme; icon: string; name: string; subtitle: [string, string] }[] = [
-  { id: "cosmic", icon: "✦", name: "Cosmic Night", subtitle: ["Profundo e imersivo", "Deep and immersive"] },
-  { id: "candy", icon: "🍭", name: "Candy Pop", subtitle: ["Colorido e divertido", "Colorful and playful"] },
-  { id: "cyberpunk", icon: "◈", name: "Cyberpunk", subtitle: ["Neon e futurista", "Neon and futuristic"] },
-];
+const themes: { id: MobileTheme; name: string; icon: keyof typeof Ionicons.glyphMap }[] = [{ id: "cosmic", name: "Cosmic Night", icon: "planet-outline" }, { id: "candy", name: "Candy Pop", icon: "color-palette-outline" }, { id: "cyberpunk", name: "Cyberpunk", icon: "flash-outline" }];
 
 export default function SettingsScreen() {
-  const { language, setLanguage, setTheme, t, theme } = useApp();
-  const colors = mobileThemes[theme];
-
-  function chooseLanguage(next: AppLanguage) {
-    setLanguage(next);
-    void Haptics.selectionAsync();
-  }
-
-  function chooseTheme(next: MobileTheme) {
-    setTheme(next);
-    void Haptics.selectionAsync();
-  }
-
-  return (
-    <Screen>
-      <BrandHeader
-        eyebrow={t("SEU JEITO DE JOGAR", "PLAY YOUR WAY")}
-        title={t("Configurações", "Settings")}
-        description={t("Personalize o aplicativo e deixe tudo com a sua cara.", "Customize the app and make it feel like yours.")}
-      />
-
-      <Card className="mb-4 gap-4">
-        <View className="flex-row items-center gap-3">
-          <Ionicons name="language" size={23} color={colors.accent} />
-          <View><Text className="text-lg font-black" style={{ color: colors.text }}>{t("Idioma", "Language")}</Text><MutedText>{t("Aplicado em todo o aplicativo", "Applied throughout the app")}</MutedText></View>
-        </View>
-        <View className="flex-row gap-3">
-          <LanguageButton flag="🇧🇷" title="Português" selected={language === "pt-BR"} onPress={() => chooseLanguage("pt-BR")} />
-          <LanguageButton flag="🇺🇸" title="English" selected={language === "en"} onPress={() => chooseLanguage("en")} />
-        </View>
-      </Card>
-
-      <Card className="mb-4 gap-4">
-        <View className="flex-row items-center gap-3">
-          <Ionicons name="color-palette-outline" size={23} color={colors.accent} />
-          <View><Text className="text-lg font-black" style={{ color: colors.text }}>{t("Temas", "Themes")}</Text><MutedText>{t("Uma mudança completa de atmosfera", "A complete change of atmosphere")}</MutedText></View>
-        </View>
-        {themeOptions.map((option) => {
-          const selected = theme === option.id;
-          const preview = mobileThemes[option.id];
-          return (
-            <Pressable key={option.id} className="min-h-[84px] flex-row items-center gap-4 rounded-2xl border p-3 active:scale-[0.99]" style={{ borderColor: selected ? colors.accent : `${colors.accent}20`, backgroundColor: selected ? `${colors.accent}12` : colors.panelAlt }} onPress={() => chooseTheme(option.id)}>
-              <View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: preview.background, borderColor: preview.accent, borderWidth: 1 }}><Text className="text-2xl">{option.icon}</Text></View>
-              <View className="flex-1"><Text className="text-base font-black" style={{ color: colors.text }}>{option.name}</Text><MutedText>{option.subtitle[language === "en" ? 1 : 0]}</MutedText></View>
-              <Ionicons name={selected ? "checkmark-circle" : "ellipse-outline"} size={24} color={selected ? colors.accent : colors.muted} />
-            </Pressable>
-          );
-        })}
-      </Card>
-
-      <Card className="gap-4">
-        <View className="flex-row items-center gap-3"><Ionicons name="shield-checkmark-outline" size={23} color={colors.accent} /><View><Text className="text-lg font-black" style={{ color: colors.text }}>{t("Privacidade", "Privacy")}</Text><MutedText>{t("Projetado para funcionar localmente", "Designed to work locally")}</MutedText></View></View>
-        <View className="rounded-2xl p-4" style={{ backgroundColor: colors.panelAlt }}>
-          <Text className="font-bold leading-6" style={{ color: colors.text }}>{t("As imagens e o progresso ficam armazenados no aparelho. Você mantém o controle das suas memórias.", "Images and progress are stored on your device. You stay in control of your memories.")}</Text>
-        </View>
-      </Card>
-    </Screen>
-  );
+  const { language, setLanguage, setTheme, t, theme } = useApp(); const colors = mobileThemes[theme];
+  const [sound, setSound] = useState(true); const [haptics, setHaptics] = useState(true);
+  function languageChange(next: AppLanguage) { setLanguage(next); void Haptics.selectionAsync(); }
+  function themeChange(next: MobileTheme) { setTheme(next); void Haptics.selectionAsync(); }
+  return <Screen><AppHeader title={t("Configurações", "Settings")} showTitle />
+    <Section title={t("IDIOMA", "LANGUAGE")}><View style={[styles.language, { backgroundColor: colors.panel, borderColor: `${colors.muted}40` }]}>{(["pt-BR", "en"] as const).map((item) => <Pressable key={item} onPress={() => languageChange(item)} style={[styles.languageOption, item === language ? { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45`, borderWidth: 1 } : null]}><Text style={[styles.languageText, { color: item === language ? colors.accent : colors.muted }]}>{item === "pt-BR" ? "Português" : "English"}</Text></Pressable>)}</View></Section>
+    <Section title={t("GALERIA DE TEMAS", "THEME GALLERY")} trailing={t("Prévia ao vivo", "Live preview")}><ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}>{themes.map((item) => { const preview = mobileThemes[item.id]; const selected = item.id === theme; return <Pressable key={item.id} onPress={() => themeChange(item.id)} style={[styles.themeCard, { backgroundColor: preview.background, borderColor: selected ? colors.accent : `${colors.muted}30` }]}><Ionicons name={item.icon} size={36} color={preview.accent} /><Text style={[styles.themeName, { color: preview.text }]}>{item.name}</Text>{selected ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} style={styles.check} /> : null}</Pressable>; })}</ScrollView></Section>
+    <Section title={t("PREFERÊNCIAS", "PREFERENCES")}><View style={[styles.group, { backgroundColor: colors.panel, borderColor: `${colors.muted}38` }]}><SettingRow icon="volume-high-outline" title={t("Som", "Sound")} right={<Switch value={sound} onValueChange={setSound} trackColor={{ true: colors.accent }} />} /><SettingRow icon="phone-portrait-outline" title={t("Resposta tátil", "Haptics")} right={<Switch value={haptics} onValueChange={setHaptics} trackColor={{ true: colors.accent }} />} /><SettingRow icon="accessibility-outline" title={t("Acessibilidade", "Accessibility")} /></View></Section>
+    <Section title={t("AJUDA", "HELP")}><View style={styles.helpRow}><HelpCard icon="game-controller-outline" title={t("Controles", "Controller Help")} /><HelpCard icon="keypad-outline" title={t("Teclado", "Keyboard Help")} /></View></Section>
+    <Pressable onPress={() => Alert.alert(t("Dados locais", "Local data"), t("A conta online ainda não está ativa. Seus puzzles continuam armazenados neste aparelho.", "Online accounts are not active yet. Your puzzles remain stored on this device."))} style={[styles.danger, { borderColor: `${colors.danger}66` }]}><Text style={[styles.dangerText, { color: colors.danger }]}>{t("Excluir dados locais", "Delete local data")}</Text><Ionicons name="trash-outline" size={22} color={colors.danger} /></Pressable>
+  </Screen>;
 }
 
-function LanguageButton({ flag, title, selected, onPress }: { flag: string; title: string; selected: boolean; onPress: () => void }) {
-  const { theme } = useApp();
-  const colors = mobileThemes[theme];
-  return (
-    <Pressable className="min-h-[92px] flex-1 items-center justify-center gap-2 rounded-2xl border active:scale-[0.98]" style={{ borderColor: selected ? colors.accent : `${colors.accent}20`, backgroundColor: selected ? `${colors.accent}16` : colors.panelAlt }} onPress={onPress}>
-      <Text className="text-3xl">{flag}</Text><Text className="font-black" style={{ color: colors.text }}>{title}</Text>
-    </Pressable>
-  );
-}
+function Section({ title, trailing, children }: { title: string; trailing?: string; children: React.ReactNode }) { const { theme } = useApp(); const c = mobileThemes[theme]; return <View style={styles.section}><View style={styles.sectionHead}><Text style={[styles.sectionTitle, { color: c.accent }]}>{title}</Text>{trailing ? <Text style={[styles.trailing, { color: c.muted }]}>{trailing}</Text> : null}</View>{children}</View>; }
+function SettingRow({ icon, title, right }: { icon: keyof typeof Ionicons.glyphMap; title: string; right?: React.ReactNode }) { const { theme } = useApp(); const c = mobileThemes[theme]; return <View style={[styles.settingRow, { borderBottomColor: `${c.muted}20` }]}><Ionicons name={icon} size={24} color={c.accent} /><Text style={[styles.settingText, { color: c.text }]}>{title}</Text>{right ?? <Ionicons name="chevron-forward" size={20} color={c.muted} />}</View>; }
+function HelpCard({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) { const { theme } = useApp(); const c = mobileThemes[theme]; return <Pressable style={[styles.help, { backgroundColor: c.panel, borderColor: `${c.muted}38` }]}><Ionicons name={icon} size={29} color={c.primary} /><Text style={[styles.helpText, { color: c.text }]}>{title}</Text></Pressable>; }
+const styles = StyleSheet.create({ section: { marginBottom: 30 }, sectionHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 13 }, sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 1.4 }, trailing: { fontFamily: "Inter_600SemiBold", fontSize: 12 }, language: { flexDirection: "row", borderRadius: 28, borderWidth: 1, padding: 4 }, languageOption: { flex: 1, minHeight: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" }, languageText: { fontFamily: "Inter_700Bold", fontSize: 16 }, themeCard: { width: 210, height: 130, borderRadius: 22, borderWidth: 1.5, padding: 18, justifyContent: "flex-end", gap: 8 }, themeName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20 }, check: { position: "absolute", top: 13, right: 13 }, group: { borderWidth: 1, borderRadius: 23, overflow: "hidden" }, settingRow: { minHeight: 64, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 18 }, settingText: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 16 }, helpRow: { flexDirection: "row", gap: 12 }, help: { flex: 1, minHeight: 130, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 12 }, helpText: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18, textAlign: "center" }, danger: { minHeight: 64, borderRadius: 20, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20 }, dangerText: { fontFamily: "Inter_700Bold", fontSize: 17 } });

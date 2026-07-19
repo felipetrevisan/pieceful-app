@@ -2,15 +2,15 @@ import type { MobileTheme } from "@/state/app-provider";
 
 export const mobileThemes = {
   cosmic: {
-    background: "#071126",
-    panel: "#111c36",
-    panelAlt: "#182441",
-    text: "#f6f7ff",
-    muted: "#aeb8d3",
-    primary: "#a879ff",
-    accent: "#4cd7f6",
-    danger: "#ff839c",
-    gradient: ["#a879ff", "#4cd7f6"] as const,
+    background: "#0a0e1a",
+    panel: "#171b28",
+    panelAlt: "#262a37",
+    text: "#dfe2f3",
+    muted: "#b9cacb",
+    primary: "#edb1ff",
+    accent: "#00f2ff",
+    danger: "#ffb4ab",
+    gradient: ["#00dbe7", "#d6baff"] as const,
   },
   candy: {
     background: "#fff6fb",

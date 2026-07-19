@@ -17,10 +17,15 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
           position: "absolute",
-          height: 78,
-          paddingTop: 8,
-          paddingBottom: 12,
-          borderTopColor: `${colors.accent}24`,
+          left: 18,
+          right: 18,
+          bottom: 12,
+          height: 70,
+          paddingTop: 7,
+          paddingBottom: 8,
+          borderTopWidth: 0,
+          borderRadius: 32,
+          overflow: "hidden",
           backgroundColor: glass ? "transparent" : `${colors.panel}f2`,
         },
         tabBarBackground: glass
@@ -33,7 +38,7 @@ export default function TabsLayout() {
               />
             )
           : undefined,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "700" },
+        tabBarLabelStyle: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
       }}
     >
       <Tabs.Screen
@@ -58,12 +63,12 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="achievements"
         options={{
-          title: t("Ajustes", "Settings"),
-          tabBarIcon: ({ color, size }) => <Ionicons name="options" color={color} size={size} />,
+          href: null,
         }}
       />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -7,7 +7,7 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, Platform, Pressable, Switch, Text, TextInput, View } from "react-native";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
-import { BrandHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
+import { AppHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
@@ -108,11 +108,7 @@ export default function CreateScreen() {
 
   return (
     <Screen>
-      <BrandHeader
-        eyebrow={t("NOVO DESAFIO", "NEW CHALLENGE")}
-        title={t("Crie seu puzzle", "Create your puzzle")}
-        description={t("Todas as opções ficam visíveis para você decidir antes de começar.", "Every option is visible so you can decide before starting.")}
-      />
+      <AppHeader title={t("Novo Puzzle", "New Puzzle")} showTitle />
 
       <Card className="mb-4 gap-4">
         <View className="flex-row items-center gap-3">
@@ -157,13 +153,12 @@ export default function CreateScreen() {
             <MutedText>{configuration.totalPieces} {t("peças", "pieces")}</MutedText>
           </View>
         </View>
-        <View className="flex-row flex-wrap gap-2">
+        <View className="flex-row overflow-hidden rounded-2xl" style={{ backgroundColor: colors.panelAlt }}>
           {presets.map((preset) => {
             const selected = selectedPreset?.id === preset.id;
             return (
-              <Pressable key={preset.id} className="min-w-[47%] flex-1 rounded-2xl border p-4 active:scale-[0.98]" style={{ borderColor: selected ? colors.accent : `${colors.accent}25`, backgroundColor: selected ? `${colors.accent}18` : colors.panelAlt }} onPress={() => selectPreset(preset)}>
-                <Text className="text-xl font-black" style={{ color: selected ? colors.accent : colors.text }}>{preset.pieces}</Text>
-                <MutedText>{preset.rows} × {preset.columns}</MutedText>
+              <Pressable key={preset.id} className="min-h-16 flex-1 items-center justify-center rounded-2xl active:scale-[0.98]" style={{ backgroundColor: selected ? `${colors.accent}18` : "transparent", borderColor: selected ? colors.accent : "transparent", borderWidth: 1 }} onPress={() => selectPreset(preset)}>
+                <Text className="text-base font-black" style={{ color: selected ? colors.accent : colors.text }}>{preset.pieces}</Text>
               </Pressable>
             );
           })}
