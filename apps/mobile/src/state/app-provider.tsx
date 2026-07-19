@@ -61,6 +61,23 @@ const defaultPreferences: MobilePreferences = { sound: true, haptics: true, high
 
 const AppContext = createContext<AppState | null>(null);
 
+function shuffledTraySlots(length: number, seed: number) {
+  const slots = Array.from({ length }, (_, index) => index);
+  let state = seed >>> 0;
+  const random = () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let index = slots.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(random() * (index + 1));
+    [slots[index], slots[target]] = [slots[target], slots[index]];
+  }
+  return slots;
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -111,14 +128,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       input.configuration.columns,
       seed,
     );
+    const shuffledSlots = shuffledTraySlots(generated.length, seed ^ 0x51f15e);
     const pieces = generated.map((piece, index) => ({
       ...piece,
       currentPosition: {
-        x: index % input.configuration.columns,
+        x: (shuffledSlots[index] ?? index) % input.configuration.columns,
         y:
           input.configuration.rows +
-          1 +
-          Math.floor(index / input.configuration.columns) * 1.18,
+          2.05 +
+          Math.floor((shuffledSlots[index] ?? index) / input.configuration.columns) * 1.18,
         rotation: input.configuration.rotationEnabled ? piece.currentPosition.rotation : 0,
       },
       trayId: null,
