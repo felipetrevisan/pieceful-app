@@ -5,6 +5,7 @@ import {
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { Children, useEffect, type ReactNode } from "react";
 import {
   Platform,
@@ -27,7 +28,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { mobileThemes } from "@/constants/pieceful-theme";
+import { isLightMobileTheme, mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
@@ -54,16 +55,18 @@ export function Screen({ children, scroll = true }: { children: ReactNode; scrol
 }
 
 export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const { preferences } = useApp();
   return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(420).springify().damping(17)}>
+    <Animated.View entering={preferences.reducedMotion ? undefined : FadeInDown.delay(delay).duration(420).springify().damping(17)}>
       {children}
     </Animated.View>
   );
 }
 
 function AmbientGlow() {
-  const { theme } = useApp();
+  const { preferences, theme } = useApp();
   const colors = mobileThemes[theme];
+  const atmosphereIcon = mobileThemeCatalog.find((item) => item.id === theme)?.icon ?? "sparkles-outline";
   const drift = useSharedValue(0);
 
   useEffect(() => {
@@ -79,6 +82,8 @@ function AmbientGlow() {
     transform: [{ translateX: drift.value * -22 }, { translateY: drift.value * 34 }, { scale: 0.9 + drift.value * 0.18 }],
   }));
 
+  if (preferences.reducedMotion) return null;
+
   return (
     <Animated.View
       pointerEvents="none"
@@ -90,18 +95,23 @@ function AmbientGlow() {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      <View style={styles.atmosphereIcon}><Ionicons name={atmosphereIcon} size={84} color={`${colors.accent}48`} /></View>
     </Animated.View>
   );
 }
 
-export function AppHeader({ title, showTitle = false }: { title?: string; showTitle?: boolean }) {
+export function AppHeader({ title, showTitle = false, back = false }: { title?: string; showTitle?: boolean; back?: boolean }) {
   const { setDrawerOpen, t, theme } = useApp();
   const colors = mobileThemes[theme];
   return (
     <View style={styles.appHeader}>
-      <Pressable accessibilityLabel={t("Abrir menu", "Open menu")} onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.headerAvatar, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45`, opacity: pressed ? 0.7 : 1 }]}>
-        <Ionicons name="extension-puzzle" size={23} color={colors.accent} />
-      </Pressable>
+      {back ? (
+        <IconButton icon="chevron-back" label={t("Voltar", "Back")} onPress={() => router.back()} />
+      ) : (
+        <Pressable accessibilityLabel={t("Abrir menu", "Open menu")} onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.headerAvatar, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45`, borderRadius: Math.max(8, colors.radius), opacity: pressed ? 0.7 : 1 }]}>
+          <Ionicons name="extension-puzzle" size={23} color={colors.accent} />
+        </Pressable>
+      )}
       <Text numberOfLines={1} style={[showTitle ? styles.headerTitle : styles.headerGreeting, { color: colors.text }]}>{title ?? t("Boa noite", "Good evening")}</Text>
       <IconButton icon="notifications-outline" label={t("Notificações", "Notifications")} />
     </View>
@@ -151,12 +161,12 @@ export function BrandHeader({ eyebrow, title, description }: { eyebrow: string; 
 }
 
 export function Card({ children, className = "", style, ...props }: ViewProps & { children: ReactNode; className?: string }) {
-  const { theme } = useApp();
+  const { preferences, theme } = useApp();
   const colors = mobileThemes[theme];
   return (
     <View
       className={`rounded-[24px] border p-5 ${className}`}
-      style={[{ backgroundColor: `${colors.panel}e8`, borderColor: `${colors.accent}26` }, style]}
+      style={[{ backgroundColor: `${colors.panel}e8`, borderColor: `${colors.accent}${preferences.highContrast ? "aa" : "26"}`, borderRadius: colors.radius, borderWidth: preferences.highContrast ? 2 : 1 }, style]}
       {...props}
     >
       {children}
@@ -192,6 +202,7 @@ export function ActionButton({
 }: ActionButtonProps) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
+  const buttonRadius = Math.max(5, Math.min(20, colors.radius - 5));
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const glass = hasLiquidGlass() && !disabled;
@@ -206,7 +217,7 @@ export function ActionButton({
   );
 
   return (
-    <Animated.View className={className} style={[styles.buttonShell, !glass && disabled ? styles.disabled : null, animatedStyle]}>
+    <Animated.View className={className} style={[styles.buttonShell, { borderRadius: buttonRadius }, !glass && disabled ? styles.disabled : null, animatedStyle]}>
       <Pressable
         accessibilityRole="button"
         disabled={disabled}
@@ -226,9 +237,9 @@ export function ActionButton({
         <GlassView
           glassEffectStyle={variant === "primary" ? "regular" : "clear"}
           isInteractive
-          colorScheme={theme === "candy" ? "light" : "dark"}
+          colorScheme={isLightMobileTheme(theme) ? "light" : "dark"}
           tintColor={variant === "danger" ? `${colors.danger}55` : variant === "primary" ? `${colors.primary}72` : `${colors.panelAlt}66`}
-          style={styles.buttonContent}
+          style={[styles.buttonContent, { borderRadius: buttonRadius }]}
         >
           {content}
         </GlassView>
@@ -237,7 +248,7 @@ export function ActionButton({
           colors={[...colors.gradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.buttonContent}
+          style={[styles.buttonContent, { borderRadius: buttonRadius }]}
         >
           {content}
         </LinearGradient>
@@ -246,6 +257,7 @@ export function ActionButton({
           style={[
             styles.buttonContent,
             styles.outlinedButton,
+            { borderRadius: buttonRadius },
             {
               backgroundColor: variant === "danger" ? `${colors.danger}14` : colors.panelAlt,
               borderColor: variant === "danger" ? `${colors.danger}66` : `${colors.accent}45`,
@@ -277,10 +289,11 @@ export function IconButton({
   const colors = mobileThemes[theme];
   const glass = hasLiquidGlass() && !props.disabled;
   const iconColor = tone === "danger" ? colors.danger : colors.accent;
+  const iconRadius = Math.max(5, Math.min(16, colors.radius - 7));
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <Animated.View style={[styles.iconButtonShell, animatedStyle]}>
+    <Animated.View style={[styles.iconButtonShell, { borderRadius: iconRadius }, animatedStyle]}>
       <Pressable
         accessibilityLabel={label}
         accessibilityRole="button"
@@ -300,14 +313,14 @@ export function IconButton({
         <GlassView
           glassEffectStyle="clear"
           isInteractive
-          colorScheme={theme === "candy" ? "light" : "dark"}
+          colorScheme={isLightMobileTheme(theme) ? "light" : "dark"}
           tintColor={tone === "danger" ? `${colors.danger}45` : `${colors.panelAlt}66`}
-          style={styles.iconButtonContent}
+          style={[styles.iconButtonContent, { borderRadius: iconRadius }]}
         >
           <Ionicons name={icon} size={21} color={iconColor} />
         </GlassView>
       ) : (
-        <View style={[styles.iconButtonContent, { backgroundColor: colors.panelAlt, borderColor: tone === "danger" ? `${colors.danger}55` : `${colors.accent}38` }]}>
+        <View style={[styles.iconButtonContent, { borderRadius: iconRadius, backgroundColor: colors.panelAlt, borderColor: tone === "danger" ? `${colors.danger}55` : `${colors.accent}38` }]}>
           <Ionicons name={icon} size={21} color={iconColor} />
         </View>
         )}
@@ -391,6 +404,7 @@ const styles = StyleSheet.create({
   },
   iconButtonPressable: { flex: 1 },
   ambientGlow: { position: "absolute", right: -110, top: 130, width: 240, height: 240, borderRadius: 120, overflow: "hidden" },
+  atmosphereIcon: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   appHeader: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 22 },
   headerAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerGreeting: { flex: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },

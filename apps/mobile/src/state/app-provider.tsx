@@ -17,7 +17,8 @@ import {
 } from "react";
 
 export type AppLanguage = "pt-BR" | "en";
-export type MobileTheme = "cosmic" | "candy" | "cyberpunk";
+export type MobileTheme = "cosmic" | "candy" | "jungle" | "rainbow" | "ocean" | "arcade" | "castle" | "storybook" | "cyberpunk" | "hologram" | "space";
+export interface MobilePreferences { sound: boolean; haptics: boolean; highContrast: boolean; reducedMotion: boolean }
 
 export interface MobilePuzzle {
   id: string;
@@ -42,10 +43,12 @@ interface AppState {
   drawerOpen: boolean;
   language: AppLanguage;
   theme: MobileTheme;
+  preferences: MobilePreferences;
   puzzles: MobilePuzzle[];
   setLanguage: (language: AppLanguage) => void;
   setTheme: (theme: MobileTheme) => void;
   setDrawerOpen: (open: boolean) => void;
+  updatePreference: (key: keyof MobilePreferences, value: boolean) => void;
   createPuzzle: (input: CreatePuzzleInput) => MobilePuzzle;
   updatePuzzlePieces: (id: string, pieces: PuzzlePiece[]) => void;
   updatePuzzleCamera: (id: string, camera: Camera) => void;
@@ -54,6 +57,7 @@ interface AppState {
 }
 
 const STORAGE_KEY = "pieceful-mobile-state-v1";
+const defaultPreferences: MobilePreferences = { sound: true, haptics: true, highContrast: false, reducedMotion: false };
 
 const AppContext = createContext<AppState | null>(null);
 
@@ -62,6 +66,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [language, setLanguageState] = useState<AppLanguage>("pt-BR");
   const [theme, setThemeState] = useState<MobileTheme>("cosmic");
+  const [preferences, setPreferences] = useState(defaultPreferences);
   const [puzzles, setPuzzles] = useState<MobilePuzzle[]>([]);
 
   useEffect(() => {
@@ -72,14 +77,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           language: AppLanguage;
           theme: MobileTheme;
           puzzles: MobilePuzzle[];
+          preferences: MobilePreferences;
         }>;
         if (parsed.language === "en" || parsed.language === "pt-BR") {
           setLanguageState(parsed.language);
         }
-        if (["cosmic", "candy", "cyberpunk"].includes(parsed.theme ?? "")) {
+        if (["cosmic", "candy", "jungle", "rainbow", "ocean", "arcade", "castle", "storybook", "cyberpunk", "hologram", "space"].includes(parsed.theme ?? "")) {
           setThemeState(parsed.theme as MobileTheme);
         }
         if (Array.isArray(parsed.puzzles)) setPuzzles(parsed.puzzles);
+        if (parsed.preferences) setPreferences({ ...defaultPreferences, ...parsed.preferences });
       })
       .catch(() => undefined)
       .finally(() => setReady(true));
@@ -87,11 +94,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ language, theme, puzzles }));
-  }, [language, puzzles, ready, theme]);
+    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ language, theme, puzzles, preferences }));
+  }, [language, preferences, puzzles, ready, theme]);
 
   const setLanguage = useCallback((next: AppLanguage) => setLanguageState(next), []);
   const setTheme = useCallback((next: MobileTheme) => setThemeState(next), []);
+  const updatePreference = useCallback((key: keyof MobilePreferences, value: boolean) => {
+    setPreferences((current) => ({ ...current, [key]: value }));
+  }, []);
 
   const createPuzzle = useCallback((input: CreatePuzzleInput) => {
     const id = `puzzle-${Date.now()}-${Math.round(Math.random() * 100_000)}`;
@@ -187,10 +197,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       drawerOpen,
       language,
       theme,
+      preferences,
       puzzles,
       setLanguage,
       setTheme,
       setDrawerOpen,
+      updatePreference,
       createPuzzle,
       updatePuzzlePieces,
       updatePuzzleCamera,
@@ -203,12 +215,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       drawerOpen,
       language,
       puzzles,
+      preferences,
       ready,
       setLanguage,
       setTheme,
       theme,
       updatePuzzlePieces,
       updatePuzzleCamera,
+      updatePreference,
     ],
   );
 

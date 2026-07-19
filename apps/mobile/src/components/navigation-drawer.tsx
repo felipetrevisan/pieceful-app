@@ -6,22 +6,20 @@ import { useEffect } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { FadeInLeft, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
-import { mobileThemes } from "@/constants/pieceful-theme";
+import { isLightMobileTheme, mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 const menu = [
-  ["person-outline", "Perfil", "Profile", "/(tabs)"],
+  ["home-outline", "Início", "Home", "/(tabs)"],
+  ["add-circle-outline", "Criar", "Create", "/(tabs)/create"],
+  ["albums-outline", "Coleção", "Collection", "/(tabs)/puzzles"],
   ["trophy-outline", "Conquistas", "Achievements", "/(tabs)/achievements"],
-  ["stats-chart-outline", "Estatísticas", "Statistics", "/(tabs)/achievements"],
-  ["color-palette-outline", "Temas", "Themes", "/(tabs)/settings"],
-  ["language-outline", "Idioma", "Language", "/(tabs)/settings"],
-  ["game-controller-outline", "Ajuda", "Help", "/(tabs)/settings"],
-  ["settings-outline", "Configurações", "Settings", "/(tabs)/settings"],
-  ["information-circle-outline", "Sobre", "About", "/(tabs)/settings"],
+  ["game-controller-outline", "Controles", "Controllers", "/help/controller"],
+  ["settings-outline", "Ajustes", "Settings", "/(tabs)/settings"],
 ] as const;
 
 export function NavigationDrawer() {
-  const { drawerOpen, puzzles, setDrawerOpen, setTheme, t, theme } = useApp();
+  const { drawerOpen, puzzles, setDrawerOpen, t, theme } = useApp();
   const { width } = useWindowDimensions();
   const pathname = usePathname();
   const colors = mobileThemes[theme];
@@ -30,6 +28,7 @@ export function NavigationDrawer() {
   const completed = puzzles.filter((puzzle) => puzzle.session.completedAt).length;
   const xp = completed * 500 + puzzles.reduce((sum, puzzle) => sum + puzzle.session.pieces.filter((piece) => piece.isPlaced).length, 0);
   const level = Math.max(1, Math.floor(xp / 1000) + 1);
+  const activeTheme = mobileThemeCatalog.find((item) => item.id === theme) ?? mobileThemeCatalog[0];
   const glass = Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   const Surface = glass ? GlassView : View;
 
@@ -71,9 +70,7 @@ export function NavigationDrawer() {
 
   function isActive(path: string, index: number) {
     if (index === 0) return pathname === "/" || pathname === "/index";
-    if (path.includes("achievements")) return pathname.includes("achievements");
-    if (path.includes("settings")) return pathname.includes("settings");
-    return false;
+    return pathname.includes(path.replace("/(tabs)/", "").replace("/(tabs)", ""));
   }
 
   return (
@@ -83,7 +80,7 @@ export function NavigationDrawer() {
         <GestureDetector gesture={pan}>
           <Animated.View style={[styles.animatedDrawer, { width: drawerWidth }, drawerStyle]}>
             <Surface
-              {...(glass ? { glassEffectStyle: "regular" as const, colorScheme: theme === "candy" ? "light" as const : "dark" as const, tintColor: `${colors.panel}ee` } : {})}
+              {...(glass ? { glassEffectStyle: "regular" as const, colorScheme: isLightMobileTheme(theme) ? "light" as const : "dark" as const, tintColor: `${colors.panel}ee` } : {})}
               style={[styles.drawer, { backgroundColor: glass ? "transparent" : colors.panel, borderColor: `${colors.accent}34` }]}
             >
               <View style={styles.dragHint}>
@@ -108,18 +105,20 @@ export function NavigationDrawer() {
               <View style={[styles.track, { backgroundColor: colors.panelAlt }]}><LinearGradient colors={[colors.primary, colors.accent]} style={[styles.progress, { width: `${xp % 1000 / 10}%` }]} /></View>
 
               <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
-                <View style={styles.menu}>
+                <Text style={[styles.menuKicker, { color: colors.muted }]}>{t("EXPLORAR", "EXPLORE")}</Text>
+                <View style={styles.menuGrid}>
                   {menu.map(([icon, pt, en, path], index) => {
                     const active = isActive(path, index);
                     return (
-                      <Animated.View key={pt} entering={FadeInLeft.delay(70 + index * 35).duration(320)}>
-                        <Pressable onPress={() => navigate(path)} style={({ pressed }) => [styles.menuItem, { backgroundColor: active ? colors.panelAlt : "transparent" }, pressed ? styles.pressed : null]}>
-                          {active ? <LinearGradient colors={[colors.accent, colors.primary]} style={styles.activeRail} /> : null}
-                          <View style={[styles.menuIcon, { backgroundColor: active ? `${colors.accent}22` : `${colors.muted}0d` }]}>
-                            <Ionicons name={icon} size={21} color={active ? colors.accent : colors.muted} />
+                      <Animated.View key={pt} entering={FadeInLeft.delay(70 + index * 35).duration(320)} style={styles.menuTileShell}>
+                        <Pressable onPress={() => navigate(path)} style={({ pressed }) => pressed ? styles.pressed : null}>
+                          <View style={[styles.menuTile, { backgroundColor: active ? colors.panelAlt : `${colors.panelAlt}66`, borderColor: active ? colors.accent : `${colors.muted}22`, borderRadius: Math.max(8, colors.radius - 4) }]}>
+                            <LinearGradient colors={active ? [...colors.gradient] : [`${colors.accent}22`, `${colors.primary}1a`]} style={[styles.menuIcon, { borderRadius: Math.max(7, colors.radius - 8) }]}>
+                              <Ionicons name={icon} size={23} color={active ? colors.background : colors.accent} />
+                            </LinearGradient>
+                            <Text numberOfLines={1} style={[styles.menuLabel, { color: colors.text }]}>{t(pt, en)}</Text>
+                            {active ? <View style={[styles.activeDot, { backgroundColor: colors.accent }]} /> : null}
                           </View>
-                          <Text style={[styles.menuLabel, { color: active ? colors.accent : colors.text }]}>{t(pt, en)}</Text>
-                          <Ionicons name="chevron-forward" size={15} color={`${colors.muted}99`} />
                         </Pressable>
                       </Animated.View>
                     );
@@ -127,17 +126,13 @@ export function NavigationDrawer() {
                 </View>
 
                 <Text style={[styles.themeLabel, { color: colors.muted }]}>{t("TEMA ATIVO", "ACTIVE THEME")}</Text>
-                <View style={styles.themeRow}>
-                  {(["cosmic", "candy"] as const).map((item) => {
-                    const itemColors = mobileThemes[item];
-                    return (
-                      <Pressable key={item} onPress={() => setTheme(item)} style={({ pressed }) => [styles.themeCard, { borderColor: item === theme ? colors.accent : "transparent", backgroundColor: colors.panelAlt }, pressed ? styles.pressed : null]}>
-                        <View style={[styles.themePreview, { backgroundColor: itemColors.background }]}><View style={[styles.themeDot, { backgroundColor: itemColors.accent }]} /></View>
-                        <Text style={[styles.themeName, { color: colors.text }]}>{item === "cosmic" ? "Cosmic Night" : "Candy Pop"}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <Pressable onPress={() => navigate("/(tabs)/settings")} style={({ pressed }) => pressed ? styles.pressed : null}>
+                  <View style={[styles.activeThemeCard, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}40`, borderRadius: Math.max(8, colors.radius) }]}>
+                    <LinearGradient colors={[...colors.gradient]} style={[styles.activeThemeIcon, { borderRadius: Math.max(7, colors.radius - 6) }]}><Ionicons name={activeTheme.icon} size={23} color={colors.background} /></LinearGradient>
+                    <View style={{ flex: 1 }}><Text style={[styles.themeName, { color: colors.text }]}>{activeTheme.name}</Text><Text style={[styles.themeDescription, { color: colors.muted }]}>{t("Ver todos os 11 estilos", "View all 11 styles")}</Text></View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+                  </View>
+                </Pressable>
               </ScrollView>
             </Surface>
           </Animated.View>
@@ -165,16 +160,17 @@ const styles = StyleSheet.create({
   track: { height: 7, borderRadius: 99, overflow: "hidden" },
   progress: { height: "100%", borderRadius: 99 },
   scrollContent: { paddingTop: 16, paddingBottom: 24 },
-  menu: { gap: 3 },
-  menuItem: { minHeight: 47, borderRadius: 15, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 10, overflow: "hidden" },
-  menuIcon: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  menuLabel: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 15 },
-  activeRail: { position: "absolute", left: 0, top: 10, bottom: 10, width: 3, borderRadius: 99 },
+  menuKicker: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 1.4, marginBottom: 10 },
+  menuGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  menuTileShell: { width: "48%" },
+  menuTile: { minHeight: 92, borderWidth: 1, padding: 11, justifyContent: "space-between" },
+  menuIcon: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
+  menuLabel: { fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 8 },
+  activeDot: { position: "absolute", width: 7, height: 7, borderRadius: 4, top: 12, right: 12 },
   pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
   themeLabel: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.2, marginTop: 22, marginBottom: 10 },
-  themeRow: { flexDirection: "row", gap: 10 },
-  themeCard: { flex: 1, padding: 8, borderRadius: 16, borderWidth: 1.5 },
-  themePreview: { height: 40, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  themeDot: { width: 18, height: 18, borderRadius: 9 },
-  themeName: { fontFamily: "Inter_600SemiBold", fontSize: 11, marginTop: 7 },
+  activeThemeCard: { minHeight: 72, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 12, padding: 10 },
+  activeThemeIcon: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  themeName: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  themeDescription: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 3 },
 });

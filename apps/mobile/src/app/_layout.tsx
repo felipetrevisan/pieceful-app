@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { NavigationDrawer } from "@/components/navigation-drawer";
-import { mobileThemes } from "@/constants/pieceful-theme";
+import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { AppProvider, useApp } from "@/state/app-provider";
 
 void SplashScreen.preventAutoHideAsync();
@@ -37,7 +37,7 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style={theme === "candy" ? "dark" : "light"} />
+      <StatusBar style={isLightMobileTheme(theme) ? "dark" : "light"} />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -48,6 +48,9 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="puzzle/[id]" />
         <Stack.Screen name="result/[id]" />
+        <Stack.Screen name="settings/accessibility" />
+        <Stack.Screen name="help/controller" />
+        <Stack.Screen name="help/keyboard" />
       </Stack>
       <NavigationDrawer />
     </>

@@ -19,14 +19,14 @@ export default function HomeScreen() {
       <AppHeader />
       <SectionHeader title={t("Continue", "Continue")} />
       {active ? <ContinueCard puzzle={active} /> : (
-        <LinearGradient colors={[`${colors.accent}22`, `${colors.primary}24`]} style={[styles.emptyHero, { borderColor: `${colors.accent}42` }]}>
+        <LinearGradient colors={[`${colors.accent}22`, `${colors.primary}24`]} style={[styles.emptyHero, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
           <Ionicons name="sparkles" size={28} color={colors.accent} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
           <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text style={styles.compactCtaText}>{t("Criar puzzle", "Create puzzle")}</Text></Pressable>
         </LinearGradient>
       )}
 
-      <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42` }]}>
+      <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
         <View style={{ flex: 1 }}><Text style={[styles.kicker, { color: colors.primary }]}>{t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text style={[styles.challengeTitle, { color: colors.text }]}>{t("Nebulosa Neon", "Neon Nebula")}</Text><Text style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
         <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name="extension-puzzle" size={30} color={colors.accent} /></View>
       </LinearGradient>
@@ -54,7 +54,7 @@ function ContinueCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"]
   const placed = puzzle.session.pieces.filter((piece) => piece.isPlaced).length;
   const progress = Math.round((placed / puzzle.session.pieces.length) * 100);
   return (
-    <Pressable onPress={() => router.push(`/puzzle/${puzzle.id}`)} style={({ pressed }) => [styles.continueCard, { borderColor: `${colors.accent}40`, opacity: pressed ? 0.85 : 1 }]}>
+    <Pressable onPress={() => router.push(`/puzzle/${puzzle.id}`)} style={({ pressed }) => [styles.continueCard, { borderColor: `${colors.accent}40`, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 }]}>
       <Image source={{ uri: puzzle.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       <LinearGradient colors={["transparent", "rgba(5,9,20,.94)"]} style={StyleSheet.absoluteFill} />
       <View style={styles.continueBottom}>
@@ -71,12 +71,12 @@ function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.gly
   const { theme } = useApp(); const colors = mobileThemes[theme];
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return <Animated.View style={[styles.quick, animatedStyle]}><Pressable onPress={onPress} onPressIn={() => { scale.set(withSpring(.9, { damping: 13, stiffness: 280 })); }} onPressOut={() => { scale.set(withSpring(1, { damping: 11, stiffness: 230 })); }} style={styles.quickPressable}><View style={[styles.quickIcon, { backgroundColor: colors.panel, borderColor: `${colors.accent}40` }]}><Ionicons name={icon} size={28} color={colors.accent} /></View><Text style={[styles.quickLabel, { color: colors.text }]}>{label}</Text></Pressable></Animated.View>;
+  return <Animated.View style={[styles.quick, animatedStyle]}><Pressable onPress={onPress} onPressIn={() => { scale.set(withSpring(.9, { damping: 13, stiffness: 280 })); }} onPressOut={() => { scale.set(withSpring(1, { damping: 11, stiffness: 230 })); }} style={styles.quickPressable}><View style={[styles.quickIcon, { backgroundColor: colors.panel, borderColor: `${colors.accent}40`, borderRadius: Math.max(7, colors.radius) }]}><Ionicons name={icon} size={28} color={colors.accent} /></View><Text style={[styles.quickLabel, { color: colors.text }]}>{label}</Text></Pressable></Animated.View>;
 }
 
 function CompletedCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"][number] }) {
   const { theme } = useApp(); const colors = mobileThemes[theme];
-  return <Pressable onPress={() => router.push(`/result/${puzzle.id}` as never)} style={[styles.completedCard, { backgroundColor: colors.panel }]}><Image source={{ uri: puzzle.imageUri }} style={styles.completedImage} contentFit="cover" /><Text numberOfLines={1} style={[styles.completedName, { color: colors.text }]}>{puzzle.name}</Text><Text style={[styles.completedMeta, { color: colors.muted }]}>{puzzle.configuration.totalPieces} pieces · 100%</Text></Pressable>;
+  return <Pressable onPress={() => router.push(`/result/${puzzle.id}` as never)} style={[styles.completedCard, { backgroundColor: colors.panel, borderRadius: colors.radius }]}><Image source={{ uri: puzzle.imageUri }} style={styles.completedImage} contentFit="cover" /><Text numberOfLines={1} style={[styles.completedName, { color: colors.text }]}>{puzzle.name}</Text><Text style={[styles.completedMeta, { color: colors.muted }]}>{puzzle.configuration.totalPieces} pieces · 100%</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({

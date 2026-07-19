@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
-import { mobileThemes } from "@/constants/pieceful-theme";
+import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export default function TabsLayout() {
@@ -24,7 +24,7 @@ export default function TabsLayout() {
           paddingTop: 7,
           paddingBottom: 8,
           borderTopWidth: 0,
-          borderRadius: 32,
+          borderRadius: Math.max(10, colors.radius + 7),
           overflow: "hidden",
           backgroundColor: glass ? "transparent" : `${colors.panel}f2`,
         },
@@ -32,7 +32,7 @@ export default function TabsLayout() {
           ? () => (
               <GlassView
                 glassEffectStyle="regular"
-                colorScheme={theme === "candy" ? "light" : "dark"}
+                colorScheme={isLightMobileTheme(theme) ? "light" : "dark"}
                 tintColor={`${colors.panel}72`}
                 style={StyleSheet.absoluteFill}
               />
