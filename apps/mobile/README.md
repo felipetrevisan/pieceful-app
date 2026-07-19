@@ -13,6 +13,8 @@ bun run --cwd apps/mobile ios
 
 Use `android` or `web` in place of `ios` for the other targets.
 
+The iOS script intentionally uses `localhost` so the Simulator does not depend on the Mac's LAN address.
+
 ## Structure
 
 - `src/app`: English application routes and tab navigation.
