@@ -3,9 +3,12 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { DIFFICULTIES, type PuzzleConfiguration, type PuzzleDifficulty } from "@puzzled/shared";
 import { AppHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
@@ -160,24 +163,10 @@ export default function CreateScreen() {
             <MutedText>{configuration.totalPieces} {t("peças", "pieces")}</MutedText>
           </View>
         </View>
-        <View style={styles.difficultyGrid}>
-          {[presets.slice(0, 4), presets.slice(4)].map((row, rowIndex) => (
-            <View key={rowIndex} style={styles.difficultyRow}>
-              {row.map((preset) => {
-                const selected = selectedPreset?.id === preset.id;
-                const [ptLabel, enLabel] = difficultyLabels[preset.id];
-                return (
-                  <Pressable key={preset.id} style={({ pressed }) => [styles.difficultyButton, pressed ? styles.difficultyPressed : null]} onPress={() => selectPreset(preset)}>
-                    <View style={[styles.difficultySurface, { backgroundColor: selected ? `${colors.accent}1f` : colors.panelAlt, borderColor: selected ? colors.accent : `${colors.muted}18` }]}>
-                      <Text style={[styles.difficultyPieces, { color: selected ? colors.accent : colors.text }]}>{preset.pieces}</Text>
-                      <Text numberOfLines={1} style={[styles.difficultyLabel, { color: selected ? colors.accent : colors.muted }]}>{t(ptLabel, enLabel)}</Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+        <DifficultySlider
+          selectedIndex={Math.max(0, presets.findIndex((preset) => preset.id === selectedPreset?.id))}
+          onSelect={(index) => selectPreset(presets[index] ?? presets[0])}
+        />
       </Card>
 
       <Card className="mb-5 gap-1">
@@ -200,14 +189,105 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  difficultyGrid: { gap: 8 },
-  difficultyRow: { flexDirection: "row", gap: 8 },
-  difficultyButton: { flex: 1, minWidth: 0, minHeight: 70, borderRadius: 16, overflow: "hidden" },
-  difficultySurface: { flex: 1, minHeight: 70, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
-  difficultyPieces: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
-  difficultyLabel: { fontFamily: "Inter_600SemiBold", fontSize: 9, marginTop: 3 },
-  difficultyPressed: { opacity: 0.72, transform: [{ scale: 0.95 }] },
+  difficultyHero: { minHeight: 112, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 16, flexDirection: "row", alignItems: "center", overflow: "hidden" },
+  difficultyHeroIcon: { width: 45, height: 45, borderRadius: 15, backgroundColor: "rgba(5,12,28,.28)", alignItems: "center", justifyContent: "center", marginRight: 13 },
+  difficultyHeroCopy: { flex: 1, minWidth: 0 },
+  difficultyHeroLabel: { color: "#08111f", fontFamily: "BricolageGrotesque_700Bold", fontSize: 22 },
+  difficultyHeroMeta: { color: "rgba(8,17,31,.68)", fontFamily: "Inter_600SemiBold", fontSize: 12, marginTop: 3 },
+  difficultyHeroCount: { color: "#08111f", fontFamily: "BricolageGrotesque_800ExtraBold", fontSize: 35, lineHeight: 37, textAlign: "right" },
+  difficultyHeroUnit: { color: "rgba(8,17,31,.68)", fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 1, textAlign: "right" },
+  slider: { height: 48, justifyContent: "center", marginTop: 3 },
+  sliderLine: { position: "absolute", left: 14, right: 14, height: 5, borderRadius: 99 },
+  sliderMarks: { position: "absolute", left: 10, right: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sliderMark: { width: 9, height: 9, borderRadius: 5, borderWidth: 2 },
+  sliderThumb: { position: "absolute", left: 0, width: 32, height: 32, borderRadius: 16, padding: 3 },
+  sliderThumbInner: { flex: 1, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  sliderFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: -2 },
+  sliderEndpoint: { fontFamily: "Inter_700Bold", fontSize: 11 },
+  sliderHint: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
 });
+
+function DifficultySlider({ selectedIndex, onSelect }: { selectedIndex: number; onSelect: (index: number) => void }) {
+  const { t, theme } = useApp();
+  const colors = mobileThemes[theme];
+  const preset = presets[selectedIndex] ?? presets[0];
+  const [ptLabel, enLabel] = difficultyLabels[preset.id];
+  const [sliderWidth, setSliderWidth] = useState(0);
+  const thumbX = useSharedValue(0);
+  const maxIndex = presets.length - 1;
+
+  useEffect(() => {
+    if (sliderWidth > 0) {
+      thumbX.set(withSpring((selectedIndex / maxIndex) * (sliderWidth - 32), { damping: 16, stiffness: 210 }));
+    }
+  }, [maxIndex, selectedIndex, sliderWidth, thumbX]);
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: thumbX.value }],
+  }));
+
+  const usableWidth = Math.max(1, sliderWidth - 32);
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-5, 5])
+    .failOffsetY([-12, 12])
+    .onUpdate((event) => {
+      thumbX.set(Math.max(0, Math.min(usableWidth, event.x - 16)));
+    })
+    .onEnd(() => {
+      const next = Math.round((thumbX.value / usableWidth) * maxIndex);
+      thumbX.set(withSpring((next / maxIndex) * usableWidth, { damping: 15, stiffness: 240 }));
+      runOnJS(onSelect)(next);
+    });
+  const tapGesture = Gesture.Tap().onEnd((event) => {
+    const next = Math.round((Math.max(0, Math.min(usableWidth, event.x - 16)) / usableWidth) * maxIndex);
+    thumbX.set(withSpring((next / maxIndex) * usableWidth, { damping: 15, stiffness: 240 }));
+    runOnJS(onSelect)(next);
+  });
+  const sliderGesture = Gesture.Race(panGesture, tapGesture);
+
+  function adjust(direction: -1 | 1) {
+    onSelect(Math.max(0, Math.min(maxIndex, selectedIndex + direction)));
+  }
+
+  return (
+    <View style={{ gap: 12 }}>
+      <LinearGradient colors={[colors.accent, colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.difficultyHero}>
+        <View style={styles.difficultyHeroIcon}><Ionicons name="speedometer-outline" size={25} color="#08111f" /></View>
+        <View style={styles.difficultyHeroCopy}>
+          <Text numberOfLines={1} style={styles.difficultyHeroLabel}>{t(ptLabel, enLabel)}</Text>
+          <Text style={styles.difficultyHeroMeta}>{preset.rows} × {preset.columns} · {String(selectedIndex + 1).padStart(2, "0")}/{String(presets.length).padStart(2, "0")}</Text>
+        </View>
+        <View><Text style={styles.difficultyHeroCount}>{preset.pieces}</Text><Text style={styles.difficultyHeroUnit}>{t("PEÇAS", "PIECES")}</Text></View>
+      </LinearGradient>
+
+      <GestureDetector gesture={sliderGesture}>
+        <Animated.View
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={t("Dificuldade do puzzle", "Puzzle difficulty")}
+          accessibilityValue={{ min: 1, max: presets.length, now: selectedIndex + 1, text: `${t(ptLabel, enLabel)}, ${preset.pieces} ${t("peças", "pieces")}` }}
+          accessibilityActions={[{ name: "increment", label: t("Aumentar dificuldade", "Increase difficulty") }, { name: "decrement", label: t("Diminuir dificuldade", "Decrease difficulty") }]}
+          onAccessibilityAction={(event) => adjust(event.nativeEvent.actionName === "increment" ? 1 : -1)}
+          onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
+          style={styles.slider}
+        >
+          <View style={[styles.sliderLine, { backgroundColor: `${colors.muted}38` }]} />
+          <View pointerEvents="none" style={styles.sliderMarks}>
+            {presets.map((item, index) => <View key={item.id} style={[styles.sliderMark, { backgroundColor: index <= selectedIndex ? colors.accent : colors.panelAlt, borderColor: index === selectedIndex ? colors.primary : colors.panel }]} />)}
+          </View>
+          <Animated.View pointerEvents="none" style={[styles.sliderThumb, thumbStyle]}>
+            <LinearGradient colors={[colors.primary, colors.accent]} style={styles.sliderThumbInner}><Ionicons name="sparkles" size={13} color="#08111f" /></LinearGradient>
+          </Animated.View>
+        </Animated.View>
+      </GestureDetector>
+      <View style={styles.sliderFooter}>
+        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>12</Text>
+        <Text style={[styles.sliderHint, { color: colors.accent }]}>{t("ARRASTE PARA AJUSTAR", "DRAG TO ADJUST")}</Text>
+        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>1000</Text>
+      </View>
+    </View>
+  );
+}
 
 function OptionRow({ icon, title, subtitle, value, onChange }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle: string; value: boolean; onChange: () => void }) {
   const { theme } = useApp();
