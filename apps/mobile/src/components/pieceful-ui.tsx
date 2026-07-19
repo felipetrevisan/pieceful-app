@@ -5,7 +5,7 @@ import {
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
-import type { ReactNode } from "react";
+import { Children, useEffect, type ReactNode } from "react";
 import {
   Platform,
   Pressable,
@@ -18,22 +18,79 @@ import {
   type ViewProps,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
-  const content = <View style={{ paddingHorizontal: 20, paddingBottom: 126, paddingTop: 8, flexGrow: 1 }}>{children}</View>;
+  const content = (
+    <View style={{ paddingHorizontal: 20, paddingBottom: 126, paddingTop: 8, flexGrow: 1 }}>
+      {Children.toArray(children).map((child, index) => (
+        <Reveal key={index} delay={Math.min(index * 75, 375)}>{child}</Reveal>
+      ))}
+    </View>
+  );
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <LinearGradient colors={[`${colors.primary}12`, "transparent", `${colors.accent}08`]} style={StyleSheet.absoluteFill} />
+      <AmbientGlow />
       {scroll ? (
         <ScrollView showsVerticalScrollIndicator={false}>{content}</ScrollView>
       ) : (
         content
       )}
     </SafeAreaView>
+  );
+}
+
+export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  return (
+    <Animated.View entering={FadeInDown.delay(delay).duration(420).springify().damping(17)}>
+      {children}
+    </Animated.View>
+  );
+}
+
+function AmbientGlow() {
+  const { theme } = useApp();
+  const colors = mobileThemes[theme];
+  const drift = useSharedValue(0);
+
+  useEffect(() => {
+    drift.set(withRepeat(
+      withSequence(withTiming(1, { duration: 3600 }), withTiming(0, { duration: 3600 })),
+      -1,
+      true,
+    ));
+  }, [drift]);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.18 + drift.value * 0.1,
+    transform: [{ translateX: drift.value * -22 }, { translateY: drift.value * 34 }, { scale: 0.9 + drift.value * 0.18 }],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.ambientGlow, glowStyle]}
+    >
+      <LinearGradient
+        colors={[`${colors.accent}05`, `${colors.primary}75`, `${colors.accent}12`]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+    </Animated.View>
   );
 }
 
@@ -127,12 +184,16 @@ export function ActionButton({
   className = "",
   disabled,
   icon,
+  onPressIn,
+  onPressOut,
   style,
   variant = "primary",
   ...props
 }: ActionButtonProps) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const glass = hasLiquidGlass() && !disabled;
   const labelColor = variant === "primary" && !glass ? "#17102d" : variant === "danger" ? colors.danger : colors.text;
   const content = (
@@ -145,20 +206,23 @@ export function ActionButton({
   );
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      className={className}
-      disabled={disabled}
-      android_ripple={Platform.OS === "android" ? { color: `${colors.text}24`, borderless: false, foreground: true } : undefined}
-      style={(state) => [
-        styles.buttonShell,
-        !glass && disabled ? styles.disabled : null,
-        state.pressed ? styles.pressed : null,
-        typeof style === "function" ? style(state) : style,
-      ]}
-      {...props}
-    >
-      {glass ? (
+    <Animated.View className={className} style={[styles.buttonShell, !glass && disabled ? styles.disabled : null, animatedStyle]}>
+      <Pressable
+        accessibilityRole="button"
+        disabled={disabled}
+        android_ripple={Platform.OS === "android" ? { color: `${colors.text}24`, borderless: false, foreground: true } : undefined}
+        onPressIn={(event) => {
+          scale.set(withSpring(0.96, { damping: 15, stiffness: 280 }));
+          onPressIn?.(event);
+        }}
+        onPressOut={(event) => {
+          scale.set(withSpring(1, { damping: 12, stiffness: 240 }));
+          onPressOut?.(event);
+        }}
+        style={(state) => [styles.buttonPressable, typeof style === "function" ? style(state) : style]}
+        {...props}
+      >
+        {glass ? (
         <GlassView
           glassEffectStyle={variant === "primary" ? "regular" : "clear"}
           isInteractive
@@ -190,14 +254,17 @@ export function ActionButton({
         >
           {content}
         </View>
-      )}
-    </Pressable>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
 export function IconButton({
   icon,
   label,
+  onPressIn,
+  onPressOut,
   tone = "default",
   style,
   ...props
@@ -210,15 +277,26 @@ export function IconButton({
   const colors = mobileThemes[theme];
   const glass = hasLiquidGlass() && !props.disabled;
   const iconColor = tone === "danger" ? colors.danger : colors.accent;
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      android_ripple={Platform.OS === "android" ? { color: `${colors.text}24`, borderless: false, foreground: true } : undefined}
-      style={(state) => [styles.iconButtonShell, state.pressed ? styles.pressed : null, typeof style === "function" ? style(state) : style]}
-      {...props}
-    >
-      {glass ? (
+    <Animated.View style={[styles.iconButtonShell, animatedStyle]}>
+      <Pressable
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        android_ripple={Platform.OS === "android" ? { color: `${colors.text}24`, borderless: false, foreground: true } : undefined}
+        onPressIn={(event) => {
+          scale.set(withSpring(0.9, { damping: 14, stiffness: 300 }));
+          onPressIn?.(event);
+        }}
+        onPressOut={(event) => {
+          scale.set(withSpring(1, { damping: 11, stiffness: 250 }));
+          onPressOut?.(event);
+        }}
+        style={(state) => [styles.iconButtonPressable, typeof style === "function" ? style(state) : style]}
+        {...props}
+      >
+        {glass ? (
         <GlassView
           glassEffectStyle="clear"
           isInteractive
@@ -232,8 +310,9 @@ export function IconButton({
         <View style={[styles.iconButtonContent, { backgroundColor: colors.panelAlt, borderColor: tone === "danger" ? `${colors.danger}55` : `${colors.accent}38` }]}>
           <Ionicons name={icon} size={21} color={iconColor} />
         </View>
-      )}
-    </Pressable>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -282,6 +361,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     width: "100%",
   },
+  buttonPressable: { flex: 1 },
   buttonLabel: {
     fontFamily: "Inter_700Bold",
     fontSize: 16,
@@ -291,9 +371,6 @@ const styles = StyleSheet.create({
   },
   outlinedButton: {
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  pressed: {
-    transform: [{ scale: 0.975 }],
   },
   disabled: {
     opacity: 0.42,
@@ -312,6 +389,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 48,
   },
+  iconButtonPressable: { flex: 1 },
+  ambientGlow: { position: "absolute", right: -110, top: 130, width: 240, height: 240, borderRadius: 120, overflow: "hidden" },
   appHeader: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 22 },
   headerAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerGreeting: { flex: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },

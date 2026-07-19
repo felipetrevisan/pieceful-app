@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { AppHeader, Card, ProgressBar, Screen, SectionHeader } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
@@ -68,7 +69,9 @@ function ContinueCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"]
 
 function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   const { theme } = useApp(); const colors = mobileThemes[theme];
-  return <Pressable onPress={onPress} style={({ pressed }) => [styles.quick, { opacity: pressed ? .7 : 1 }]}><View style={[styles.quickIcon, { backgroundColor: colors.panel, borderColor: `${colors.accent}40` }]}><Ionicons name={icon} size={25} color={colors.accent} /></View><Text style={[styles.quickLabel, { color: colors.text }]}>{label}</Text></Pressable>;
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return <Animated.View style={[styles.quick, animatedStyle]}><Pressable onPress={onPress} onPressIn={() => { scale.set(withSpring(.9, { damping: 13, stiffness: 280 })); }} onPressOut={() => { scale.set(withSpring(1, { damping: 11, stiffness: 230 })); }} style={styles.quickPressable}><View style={[styles.quickIcon, { backgroundColor: colors.panel, borderColor: `${colors.accent}40` }]}><Ionicons name={icon} size={28} color={colors.accent} /></View><Text style={[styles.quickLabel, { color: colors.text }]}>{label}</Text></Pressable></Animated.View>;
 }
 
 function CompletedCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"][number] }) {
@@ -91,10 +94,11 @@ const styles = StyleSheet.create({
   challengeTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20, marginTop: 5 },
   body: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 },
   challengeIcon: { width: 60, height: 60, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-  quickRow: { flexDirection: "row", justifyContent: "space-around", marginBottom: 28 },
-  quick: { alignItems: "center", gap: 9, minWidth: 120 },
-  quickIcon: { width: 56, height: 56, borderRadius: 28, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  quickLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  quickRow: { flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 30 },
+  quick: { flex: 1, maxWidth: 154 },
+  quickPressable: { width: "100%", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 6, paddingVertical: 4 },
+  quickIcon: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  quickLabel: { width: "100%", fontFamily: "Inter_600SemiBold", fontSize: 14, lineHeight: 19, marginTop: 13, textAlign: "center" },
   completedCard: { width: 230, borderRadius: 22, overflow: "hidden", paddingBottom: 14 },
   completedImage: { width: "100%", height: 145 },
   completedName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 17, marginHorizontal: 14, marginTop: 11 },

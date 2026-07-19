@@ -5,18 +5,25 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Platform, Pressable, Switch, Text, TextInput, View } from "react-native";
-import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
+import { Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { DIFFICULTIES, type PuzzleConfiguration, type PuzzleDifficulty } from "@puzzled/shared";
 import { AppHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
-const presets = [
-  { id: "beginner" as const, rows: 3, columns: 4, pieces: 12 },
-  { id: "easy" as const, rows: 4, columns: 6, pieces: 24 },
-  { id: "normal" as const, rows: 6, columns: 8, pieces: 48 },
-  { id: "medium" as const, rows: 8, columns: 12, pieces: 96 },
-];
+const presets = DIFFICULTIES;
+
+const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
+  beginner: ["Iniciante", "Beginner"],
+  easy: ["Fácil", "Easy"],
+  normal: ["Normal", "Normal"],
+  medium: ["Médio", "Medium"],
+  hard: ["Difícil", "Hard"],
+  advanced: ["Avançado", "Advanced"],
+  master: ["Mestre", "Master"],
+  legendary: ["Lendário", "Legendary"],
+  custom: ["Personalizado", "Custom"],
+};
 
 export default function CreateScreen() {
   const { createPuzzle, t, theme } = useApp();
@@ -153,15 +160,23 @@ export default function CreateScreen() {
             <MutedText>{configuration.totalPieces} {t("peças", "pieces")}</MutedText>
           </View>
         </View>
-        <View className="flex-row overflow-hidden rounded-2xl" style={{ backgroundColor: colors.panelAlt }}>
-          {presets.map((preset) => {
-            const selected = selectedPreset?.id === preset.id;
-            return (
-              <Pressable key={preset.id} className="min-h-16 flex-1 items-center justify-center rounded-2xl active:scale-[0.98]" style={{ backgroundColor: selected ? `${colors.accent}18` : "transparent", borderColor: selected ? colors.accent : "transparent", borderWidth: 1 }} onPress={() => selectPreset(preset)}>
-                <Text className="text-base font-black" style={{ color: selected ? colors.accent : colors.text }}>{preset.pieces}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.difficultyGrid}>
+          {[presets.slice(0, 4), presets.slice(4)].map((row, rowIndex) => (
+            <View key={rowIndex} style={styles.difficultyRow}>
+              {row.map((preset) => {
+                const selected = selectedPreset?.id === preset.id;
+                const [ptLabel, enLabel] = difficultyLabels[preset.id];
+                return (
+                  <Pressable key={preset.id} style={({ pressed }) => [styles.difficultyButton, pressed ? styles.difficultyPressed : null]} onPress={() => selectPreset(preset)}>
+                    <View style={[styles.difficultySurface, { backgroundColor: selected ? `${colors.accent}1f` : colors.panelAlt, borderColor: selected ? colors.accent : `${colors.muted}18` }]}>
+                      <Text style={[styles.difficultyPieces, { color: selected ? colors.accent : colors.text }]}>{preset.pieces}</Text>
+                      <Text numberOfLines={1} style={[styles.difficultyLabel, { color: selected ? colors.accent : colors.muted }]}>{t(ptLabel, enLabel)}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
         </View>
       </Card>
 
@@ -183,6 +198,16 @@ export default function CreateScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  difficultyGrid: { gap: 8 },
+  difficultyRow: { flexDirection: "row", gap: 8 },
+  difficultyButton: { flex: 1, minWidth: 0, minHeight: 70, borderRadius: 16, overflow: "hidden" },
+  difficultySurface: { flex: 1, minHeight: 70, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  difficultyPieces: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
+  difficultyLabel: { fontFamily: "Inter_600SemiBold", fontSize: 9, marginTop: 3 },
+  difficultyPressed: { opacity: 0.72, transform: [{ scale: 0.95 }] },
+});
 
 function OptionRow({ icon, title, subtitle, value, onChange }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle: string; value: boolean; onChange: () => void }) {
   const { theme } = useApp();
