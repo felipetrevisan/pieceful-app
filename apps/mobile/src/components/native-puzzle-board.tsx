@@ -1,4 +1,4 @@
-import { neighborSnapOffset, type PuzzlePiece, type PuzzlePieceShape } from "@puzzled/puzzle-engine";
+import { neighborSnapOffset, normalizeQuarterTurn, type PuzzlePiece, type PuzzlePieceShape } from "@puzzled/puzzle-engine";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -149,6 +149,32 @@ export function NativePuzzleBoard({
   const groupTranslationY = useSharedValue(0);
 
   useEffect(() => {
+    const invalidGroups = new Set(
+      pieces
+        .filter(
+          (piece) =>
+            piece.groupId &&
+            piece.groupId !== "tabuleiro" &&
+            normalizeQuarterTurn(piece.currentPosition.rotation) !== 0,
+        )
+        .map((piece) => piece.groupId),
+    );
+    let changed = false;
+    const normalizedPieces = pieces.map((piece) => {
+      const normalizedRotation = normalizeQuarterTurn(piece.currentPosition.rotation);
+      const mustReleaseInvalidGroup = Boolean(piece.groupId && invalidGroups.has(piece.groupId));
+      if (normalizedRotation === piece.currentPosition.rotation && !mustReleaseInvalidGroup) return piece;
+      changed = true;
+      return {
+        ...piece,
+        groupId: mustReleaseInvalidGroup ? null : piece.groupId,
+        currentPosition: { ...piece.currentPosition, rotation: normalizedRotation },
+      };
+    });
+    if (changed) onPiecesChange(normalizedPieces);
+  }, [onPiecesChange, pieces]);
+
+  useEffect(() => {
     if (initialZoom <= 1.01 && (initialPanX !== 0 || initialPanY !== 0)) {
       onCameraChange(0, 0, initialZoom);
     }
@@ -228,6 +254,9 @@ export function NativePuzzleBoard({
   ) {
     const movingPiece = pieces.find((piece) => piece.id === id);
     if (!movingPiece) return;
+    const effectiveRotation = movingPiece.groupId
+      ? normalizeQuarterTurn(movingPiece.currentPosition.rotation)
+      : normalizeQuarterTurn(rotation);
     const storedSlot = pieces.filter(
       (piece) => piece.id !== id && !piece.isPlaced && piece.trayId !== null,
     ).length;
@@ -242,7 +271,7 @@ export function NativePuzzleBoard({
               currentPosition: {
                 x: storedSlot % columns,
                 y: rows + 1.55 + Math.floor(storedSlot / columns) * 1.18,
-                rotation,
+                rotation: effectiveRotation,
               },
             }
           : piece,
@@ -267,7 +296,9 @@ export function NativePuzzleBoard({
             currentPosition: {
               x: piece.currentPosition.x + deltaX,
               y: piece.currentPosition.y + deltaY,
-              rotation: piece.id === id ? rotation : piece.currentPosition.rotation,
+              rotation: normalizeQuarterTurn(
+                piece.id === id ? effectiveRotation : piece.currentPosition.rotation,
+              ),
             },
           }
         : piece,
@@ -285,8 +316,12 @@ export function NativePuzzleBoard({
       let match: { offsetX: number; offsetY: number; stationary: PuzzlePiece } | null = null;
       const movingMembers = next.filter((piece) => memberIds.has(piece.id));
       for (const moving of movingMembers) {
+        // Connected groups are locked against rotation. Only correctly oriented
+        // loose pieces may create a new group, avoiding an unsolvable rotated set.
+        if (normalizeQuarterTurn(moving.currentPosition.rotation) !== 0) continue;
         for (const stationary of next) {
           if (memberIds.has(stationary.id) || stationary.trayId !== null) continue;
+          if (normalizeQuarterTurn(stationary.currentPosition.rotation) !== 0) continue;
           const offset = neighborSnapOffset(moving, stationary, 0.3);
           if (offset) {
             match = { offsetX: offset.x, offsetY: offset.y, stationary };
@@ -549,7 +584,7 @@ function DraggablePiece({
   const extent = cell + margin * 2;
   const x = useSharedValue(piece.currentPosition.x * cell);
   const y = useSharedValue(piece.currentPosition.y * cell);
-  const rotation = useSharedValue(piece.currentPosition.rotation);
+  const rotation = useSharedValue(normalizeQuarterTurn(piece.currentPosition.rotation));
   const startX = useSharedValue(piece.currentPosition.x * cell);
   const startY = useSharedValue(piece.currentPosition.y * cell);
   const dragging = useSharedValue(false);
@@ -573,7 +608,7 @@ function DraggablePiece({
       activeGroupId.set(null);
       activeGroupPieceId.set(null);
     }
-    rotation.set(withTiming(piece.currentPosition.rotation, { duration: 180 }));
+    rotation.set(withTiming(normalizeQuarterTurn(piece.currentPosition.rotation), { duration: 180 }));
   }, [activeGroupId, activeGroupPieceId, cell, groupTranslationX, groupTranslationY, piece.currentPosition.rotation, piece.currentPosition.x, piece.currentPosition.y, piece.groupId, piece.id, rotation, x, y]);
 
   const notify = (
@@ -582,7 +617,7 @@ function DraggablePiece({
     nextRotation: number,
     destination: "board" | "drawer",
   ) => {
-    const normalized = ((nextRotation % 360) + 360) % 360;
+    const normalized = normalizeQuarterTurn(nextRotation);
     if (destination === "drawer") {
       onChange(piece.id, nextX / cell, nextY / cell, normalized, false, "drawer");
       return;
@@ -671,7 +706,8 @@ function DraggablePiece({
 
       const targetX = piece.correctPosition.x * cell;
       const targetY = piece.correctPosition.y * cell;
-      const normalized = ((rotation.get() % 360) + 360) % 360;
+      const currentQuarterTurn = Math.round(rotation.get() / 90) * 90;
+      const normalized = ((currentQuarterTurn % 360) + 360) % 360;
       const snaps = Math.hypot(x.get() - targetX, y.get() - targetY) <= cell * 0.38 && normalized === 0;
       if (snaps) {
         if (piece.groupId && piece.groupId !== "tabuleiro") {
@@ -702,11 +738,12 @@ function DraggablePiece({
     });
 
   const rotate = Gesture.Tap()
-    .enabled(!piece.isPlaced && !stored)
+    .enabled(!piece.isPlaced && !stored && piece.groupId === null)
     .numberOfTaps(2)
     .maxDuration(280)
     .onEnd(() => {
-      const nextRotation = (rotation.get() + 90) % 360;
+      const currentQuarterTurn = Math.round(rotation.get() / 90) * 90;
+      const nextRotation = ((currentQuarterTurn + 90) % 360 + 360) % 360;
       rotation.set(withTiming(nextRotation, { duration: 180 }));
       runOnJS(notify)(x.get(), y.get(), nextRotation, "board");
     });

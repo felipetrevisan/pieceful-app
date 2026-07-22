@@ -4,6 +4,7 @@ import {
   edgeBump,
   generatePieces,
   neighborSnapOffset,
+  normalizeQuarterTurn,
   screenToWorld,
   worldToScreen,
 } from ".";
@@ -44,6 +45,13 @@ describe("geometria", () => {
   test("snap exige proximidade e rotação", () => {
     expect(canSnap({ x: 1.05, y: 1, rotation: 360 }, { x: 1, y: 1, rotation: 0 }, 0.1)).toBe(true);
     expect(canSnap({ x: 1.05, y: 1, rotation: 90 }, { x: 1, y: 1, rotation: 0 }, 0.1)).toBe(false);
+  });
+
+  test("normaliza rotações interrompidas para passos exatos de 90 graus", () => {
+    expect(normalizeQuarterTurn(127)).toBe(90);
+    expect(normalizeQuarterTurn(179.8)).toBe(180);
+    expect(normalizeQuarterTurn(359.9)).toBe(0);
+    expect(normalizeQuarterTurn(-91)).toBe(270);
   });
 
   test("ímã reconhece apenas vizinhas corretas e respeita a rotação", () => {

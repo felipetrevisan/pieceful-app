@@ -26,6 +26,11 @@ export function canSnap(
   return rotation === target.rotation && snapDistance(current, target) <= tolerance;
 }
 
+export function normalizeQuarterTurn(rotation: number): number {
+  const quarterTurn = Math.round(rotation / 90) * 90;
+  return ((quarterTurn % 360) + 360) % 360;
+}
+
 function normalizedRotation(rotation: number): number {
   return ((rotation % 360) + 360) % 360;
 }
