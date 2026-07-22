@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: { default: "Pieceful", template: "%s · Pieceful" },
   description: "Transforme suas fotos em quebra-cabeças personalizados de até 1.000 peças.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
   openGraph: {
     title: "Pieceful",
     description: "Transforme suas fotos em quebra-cabeças personalizados de até 1.000 peças.",

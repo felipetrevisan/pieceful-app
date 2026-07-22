@@ -49,3 +49,12 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# generated native module build artifacts
+/apps/mobile/modules/my-module/android/build/
+
+# local Supabase CLI state
+/supabase/.temp/
+
+# unrelated starter copy created locally
+/README 2.md

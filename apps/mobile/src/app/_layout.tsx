@@ -9,18 +9,25 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { AuthGate } from "@/components/auth-gate";
+import { FrostedScene } from "@/components/frosted-surface";
+import { GuidedTour } from "@/components/guided-tour";
 import { NavigationDrawer } from "@/components/navigation-drawer";
+import { StartupSplash } from "@/components/startup-splash";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { AppProvider, useApp } from "@/state/app-provider";
+import { SocialProvider, useSocial } from "@/state/social-provider";
 
 void SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { ready, theme } = useApp();
+  const { ready: socialReady, session } = useSocial();
   const colors = mobileThemes[theme];
+  const [showStartupSplash, setShowStartupSplash] = useState(true);
   const [fontsLoaded] = useFonts({
     BricolageGrotesque_700Bold,
     BricolageGrotesque_800ExtraBold,
@@ -30,29 +37,42 @@ function RootNavigator() {
   });
 
   useEffect(() => {
-    if (ready && fontsLoaded) void SplashScreen.hideAsync();
-  }, [fontsLoaded, ready]);
+    void SplashScreen.hideAsync();
+  }, []);
 
-  if (!ready || !fontsLoaded) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  const finishStartup = useCallback(() => setShowStartupSplash(false), []);
 
   return (
     <>
-      <StatusBar style={isLightMobileTheme(theme) ? "dark" : "light"} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-          animation: "slide_from_right",
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="puzzle/[id]" />
-        <Stack.Screen name="result/[id]" />
-        <Stack.Screen name="settings/accessibility" />
-        <Stack.Screen name="help/controller" />
-        <Stack.Screen name="help/keyboard" />
-      </Stack>
-      <NavigationDrawer />
+      <StatusBar style={!session ? "light" : isLightMobileTheme(theme) ? "dark" : "light"} />
+      <FrostedScene overlays={session ? <NavigationDrawer /> : undefined}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+            animation: "slide_from_right",
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="auth/callback" />
+          <Stack.Screen name="puzzle/[id]" />
+          <Stack.Screen name="result/[id]" />
+          <Stack.Screen name="settings/accessibility" />
+          <Stack.Screen name="help/controller" />
+          <Stack.Screen name="help/touch" />
+        </Stack>
+      </FrostedScene>
+      {!session && !showStartupSplash ? (
+        <View style={styles.gate}>
+          <AuthGate />
+        </View>
+      ) : null}
+      {showStartupSplash ? (
+        <View style={styles.gate}>
+          <StartupSplash resourcesReady={ready && fontsLoaded && socialReady} fontsLoaded={fontsLoaded} onFinished={finishStartup} />
+        </View>
+      ) : null}
+      {session && !showStartupSplash ? <GuidedTour /> : null}
     </>
   );
 }
@@ -61,8 +81,18 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
-        <RootNavigator />
+        <SocialProvider>
+          <RootNavigator />
+        </SocialProvider>
       </AppProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  gate: {
+    position: "absolute",
+    inset: 0,
+    zIndex: 1000,
+  },
+});

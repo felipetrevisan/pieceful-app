@@ -29,6 +29,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { isLightMobileTheme, mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
+import { FrostedBackdrop } from "@/components/frosted-surface";
 import { useApp } from "@/state/app-provider";
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
@@ -106,14 +107,14 @@ export function AppHeader({ title, showTitle = false, back = false }: { title?: 
   return (
     <View style={styles.appHeader}>
       {back ? (
-        <IconButton icon="chevron-back" label={t("Voltar", "Back")} onPress={() => router.back()} />
+        <IconButton round icon="chevron-back" label={t("Voltar", "Back")} onPress={() => router.back()} />
       ) : (
-        <Pressable accessibilityLabel={t("Abrir menu", "Open menu")} onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.headerAvatar, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45`, borderRadius: Math.max(8, colors.radius), opacity: pressed ? 0.7 : 1 }]}>
+        <Pressable accessibilityLabel={t("Abrir menu", "Open menu")} onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.headerAvatar, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45`, opacity: pressed ? 0.7 : 1 }]}>
           <Ionicons name="extension-puzzle" size={23} color={colors.accent} />
         </Pressable>
       )}
-      <Text numberOfLines={1} style={[showTitle ? styles.headerTitle : styles.headerGreeting, { color: colors.text }]}>{title ?? t("Boa noite", "Good evening")}</Text>
-      <IconButton icon="notifications-outline" label={t("Notificações", "Notifications")} />
+      <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[showTitle ? styles.headerTitle : styles.headerGreeting, { color: colors.text }]}>{title ?? t("Boa noite", "Good evening")}</Text>
+      <IconButton round icon="notifications-outline" label={t("Notificações", "Notifications")} />
     </View>
   );
 }
@@ -123,8 +124,8 @@ export function SectionHeader({ title, action, onAction }: { title: string; acti
   const colors = mobileThemes[theme];
   return (
     <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      {action ? <Pressable onPress={onAction}><Text style={[styles.sectionAction, { color: colors.accent }]}>{action}</Text></Pressable> : null}
+      <Text maxFontSizeMultiplier={1.2} numberOfLines={2} style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+      {action ? <Pressable onPress={onAction}><Text maxFontSizeMultiplier={1.2} style={[styles.sectionAction, { color: colors.accent }]}>{action}</Text></Pressable> : null}
     </View>
   );
 }
@@ -166,9 +167,10 @@ export function Card({ children, className = "", style, ...props }: ViewProps & 
   return (
     <View
       className={`rounded-[24px] border p-5 ${className}`}
-      style={[{ backgroundColor: `${colors.panel}e8`, borderColor: `${colors.accent}${preferences.highContrast ? "aa" : "26"}`, borderRadius: colors.radius, borderWidth: preferences.highContrast ? 2 : 1 }, style]}
+      style={[{ backgroundColor: "transparent", borderColor: `${colors.accent}${preferences.highContrast ? "aa" : "32"}`, borderRadius: colors.radius, borderWidth: preferences.highContrast ? 2 : 1, overflow: "hidden" }, style]}
       {...props}
     >
+      <FrostedBackdrop intensity={52} />
       {children}
     </View>
   );
@@ -277,19 +279,21 @@ export function IconButton({
   label,
   onPressIn,
   onPressOut,
+  round = false,
   tone = "default",
   style,
   ...props
 }: Omit<PressableProps, "children"> & {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  round?: boolean;
   tone?: "default" | "danger";
 }) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
   const glass = hasLiquidGlass() && !props.disabled;
   const iconColor = tone === "danger" ? colors.danger : colors.accent;
-  const iconRadius = Math.max(5, Math.min(16, colors.radius - 7));
+  const iconRadius = round ? 24 : Math.max(5, Math.min(16, colors.radius - 7));
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
@@ -410,8 +414,8 @@ const styles = StyleSheet.create({
   headerGreeting: { flex: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
   headerTitle: { flex: 1, fontFamily: "BricolageGrotesque_800ExtraBold", fontSize: 27, textAlign: "center" },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  sectionTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 22 },
-  sectionAction: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 1 },
+  sectionTitle: { flex: 1, flexShrink: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 22, paddingRight: 6 },
+  sectionAction: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 1, marginLeft: 12 },
   progressTrack: { height: 7, borderRadius: 99, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 99 },
 });

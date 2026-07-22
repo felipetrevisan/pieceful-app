@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { FrostedBackdrop } from "@/components/frosted-surface";
 import { AppHeader, Card, ProgressBar, Screen, SectionHeader } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
@@ -21,13 +22,13 @@ export default function HomeScreen() {
       {active ? <ContinueCard puzzle={active} /> : (
         <LinearGradient colors={[`${colors.accent}22`, `${colors.primary}24`]} style={[styles.emptyHero, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
           <Ionicons name="sparkles" size={28} color={colors.accent} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
-          <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text style={styles.compactCtaText}>{t("Criar puzzle", "Create puzzle")}</Text></Pressable>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.emptyTitle, { color: colors.text }]}>{t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
+          <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text maxFontSizeMultiplier={1.2} style={styles.compactCtaText}>{t("Criar puzzle", "Create puzzle")}</Text></Pressable>
         </LinearGradient>
       )}
 
       <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
-        <View style={{ flex: 1 }}><Text style={[styles.kicker, { color: colors.primary }]}>{t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text style={[styles.challengeTitle, { color: colors.text }]}>{t("Nebulosa Neon", "Neon Nebula")}</Text><Text style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
+        <View style={{ flex: 1 }}><Text maxFontSizeMultiplier={1.2} style={[styles.kicker, { color: colors.primary }]}>{t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.challengeTitle, { color: colors.text }]}>{t("Nebulosa Neon", "Neon Nebula")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
         <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name="extension-puzzle" size={30} color={colors.accent} /></View>
       </LinearGradient>
 
@@ -42,7 +43,7 @@ export default function HomeScreen() {
           {completed.map((puzzle) => <CompletedCard key={puzzle.id} puzzle={puzzle} />)}
         </ScrollView>
       ) : (
-        <Card style={{ alignItems: "center", gap: 8 }}><Ionicons name="images-outline" size={29} color={colors.accent} /><Text style={[styles.cardTitle, { color: colors.text }]}>{t("Nenhum puzzle concluído ainda", "No completed puzzles yet")}</Text><Text style={[styles.body, { color: colors.muted, textAlign: "center" }]}>{t("Sua galeria aparecerá aqui.", "Your gallery will appear here.")}</Text></Card>
+        <Card style={{ alignItems: "center", gap: 8 }}><Ionicons name="images-outline" size={29} color={colors.accent} /><Text maxFontSizeMultiplier={1.2} style={[styles.cardTitle, { color: colors.text }]}>{t("Nenhum puzzle concluído ainda", "No completed puzzles yet")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, styles.emptyGalleryCopy, { color: colors.muted }]}>{t("Seus puzzles concluídos aparecerão aqui.", "Your completed puzzles will appear here.")}</Text></Card>
       )}
     </Screen>
   );
@@ -55,13 +56,18 @@ function ContinueCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"]
   const progress = Math.round((placed / puzzle.session.pieces.length) * 100);
   return (
     <Pressable onPress={() => router.push(`/puzzle/${puzzle.id}`)} style={({ pressed }) => [styles.continueCard, { borderColor: `${colors.accent}40`, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 }]}>
-      <Image source={{ uri: puzzle.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      <LinearGradient colors={["transparent", "rgba(5,9,20,.94)"]} style={StyleSheet.absoluteFill} />
-      <View style={styles.continueBottom}>
-        <View style={styles.playCircle}><Ionicons name="play" size={25} color="#063238" /></View>
-        <Text numberOfLines={1} style={styles.heroTitle}>{puzzle.name}</Text>
-        <Text style={styles.heroMeta}>{puzzle.configuration.totalPieces} {t("peças", "pieces")} · {progress}%</Text>
-        <ProgressBar value={progress} />
+      <View style={styles.continueImageWrap}>
+        <Image source={{ uri: puzzle.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <LinearGradient colors={["transparent", "rgba(5,9,20,.5)"]} style={StyleSheet.absoluteFill} />
+      </View>
+      <View style={styles.continueContent}>
+        <FrostedBackdrop intensity={55} />
+        <View style={styles.continueCopy}>
+          <Text numberOfLines={1} style={[styles.heroTitle, { color: colors.text }]}>{puzzle.name}</Text>
+          <Text style={[styles.heroMeta, { color: colors.muted }]}>{puzzle.configuration.totalPieces} {t("peças", "pieces")} · {progress}%</Text>
+        </View>
+        <View style={[styles.playCircle, { backgroundColor: colors.accent }]}><Ionicons name="play" size={23} color={colors.background} /></View>
+        <View style={styles.continueProgress}><ProgressBar value={progress} /></View>
       </View>
     </Pressable>
   );
@@ -71,7 +77,7 @@ function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.gly
   const { theme } = useApp(); const colors = mobileThemes[theme];
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return <Animated.View style={[styles.quick, animatedStyle]}><Pressable onPress={onPress} onPressIn={() => { scale.set(withSpring(.9, { damping: 13, stiffness: 280 })); }} onPressOut={() => { scale.set(withSpring(1, { damping: 11, stiffness: 230 })); }} style={styles.quickPressable}><View style={[styles.quickIcon, { backgroundColor: colors.panel, borderColor: `${colors.accent}40`, borderRadius: Math.max(7, colors.radius) }]}><Ionicons name={icon} size={28} color={colors.accent} /></View><Text style={[styles.quickLabel, { color: colors.text }]}>{label}</Text></Pressable></Animated.View>;
+  return <Animated.View style={[styles.quick, animatedStyle]}><Pressable onPress={onPress} onPressIn={() => { scale.set(withSpring(.9, { damping: 13, stiffness: 280 })); }} onPressOut={() => { scale.set(withSpring(1, { damping: 11, stiffness: 230 })); }} style={styles.quickPressable}><View style={[styles.quickIcon, { backgroundColor: colors.panel, borderColor: `${colors.accent}40`, borderRadius: Math.max(7, colors.radius) }]}><Ionicons name={icon} size={28} color={colors.accent} /></View><Text maxFontSizeMultiplier={1.2} style={[styles.quickLabel, { color: colors.text }]}>{label}</Text></Pressable></Animated.View>;
 }
 
 function CompletedCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"][number] }) {
@@ -80,11 +86,14 @@ function CompletedCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"
 }
 
 const styles = StyleSheet.create({
-  continueCard: { height: 230, borderRadius: 28, overflow: "hidden", borderWidth: 1, marginBottom: 18 },
-  continueBottom: { position: "absolute", left: 18, right: 18, bottom: 17 },
-  playCircle: { position: "absolute", right: 0, bottom: 33, width: 56, height: 56, borderRadius: 28, backgroundColor: "#8cebf1", alignItems: "center", justifyContent: "center" },
-  heroTitle: { color: "white", fontFamily: "BricolageGrotesque_700Bold", fontSize: 23, maxWidth: "72%" },
-  heroMeta: { color: "#d6dbea", fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 3, marginBottom: 12 },
+  continueCard: { minHeight: 248, borderRadius: 28, overflow: "hidden", borderWidth: 1, marginBottom: 18 },
+  continueImageWrap: { width: "100%", height: 128, overflow: "hidden" },
+  continueContent: { minHeight: 120, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 15, overflow: "hidden" },
+  continueCopy: { minHeight: 50, paddingRight: 64 },
+  playCircle: { position: "absolute", right: 15, top: 13, width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  continueProgress: { marginTop: 9 },
+  heroTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20 },
+  heroMeta: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 3 },
   emptyHero: { minHeight: 190, borderRadius: 28, borderWidth: 1, padding: 22, justifyContent: "center", gap: 12, marginBottom: 18 },
   emptyTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 23, maxWidth: 280 },
   compactCta: { alignSelf: "flex-start", borderRadius: 99, paddingHorizontal: 18, paddingVertical: 11 },
@@ -104,4 +113,5 @@ const styles = StyleSheet.create({
   completedName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 17, marginHorizontal: 14, marginTop: 11 },
   completedMeta: { fontFamily: "Inter_400Regular", fontSize: 12, marginHorizontal: 14, marginTop: 3 },
   cardTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 17 },
+  emptyGalleryCopy: { alignSelf: "stretch", textAlign: "center" },
 });

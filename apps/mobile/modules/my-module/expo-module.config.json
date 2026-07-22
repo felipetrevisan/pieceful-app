@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["PiecefulGameServicesModule"]
+  },
+  "android": {
+    "modules": ["app.perazzo.piecefulgames.PiecefulGameServicesModule"]
+  }
+}

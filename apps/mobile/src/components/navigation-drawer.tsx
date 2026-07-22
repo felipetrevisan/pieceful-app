@@ -1,26 +1,34 @@
 import { Ionicons } from "@expo/vector-icons";
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import { router, usePathname } from "expo-router";
 import { useEffect } from "react";
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { FadeInLeft, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { isLightMobileTheme, mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
+import { FrostedBackdrop } from "@/components/frosted-surface";
 import { useApp } from "@/state/app-provider";
+import { useSocial } from "@/state/social-provider";
 
 const menu = [
   ["home-outline", "Início", "Home", "/(tabs)"],
   ["add-circle-outline", "Criar", "Create", "/(tabs)/create"],
   ["albums-outline", "Coleção", "Collection", "/(tabs)/puzzles"],
   ["trophy-outline", "Conquistas", "Achievements", "/(tabs)/achievements"],
+  ["people-outline", "Amigos", "Friends", "/(tabs)/friends"],
+  ["person-outline", "Perfil", "Profile", "/(tabs)/profile"],
   ["game-controller-outline", "Controles", "Controllers", "/help/controller"],
   ["settings-outline", "Ajustes", "Settings", "/(tabs)/settings"],
 ] as const;
 
 export function NavigationDrawer() {
   const { drawerOpen, puzzles, setDrawerOpen, t, theme } = useApp();
+  const { profile, session } = useSocial();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const colors = mobileThemes[theme];
   const drawerWidth = Math.min(width * 0.88, 410);
@@ -31,6 +39,10 @@ export function NavigationDrawer() {
   const activeTheme = mobileThemeCatalog.find((item) => item.id === theme) ?? mobileThemeCatalog[0];
   const glass = Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   const Surface = glass ? GlassView : View;
+  const profileName = profile.displayName.trim()
+    || String(session?.user.user_metadata?.full_name ?? session?.user.user_metadata?.name ?? "").trim()
+    || session?.user.email?.split("@")[0]
+    || t("Jogador", "Player");
 
   useEffect(() => {
     if (drawerOpen) {
@@ -41,6 +53,20 @@ export function NavigationDrawer() {
   }, [drawerOpen, drawerWidth, translateX]);
 
   const drawerStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, Math.min(1, 1 + translateX.value / drawerWidth)),
+  }));
+  const edgePan = Gesture.Pan()
+    .activeOffsetX(5)
+    .failOffsetY([-18, 18])
+    .onUpdate((event) => {
+      translateX.set(Math.max(-drawerWidth, Math.min(0, -drawerWidth + event.translationX)));
+    })
+    .onEnd((event) => {
+      const shouldOpen = event.translationX > drawerWidth * 0.34 || event.velocityX > 650;
+      translateX.set(withSpring(shouldOpen ? 0 : -drawerWidth, { damping: 20, stiffness: 230 }));
+      runOnJS(setDrawerOpen)(shouldOpen);
+    });
   const pan = Gesture.Pan()
     .activeOffsetX([-8, 8])
     .failOffsetY([-18, 18])
@@ -74,30 +100,44 @@ export function NavigationDrawer() {
   }
 
   return (
-    <Modal visible={drawerOpen} transparent animationType="fade" onRequestClose={closeDrawer}>
-      <View style={styles.overlay}>
-        <Pressable accessibilityLabel={t("Fechar menu", "Close menu")} style={StyleSheet.absoluteFill} onPress={closeDrawer} />
+    <View pointerEvents={drawerOpen ? "auto" : "box-none"} style={styles.rootOverlay}>
+      <Animated.View pointerEvents="none" style={[styles.overlay, backdropStyle]} />
+      {drawerOpen ? <Pressable accessibilityLabel={t("Fechar menu", "Close menu")} style={StyleSheet.absoluteFill} onPress={closeDrawer} /> : null}
+      {!drawerOpen ? (
+        <GestureDetector gesture={edgePan}>
+          <Animated.View accessibilityLabel={t("Deslize para abrir o menu", "Swipe to open menu")} style={styles.edgeZone} />
+        </GestureDetector>
+      ) : null}
         <GestureDetector gesture={pan}>
           <Animated.View style={[styles.animatedDrawer, { width: drawerWidth }, drawerStyle]}>
             <Surface
               {...(glass ? { glassEffectStyle: "regular" as const, colorScheme: isLightMobileTheme(theme) ? "light" as const : "dark" as const, tintColor: `${colors.panel}ee` } : {})}
-              style={[styles.drawer, { backgroundColor: glass ? "transparent" : colors.panel, borderColor: `${colors.accent}34` }]}
+              style={[styles.drawer, { paddingTop: insets.top + 10, paddingBottom: Math.max(insets.bottom, 10), backgroundColor: glass ? "transparent" : colors.panel, borderColor: `${colors.accent}34` }]}
             >
+              {!glass ? <FrostedBackdrop intensity={78} /> : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("Fechar menu", "Close menu")}
+                hitSlop={10}
+                onPress={closeDrawer}
+                style={[styles.closeButton, { top: insets.top + 8, backgroundColor: colors.panelAlt, borderColor: `${colors.accent}55` }]}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </Pressable>
               <View style={styles.dragHint}>
                 <View style={[styles.dragPill, { backgroundColor: `${colors.muted}66` }]} />
                 <Text style={[styles.dragText, { color: colors.muted }]}>{t("Deslize para fechar", "Swipe left to close")}</Text>
               </View>
 
               <View style={styles.profileRow}>
-                <LinearGradient colors={[colors.accent, colors.primary]} style={styles.avatar}>
-                  <Ionicons name="extension-puzzle" size={29} color="#08101c" />
-                </LinearGradient>
-                <View style={styles.profileCopy}>
-                  <Text style={[styles.profileName, { color: colors.text }]}>{t("Jogador Um", "Player One")}</Text>
-                  <Text style={[styles.profileLevel, { color: colors.muted }]}>Level {level} · {t("Mestre Puzzler", "Master Puzzler")}</Text>
-                </View>
-                <Pressable onPress={closeDrawer} style={[styles.closeButton, { backgroundColor: colors.panelAlt }]}>
-                  <Ionicons name="close" size={22} color={colors.text} />
+                <Pressable onPress={() => navigate(session ? "/(tabs)/profile" : "/(tabs)/account")} style={({ pressed }) => [styles.profileLink, pressed ? styles.pressed : null]}>
+                  <LinearGradient colors={[colors.accent, colors.primary]} style={styles.avatar}>
+                    {profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} contentFit="cover" /> : <Ionicons name="extension-puzzle" size={29} color="#08101c" />}
+                  </LinearGradient>
+                  <View style={styles.profileCopy}>
+                    <Text numberOfLines={1} style={[styles.profileName, { color: colors.text }]}>{profileName}</Text>
+                    <Text style={[styles.profileLevel, { color: colors.muted }]}>Level {level} · {t("Mestre Puzzler", "Master Puzzler")}</Text>
+                  </View>
                 </Pressable>
               </View>
 
@@ -110,7 +150,7 @@ export function NavigationDrawer() {
                   {menu.map(([icon, pt, en, path], index) => {
                     const active = isActive(path, index);
                     return (
-                      <Animated.View key={pt} entering={FadeInLeft.delay(70 + index * 35).duration(320)} style={styles.menuTileShell}>
+                      <Animated.View key={pt} entering={FadeInDown.delay(70 + index * 35).duration(320)} style={styles.menuTileShell}>
                         <Pressable onPress={() => navigate(path)} style={({ pressed }) => pressed ? styles.pressed : null}>
                           <View style={[styles.menuTile, { backgroundColor: active ? colors.panelAlt : `${colors.panelAlt}66`, borderColor: active ? colors.accent : `${colors.muted}22`, borderRadius: Math.max(8, colors.radius - 4) }]}>
                             <LinearGradient colors={active ? [...colors.gradient] : [`${colors.accent}22`, `${colors.primary}1a`]} style={[styles.menuIcon, { borderRadius: Math.max(7, colors.radius - 8) }]}>
@@ -137,24 +177,27 @@ export function NavigationDrawer() {
             </Surface>
           </Animated.View>
         </GestureDetector>
-      </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(2,6,16,0.64)" },
-  animatedDrawer: { flex: 1 },
-  drawer: { flex: 1, borderRightWidth: StyleSheet.hairlineWidth, borderTopRightRadius: 32, borderBottomRightRadius: 32, paddingHorizontal: 20, paddingTop: 14, overflow: "hidden" },
-  dragHint: { minHeight: 30, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  rootOverlay: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, zIndex: 200 },
+  overlay: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(2,6,16,0.64)" },
+  edgeZone: { position: "absolute", left: 0, top: 0, bottom: 0, width: 24, zIndex: 202 },
+  animatedDrawer: { position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 201 },
+  drawer: { flex: 1, borderRightWidth: StyleSheet.hairlineWidth, borderTopRightRadius: 32, borderBottomRightRadius: 32, paddingHorizontal: 20, overflow: "hidden" },
+  dragHint: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 50 },
   dragPill: { width: 28, height: 4, borderRadius: 99 },
   dragText: { fontFamily: "Inter_600SemiBold", fontSize: 10, letterSpacing: 0.3 },
-  profileRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 },
-  profileCopy: { flex: 1, minWidth: 0 },
-  avatar: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center" },
-  profileName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 22 },
+  profileRow: { width: "100%", height: 76, marginTop: 10 },
+  profileLink: { width: "100%", height: 76, position: "relative" },
+  profileCopy: { position: "absolute", left: 74, right: 0, top: 13, minWidth: 0 },
+  avatar: { position: "absolute", left: 0, top: 8, width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  avatarImage: { width: "100%", height: "100%", borderRadius: 30 },
+  profileName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20, lineHeight: 25 },
   profileLevel: { fontFamily: "Inter_600SemiBold", fontSize: 12, marginTop: 3 },
-  closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  closeButton: { position: "absolute", right: 14, zIndex: 20, width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", elevation: 12 },
   xpHeader: { flexDirection: "row", justifyContent: "space-between", marginTop: 20, marginBottom: 7 },
   xpText: { fontFamily: "Inter_700Bold", fontSize: 12 },
   track: { height: 7, borderRadius: 99, overflow: "hidden" },

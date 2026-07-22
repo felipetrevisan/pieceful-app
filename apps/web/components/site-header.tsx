@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { type FocusEvent, type PointerEvent, useState } from "react";
 import { useI18n } from "@/lib/i18n";
@@ -171,7 +172,7 @@ export function SiteHeader({ active }: { active?: HeaderRoute }) {
     <header className="site-header">
       <Link href="/" className="brand">
         <span className="brand-mark">
-          <Icon name="puzzle" size={18} />
+          <Image src="/pieceful-logo.png" alt="" width={36} height={36} priority />
         </span>{" "}
         Pieceful
       </Link>

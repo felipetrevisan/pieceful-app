@@ -15,7 +15,6 @@ import {
   resolvePuzzleOrientation,
   type PuzzleConfiguration,
   type PuzzleDifficulty,
-  type PuzzleOrientation,
 } from "@puzzled/shared";
 import { AppHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
@@ -40,7 +39,6 @@ export default function CreateScreen() {
   const colors = mobileThemes[theme];
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [orientation, setOrientation] = useState<PuzzleOrientation>("automatic");
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [difficulty, setDifficulty] = useState<PuzzleDifficulty>("normal");
   const [configuration, setConfiguration] = useState<PuzzleConfiguration>({
@@ -58,7 +56,7 @@ export default function CreateScreen() {
     [configuration.totalPieces],
   );
   const resolvedOrientation = resolvePuzzleOrientation(
-    orientation,
+    "automatic",
     imageDimensions?.width,
     imageDimensions?.height,
   );
@@ -100,7 +98,7 @@ export default function CreateScreen() {
       const dimensions = { width: asset.width, height: asset.height };
       setImageDimensions(dimensions);
       const nextOrientation = resolvePuzzleOrientation(
-        orientation,
+        "automatic",
         dimensions.width,
         dimensions.height,
       );
@@ -126,16 +124,6 @@ export default function CreateScreen() {
       ...grid,
       totalPieces: preset.pieces,
     }));
-    if (preferences.haptics) void Haptics.selectionAsync();
-  }
-
-  function selectOrientation(next: PuzzleOrientation) {
-    setOrientation(next);
-    const resolved = resolvePuzzleOrientation(next, imageDimensions?.width, imageDimensions?.height);
-    setConfiguration((current) => {
-      const grid = orientPuzzleGrid(current.rows, current.columns, resolved);
-      return { ...current, ...grid, totalPieces: grid.rows * grid.columns };
-    });
     if (preferences.haptics) void Haptics.selectionAsync();
   }
 
@@ -174,6 +162,16 @@ export default function CreateScreen() {
         {imageUri ? (
           <View className="gap-3">
             <Image source={{ uri: imageUri }} style={{ width: "100%", aspectRatio: configuration.columns / configuration.rows, borderRadius: 18, backgroundColor: colors.panelAlt }} contentFit="cover" transition={220} />
+            <View style={[styles.detectedFormat, { backgroundColor: `${colors.accent}12`, borderColor: `${colors.accent}42`, borderRadius: Math.max(11, colors.radius - 2) }]}>
+              <View style={[styles.detectedFormatIcon, { backgroundColor: `${colors.accent}1c` }]}>
+                <Ionicons name={resolvedOrientation === "portrait" ? "phone-portrait-outline" : "phone-landscape-outline"} size={22} color={colors.accent} />
+              </View>
+              <View style={styles.detectedFormatCopy}>
+                <Text style={[styles.detectedFormatTitle, { color: colors.text }]}>{t("Formato detectado automaticamente", "Format detected automatically")}</Text>
+                <Text style={[styles.detectedFormatMeta, { color: colors.muted }]}>{resolvedOrientation === "portrait" ? t("Foto vertical · tabuleiro ajustado", "Portrait photo · board adjusted") : t("Foto horizontal · tabuleiro ajustado", "Landscape photo · board adjusted")}</Text>
+              </View>
+              <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+            </View>
             <TextInput
               value={name}
               onChangeText={setName}
@@ -199,17 +197,6 @@ export default function CreateScreen() {
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>2</Text></View>
           <View className="flex-1">
-            <Text className="text-lg font-black" style={{ color: colors.text }}>{t("Formato do puzzle", "Puzzle orientation")}</Text>
-            <MutedText>{resolvedOrientation === "portrait" ? t("Tabuleiro vertical", "Portrait board") : t("Tabuleiro horizontal", "Landscape board")}</MutedText>
-          </View>
-        </View>
-        <OrientationPicker value={orientation} resolved={resolvedOrientation} hasImage={imageDimensions !== null} onSelect={selectOrientation} />
-      </Card>
-
-      <Card className="mb-4 gap-4">
-        <View className="flex-row items-center gap-3">
-          <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>3</Text></View>
-          <View className="flex-1">
             <Text className="text-lg font-black" style={{ color: colors.text }}>{t("Escolha a dificuldade", "Choose difficulty")}</Text>
             <MutedText>{configuration.totalPieces} {t("peças", "pieces")}</MutedText>
           </View>
@@ -223,7 +210,7 @@ export default function CreateScreen() {
 
       <Card className="mb-5 gap-1">
         <View className="mb-3 flex-row items-center gap-3">
-          <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>4</Text></View>
+          <View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.panelAlt }}><Text className="font-black" style={{ color: colors.accent }}>3</Text></View>
           <View className="flex-1">
             <Text className="text-lg font-black" style={{ color: colors.text }}>{t("Opções da partida", "Game options")}</Text>
             <MutedText>{t("Tudo pronto e visível de cara.", "Everything ready and visible right away.")}</MutedText>
@@ -241,12 +228,11 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  orientationRow: { flexDirection: "row", gap: 9 },
-  orientationOption: { flex: 1, minHeight: 104, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 6 },
-  orientationShape: { width: 36, height: 27, borderWidth: 2, borderRadius: 6, alignItems: "center", justifyContent: "center" },
-  orientationShapePortrait: { width: 23, height: 34 },
-  orientationLabel: { fontFamily: "Inter_700Bold", fontSize: 10, textAlign: "center" },
-  orientationMeta: { fontFamily: "Inter_600SemiBold", fontSize: 8, textAlign: "center" },
+  detectedFormat: { minHeight: 68, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 10 },
+  detectedFormatIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  detectedFormatCopy: { flex: 1, minWidth: 0 },
+  detectedFormatTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 14 },
+  detectedFormatMeta: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 2 },
   difficultyHero: { minHeight: 112, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 16, flexDirection: "row", alignItems: "center", overflow: "hidden" },
   difficultyHeroIcon: { width: 45, height: 45, borderRadius: 15, backgroundColor: "rgba(5,12,28,.28)", alignItems: "center", justifyContent: "center", marginRight: 13 },
   difficultyHeroCopy: { flex: 1, minWidth: 0 },
@@ -264,68 +250,6 @@ const styles = StyleSheet.create({
   sliderEndpoint: { fontFamily: "Inter_700Bold", fontSize: 11 },
   sliderHint: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
 });
-
-function OrientationPicker({
-  value,
-  resolved,
-  hasImage,
-  onSelect,
-}: {
-  value: PuzzleOrientation;
-  resolved: ReturnType<typeof resolvePuzzleOrientation>;
-  hasImage: boolean;
-  onSelect: (value: PuzzleOrientation) => void;
-}) {
-  const { t, theme } = useApp();
-  const colors = mobileThemes[theme];
-  const options: readonly [PuzzleOrientation, string, keyof typeof Ionicons.glyphMap][] = [
-    ["automatic", t("Automático", "Automatic"), "sparkles"],
-    ["portrait", t("Vertical", "Portrait"), "phone-portrait-outline"],
-    ["landscape", t("Horizontal", "Landscape"), "phone-landscape-outline"],
-  ];
-  return (
-    <View style={styles.orientationRow} accessibilityRole="radiogroup">
-      {options.map(([option, label, icon]) => {
-        const selected = value === option;
-        const shape = option === "automatic" ? resolved : option;
-        return (
-          <Pressable
-            key={option}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: selected }}
-            onPress={() => onSelect(option)}
-            style={({ pressed }) => [
-              styles.orientationOption,
-              {
-                backgroundColor: selected ? `${colors.accent}18` : colors.panelAlt,
-                borderColor: selected ? colors.accent : `${colors.muted}25`,
-                borderRadius: Math.max(10, colors.radius - 2),
-                opacity: pressed ? 0.7 : 1,
-                transform: [{ scale: pressed ? 0.97 : 1 }],
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.orientationShape,
-                shape === "portrait" && styles.orientationShapePortrait,
-                { borderColor: selected ? colors.accent : colors.muted },
-              ]}
-            >
-              <Ionicons name={icon} size={13} color={selected ? colors.accent : colors.muted} />
-            </View>
-            <Text numberOfLines={1} style={[styles.orientationLabel, { color: selected ? colors.text : colors.muted }]}>{label}</Text>
-            <Text numberOfLines={1} style={[styles.orientationMeta, { color: colors.muted }]}>
-              {option === "automatic"
-                ? !hasImage ? t("após a foto", "after photo") : resolved === "portrait" ? t("detectado: vertical", "detected: portrait") : t("detectado: horizontal", "detected: landscape")
-                : option === "portrait" ? "3:4" : "4:3"}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
 
 function DifficultySlider({ selectedIndex, orientation, onSelect }: { selectedIndex: number; orientation: ReturnType<typeof resolvePuzzleOrientation>; onSelect: (index: number) => void }) {
   const { t, theme } = useApp();

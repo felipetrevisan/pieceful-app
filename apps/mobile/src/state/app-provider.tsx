@@ -41,6 +41,8 @@ interface CreatePuzzleInput {
 interface AppState {
   ready: boolean;
   drawerOpen: boolean;
+  tourOpen: boolean;
+  tourCompleted: boolean;
   language: AppLanguage;
   theme: MobileTheme;
   preferences: MobilePreferences;
@@ -48,11 +50,16 @@ interface AppState {
   setLanguage: (language: AppLanguage) => void;
   setTheme: (theme: MobileTheme) => void;
   setDrawerOpen: (open: boolean) => void;
+  startTour: () => void;
+  completeTour: () => void;
   updatePreference: (key: keyof MobilePreferences, value: boolean) => void;
   createPuzzle: (input: CreatePuzzleInput) => MobilePuzzle;
   updatePuzzlePieces: (id: string, pieces: PuzzlePiece[]) => void;
   updatePuzzleCamera: (id: string, camera: Camera) => void;
+  updatePuzzleElapsedTime: (id: string, elapsedTime: number) => void;
+  renamePuzzle: (id: string, name: string) => void;
   deletePuzzle: (id: string) => void;
+  mergeRemotePuzzles: (puzzles: MobilePuzzle[]) => void;
   t: (portuguese: string, english: string) => string;
 }
 
@@ -81,6 +88,8 @@ function shuffledTraySlots(length: number, seed: number) {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourCompleted, setTourCompleted] = useState(false);
   const [language, setLanguageState] = useState<AppLanguage>("pt-BR");
   const [theme, setThemeState] = useState<MobileTheme>("cosmic");
   const [preferences, setPreferences] = useState(defaultPreferences);
@@ -89,12 +98,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
-        if (!stored) return;
+        if (!stored) {
+          setTourOpen(true);
+          return;
+        }
         const parsed = JSON.parse(stored) as Partial<{
           language: AppLanguage;
           theme: MobileTheme;
           puzzles: MobilePuzzle[];
           preferences: MobilePreferences;
+          tourCompleted: boolean;
         }>;
         if (parsed.language === "en" || parsed.language === "pt-BR") {
           setLanguageState(parsed.language);
@@ -104,6 +117,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         if (Array.isArray(parsed.puzzles)) setPuzzles(parsed.puzzles);
         if (parsed.preferences) setPreferences({ ...defaultPreferences, ...parsed.preferences });
+        const completed = parsed.tourCompleted === true;
+        setTourCompleted(completed);
+        setTourOpen(!completed);
       })
       .catch(() => undefined)
       .finally(() => setReady(true));
@@ -111,11 +127,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ language, theme, puzzles, preferences }));
-  }, [language, preferences, puzzles, ready, theme]);
+    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ language, theme, puzzles, preferences, tourCompleted }));
+  }, [language, preferences, puzzles, ready, theme, tourCompleted]);
 
   const setLanguage = useCallback((next: AppLanguage) => setLanguageState(next), []);
   const setTheme = useCallback((next: MobileTheme) => setThemeState(next), []);
+  const startTour = useCallback(() => setTourOpen(true), []);
+  const completeTour = useCallback(() => {
+    setTourCompleted(true);
+    setTourOpen(false);
+  }, []);
   const updatePreference = useCallback((key: keyof MobilePreferences, value: boolean) => {
     setPreferences((current) => ({ ...current, [key]: value }));
   }, []);
@@ -135,11 +156,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         x: (shuffledSlots[index] ?? index) % input.configuration.columns,
         y:
           input.configuration.rows +
-          2.05 +
+          1.55 +
           Math.floor((shuffledSlots[index] ?? index) / input.configuration.columns) * 1.18,
         rotation: input.configuration.rotationEnabled ? piece.currentPosition.rotation : 0,
       },
-      trayId: null,
+      trayId: "drawer",
     }));
     const now = new Date().toISOString();
     const puzzle: MobilePuzzle = {
@@ -205,14 +226,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const updatePuzzleElapsedTime = useCallback((id: string, elapsedTime: number) => {
+    setPuzzles((current) =>
+      current.map((puzzle) =>
+        puzzle.id === id
+          ? {
+              ...puzzle,
+              session: { ...puzzle.session, elapsedTime },
+            }
+          : puzzle,
+      ),
+    );
+  }, []);
+
   const deletePuzzle = useCallback((id: string) => {
     setPuzzles((current) => current.filter((puzzle) => puzzle.id !== id));
+  }, []);
+
+  const renamePuzzle = useCallback((id: string, name: string) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    setPuzzles((current) => current.map((puzzle) => puzzle.id === id
+      ? { ...puzzle, name: trimmedName, updatedAt: new Date().toISOString() }
+      : puzzle));
+  }, []);
+
+  const mergeRemotePuzzles = useCallback((remotePuzzles: MobilePuzzle[]) => {
+    setPuzzles((current) => {
+      const merged = new Map(current.map((puzzle) => [puzzle.id, puzzle]));
+      for (const remote of remotePuzzles) {
+        const local = merged.get(remote.id);
+        if (!local || new Date(remote.updatedAt).getTime() > new Date(local.updatedAt).getTime()) {
+          merged.set(remote.id, remote);
+        }
+      }
+      return [...merged.values()].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+    });
   }, []);
 
   const value = useMemo<AppState>(
     () => ({
       ready,
       drawerOpen,
+      tourOpen,
+      tourCompleted,
       language,
       theme,
       preferences,
@@ -220,16 +277,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLanguage,
       setTheme,
       setDrawerOpen,
+      startTour,
+      completeTour,
       updatePreference,
       createPuzzle,
       updatePuzzlePieces,
       updatePuzzleCamera,
+      updatePuzzleElapsedTime,
+      renamePuzzle,
       deletePuzzle,
+      mergeRemotePuzzles,
       t: (portuguese, english) => (language === "en" ? english : portuguese),
     }),
     [
       createPuzzle,
+      completeTour,
       deletePuzzle,
+      mergeRemotePuzzles,
+      renamePuzzle,
       drawerOpen,
       language,
       puzzles,
@@ -238,8 +303,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLanguage,
       setTheme,
       theme,
+      tourCompleted,
+      tourOpen,
+      startTour,
       updatePuzzlePieces,
       updatePuzzleCamera,
+      updatePuzzleElapsedTime,
       updatePreference,
     ],
   );
