@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import GameKit
 import UIKit
+import AVFoundation
 
 private final class PiecefulGameCenterDelegate: NSObject, GKGameCenterControllerDelegate {
   func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
@@ -13,6 +14,7 @@ public class PiecefulGameServicesModule: Module {
 
   public func definition() -> ModuleDefinition {
     Name("PiecefulGameServices")
+    Events("onTimelapseProgress")
 
     AsyncFunction("authenticate") { (promise: Promise) in
       GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
@@ -60,5 +62,19 @@ public class PiecefulGameServicesModule: Module {
         promise.resolve(nil)
       }
     }.runOnQueue(.main)
+
+    AsyncFunction("createTimelapse") { (payload: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let encoder = PiecefulTimelapseEncoder()
+          let uri = try encoder.encode(payload: payload) { progress in
+            self.sendEvent("onTimelapseProgress", ["progress": progress])
+          }
+          promise.resolve(uri)
+        } catch {
+          promise.reject("ERR_TIMELAPSE", error.localizedDescription)
+        }
+      }
+    }
   }
 }

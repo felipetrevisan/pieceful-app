@@ -6,10 +6,15 @@ export interface PlatformPlayer {
   playerName?: string;
 }
 
-declare class PiecefulGameServicesModule extends NativeModule {
+type PiecefulGameServicesEvents = {
+  onTimelapseProgress: (event: { progress: number }) => void;
+};
+
+declare class PiecefulGameServicesModule extends NativeModule<PiecefulGameServicesEvents> {
   authenticate(): Promise<PlatformPlayer>;
   reportAchievement(identifier: string, percent: number): Promise<void>;
   showAchievements(): Promise<void>;
+  createTimelapse(payload: string): Promise<string>;
 }
 
 export default requireOptionalNativeModule<PiecefulGameServicesModule>("PiecefulGameServices");

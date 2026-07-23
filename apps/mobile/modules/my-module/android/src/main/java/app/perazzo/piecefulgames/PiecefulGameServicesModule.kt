@@ -5,10 +5,12 @@ import com.google.android.gms.games.PlayGamesSdk
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import org.json.JSONObject
 
 class PiecefulGameServicesModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("PiecefulGameServices")
+    Events("onTimelapseProgress")
 
     AsyncFunction("authenticate") { promise: Promise ->
       val activity = appContext.currentActivity
@@ -49,6 +51,24 @@ class PiecefulGameServicesModule : Module() {
       }.addOnFailureListener { error ->
         promise.reject("ERR_PLAY_GAMES_UI", error.localizedMessage, error)
       }
+    }
+
+    AsyncFunction("createTimelapse") { payload: String, promise: Promise ->
+      val context = appContext.reactContext
+      if (context == null) {
+        promise.reject("ERR_NO_CONTEXT", "Unable to create a video without an Android context", null)
+        return@AsyncFunction
+      }
+      Thread {
+        try {
+          val uri = PiecefulTimelapseEncoder(context).encode(JSONObject(payload)) { progress ->
+            sendEvent("onTimelapseProgress", mapOf("progress" to progress))
+          }
+          promise.resolve(uri)
+        } catch (error: Throwable) {
+          promise.reject("ERR_TIMELAPSE", error.localizedMessage ?: "Unable to create timelapse", error)
+        }
+      }.start()
     }
   }
 }

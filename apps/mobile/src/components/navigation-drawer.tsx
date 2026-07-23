@@ -25,7 +25,7 @@ const menu = [
 ] as const;
 
 export function NavigationDrawer() {
-  const { drawerOpen, puzzles, setDrawerOpen, t, theme } = useApp();
+  const { ageGroup, drawerOpen, puzzles, setDrawerOpen, t, theme } = useApp();
   const { profile, session } = useSocial();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -39,7 +39,9 @@ export function NavigationDrawer() {
   const activeTheme = mobileThemeCatalog.find((item) => item.id === theme) ?? mobileThemeCatalog[0];
   const glass = Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   const Surface = glass ? GlassView : View;
-  const profileName = profile.displayName.trim()
+  const childMode = ageGroup === "child";
+  const visibleMenu = childMode ? menu.filter((item) => item[1] !== "Amigos" && item[1] !== "Perfil") : menu;
+  const profileName = (childMode ? t("Pequeno Puzzler", "Little Puzzler") : profile.displayName.trim())
     || String(session?.user.user_metadata?.full_name ?? session?.user.user_metadata?.name ?? "").trim()
     || session?.user.email?.split("@")[0]
     || t("Jogador", "Player");
@@ -130,13 +132,13 @@ export function NavigationDrawer() {
               </View>
 
               <View style={styles.profileRow}>
-                <Pressable onPress={() => navigate(session ? "/(tabs)/profile" : "/(tabs)/account")} style={({ pressed }) => [styles.profileLink, pressed ? styles.pressed : null]}>
+                <Pressable onPress={() => navigate(childMode ? "/(tabs)/settings" : session ? "/(tabs)/profile" : "/(tabs)/account")} style={({ pressed }) => [styles.profileLink, pressed ? styles.pressed : null]}>
                   <LinearGradient colors={[colors.accent, colors.primary]} style={styles.avatar}>
                     {profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} contentFit="cover" /> : <Ionicons name="extension-puzzle" size={29} color="#08101c" />}
                   </LinearGradient>
                   <View style={styles.profileCopy}>
                     <Text numberOfLines={1} style={[styles.profileName, { color: colors.text }]}>{profileName}</Text>
-                    <Text style={[styles.profileLevel, { color: colors.muted }]}>Level {level} · {t("Mestre Puzzler", "Master Puzzler")}</Text>
+                    <Text style={[styles.profileLevel, { color: colors.muted }]}>{childMode ? t("Modo infantil", "Kids mode") : `Level ${level} · ${t("Mestre Puzzler", "Master Puzzler")}`}</Text>
                   </View>
                 </Pressable>
               </View>
@@ -147,7 +149,7 @@ export function NavigationDrawer() {
               <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
                 <Text style={[styles.menuKicker, { color: colors.muted }]}>{t("EXPLORAR", "EXPLORE")}</Text>
                 <View style={styles.menuGrid}>
-                  {menu.map(([icon, pt, en, path], index) => {
+                  {visibleMenu.map(([icon, pt, en, path], index) => {
                     const active = isActive(path, index);
                     return (
                       <Animated.View key={pt} entering={FadeInDown.delay(70 + index * 35).duration(320)} style={styles.menuTileShell}>

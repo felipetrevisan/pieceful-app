@@ -612,6 +612,20 @@ canvas:focus-visible {
   font-size: 12px;
   border-top: 1px solid rgba(149, 142, 160, 0.12);
 }
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.footer-links a,
+.legal-page a {
+  color: var(--cyan);
+  text-underline-offset: 3px;
+}
+.footer-links a:hover,
+.legal-page a:hover {
+  color: var(--primary-light);
+}
 
 .hero {
   min-height: 610px;
@@ -1477,6 +1491,54 @@ summary {
 .content-page > p {
   margin: 0 0 38px;
   color: var(--muted);
+}
+.legal-page {
+  width: min(880px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 64px 0 100px;
+}
+.legal-page > h1 {
+  margin: 5px 0 8px;
+  font-size: clamp(38px, 7vw, 64px);
+  letter-spacing: -0.05em;
+}
+.legal-page > p,
+.legal-page section p,
+.legal-page li {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.75;
+}
+.legal-page .legal-updated {
+  margin: 0 0 34px;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.legal-page section {
+  margin-top: 38px;
+  padding-top: 30px;
+  border-top: 1px solid color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.legal-page h2 {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: clamp(21px, 3vw, 27px);
+}
+.legal-page ul,
+.legal-page ol {
+  display: grid;
+  gap: 10px;
+  padding-left: 22px;
+}
+.compact-legal-page {
+  min-height: 72vh;
+}
+.legal-back {
+  width: fit-content;
+  margin-top: 42px;
 }
 .empty-state {
   min-height: 400px;

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthGate } from "@/components/auth-gate";
+import { AgeGate } from "@/components/age-gate";
 import { FrostedScene } from "@/components/frosted-surface";
 import { GuidedTour } from "@/components/guided-tour";
 import { NavigationDrawer } from "@/components/navigation-drawer";
@@ -20,11 +21,12 @@ import { StartupSplash } from "@/components/startup-splash";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { AppProvider, useApp } from "@/state/app-provider";
 import { SocialProvider, useSocial } from "@/state/social-provider";
+import { MonetizationProvider } from "@/state/monetization-provider";
 
 void SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { ready, theme } = useApp();
+  const { ageGateCompleted, ageGroup, ready, theme } = useApp();
   const { ready: socialReady, session } = useSocial();
   const colors = mobileThemes[theme];
   const [showStartupSplash, setShowStartupSplash] = useState(true);
@@ -41,11 +43,13 @@ function RootNavigator() {
   }, []);
 
   const finishStartup = useCallback(() => setShowStartupSplash(false), []);
+  const guestChild = ageGroup === "child";
+  const hasAppAccess = Boolean(session) || guestChild;
 
   return (
     <>
-      <StatusBar style={!session ? "light" : isLightMobileTheme(theme) ? "dark" : "light"} />
-      <FrostedScene overlays={session ? <NavigationDrawer /> : undefined}>
+      <StatusBar style={!hasAppAccess ? "light" : isLightMobileTheme(theme) ? "dark" : "light"} />
+      <FrostedScene overlays={hasAppAccess ? <NavigationDrawer /> : undefined}>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -62,7 +66,12 @@ function RootNavigator() {
           <Stack.Screen name="help/touch" />
         </Stack>
       </FrostedScene>
-      {!session && !showStartupSplash ? (
+      {!ageGateCompleted && !showStartupSplash ? (
+        <View style={styles.gate}>
+          <AgeGate />
+        </View>
+      ) : null}
+      {ageGateCompleted && !hasAppAccess && !showStartupSplash ? (
         <View style={styles.gate}>
           <AuthGate />
         </View>
@@ -72,7 +81,7 @@ function RootNavigator() {
           <StartupSplash resourcesReady={ready && fontsLoaded && socialReady} fontsLoaded={fontsLoaded} onFinished={finishStartup} />
         </View>
       ) : null}
-      {session && !showStartupSplash ? <GuidedTour /> : null}
+      {hasAppAccess && !showStartupSplash ? <GuidedTour /> : null}
     </>
   );
 }
@@ -82,7 +91,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
         <SocialProvider>
-          <RootNavigator />
+          <MonetizationProvider>
+            <RootNavigator />
+          </MonetizationProvider>
         </SocialProvider>
       </AppProvider>
     </GestureHandlerRootView>

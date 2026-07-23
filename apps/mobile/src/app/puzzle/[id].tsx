@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativePuzzleBoard } from "@/components/native-puzzle-board";
@@ -12,10 +12,12 @@ import { PuzzlePieceDrawer, type ScreenFrame } from "@/components/puzzle-piece-d
 import { IconButton, PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
+import { useMonetization } from "@/state/monetization-provider";
 
 export default function PuzzleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { puzzles, setDrawerOpen, t, theme, updatePuzzleCamera, updatePuzzleElapsedTime, updatePuzzlePieces } = useApp();
+  const { incrementPuzzleHints, puzzles, setDrawerOpen, t, theme, updatePuzzleCamera, updatePuzzleElapsedTime, updatePuzzlePieces } = useApp();
+  const { premium, showRewardedHint } = useMonetization();
   const colors = mobileThemes[theme];
   const puzzle = puzzles.find((item) => item.id === id);
   const [pieces, setPieces] = useState<PuzzlePiece[]>(puzzle?.session.pieces ?? []);
@@ -51,9 +53,10 @@ export default function PuzzleScreen() {
     }
   }
 
-  function useHint() {
+  function placeHint() {
     const candidate = pieces.find((piece) => !piece.isPlaced);
     if (!candidate) return;
+    incrementPuzzleHints(id);
     savePieces(
       pieces.map((piece) =>
         piece.id === candidate.id
@@ -62,6 +65,24 @@ export default function PuzzleScreen() {
       ),
     );
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  function useHint() {
+    if (premium) {
+      placeHint();
+      return;
+    }
+    Alert.alert(
+      t("Ganhar uma dica", "Get a hint"),
+      t("Assista a um anúncio recompensado para encaixar uma peça. O anúncio só abre se você confirmar.", "Watch a rewarded ad to place one piece. The ad only opens after you confirm."),
+      [
+        { text: t("Agora não", "Not now"), style: "cancel" },
+        { text: t("Assistir anúncio", "Watch ad"), onPress: () => void showRewardedHint().then((earned) => {
+          if (earned) placeHint();
+          else Alert.alert(t("Anúncio indisponível", "Ad unavailable"), t("Não foi possível carregar o anúncio. Tente novamente mais tarde.", "The ad couldn't be loaded. Try again later."));
+        }) },
+      ],
+    );
   }
 
   function releasePiece(id: string, x: number, y: number, rotation: number) {
@@ -141,7 +162,7 @@ export default function PuzzleScreen() {
           }}
         />
         {puzzle.configuration.hintsEnabled && progress < 100 ? (
-          <SecondaryButton className="mt-4" icon="bulb-outline" onPress={useHint}>{t("Encaixar uma peça", "Place one piece")}</SecondaryButton>
+          <SecondaryButton className="mt-4" icon={premium ? "bulb-outline" : "play-circle-outline"} onPress={useHint}>{premium ? t("Usar dica Premium", "Use Premium hint") : t("Assistir anúncio para ganhar dica", "Watch ad to get a hint")}</SecondaryButton>
         ) : null}
       </ScrollView>
 

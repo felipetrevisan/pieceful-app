@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Asset } from "expo-asset";
 import { Directory, File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -6,7 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import {
@@ -21,6 +22,12 @@ import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 const presets = DIFFICULTIES;
+const kidPictures = [
+  { source: require("../../../assets/images/kids/dinosaur-picnic.png"), pt: "Piquenique dos dinos", en: "Dino picnic" },
+  { source: require("../../../assets/images/kids/happy-space.png"), pt: "Viagem espacial", en: "Space trip" },
+  { source: require("../../../assets/images/kids/ocean-friends.png"), pt: "Amigos do oceano", en: "Ocean friends" },
+  { source: require("../../../assets/images/kids/rainbow-castle.png"), pt: "Castelo arco-íris", en: "Rainbow castle" },
+] as const;
 
 const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
   beginner: ["Iniciante", "Beginner"],
@@ -35,7 +42,7 @@ const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
 };
 
 export default function CreateScreen() {
-  const { createPuzzle, preferences, t, theme } = useApp();
+  const { ageGroup, createPuzzle, preferences, t, theme } = useApp();
   const colors = mobileThemes[theme];
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -116,6 +123,30 @@ export default function CreateScreen() {
     }
   }
 
+  async function chooseKidPicture(item: (typeof kidPictures)[number]) {
+    try {
+      const asset = Asset.fromModule(item.source);
+      await asset.downloadAsync();
+      const sourceUri = asset.localUri ?? asset.uri;
+      const directory = new Directory(Paths.document, "puzzle-images");
+      directory.create({ idempotent: true, intermediates: true });
+      const pictureKey = item.en.toLowerCase().replaceAll(" ", "-");
+      const destination = new File(directory, `kids-${pictureKey}.png`);
+      await new File(sourceUri).copy(destination, { overwrite: true });
+      setImageUri(destination.uri);
+      setImageDimensions({ width: asset.width ?? 627, height: asset.height ?? 627 });
+      setName(t(item.pt, item.en));
+      setDifficulty("custom");
+      setConfiguration((current) => {
+        const side = Math.max(2, Math.round(Math.sqrt(current.totalPieces)));
+        return { ...current, rows: side, columns: side, totalPieces: side * side };
+      });
+      if (preferences.haptics) await Haptics.selectionAsync();
+    } catch {
+      Alert.alert(t("Não foi possível abrir a imagem", "Couldn't open the picture"), t("Tente novamente.", "Try again."));
+    }
+  }
+
   function selectPreset(preset: (typeof presets)[number]) {
     const grid = orientPuzzleGrid(preset.rows, preset.columns, resolvedOrientation);
     setDifficulty(preset.id);
@@ -158,6 +189,17 @@ export default function CreateScreen() {
             <MutedText>{t("Ela continua somente no seu aparelho.", "It stays only on your device.")}</MutedText>
           </View>
         </View>
+
+        {ageGroup === "child" ? <View style={styles.kidGallery}>
+          <View style={styles.kidHeading}><Ionicons name="sparkles" size={19} color={colors.primary} /><Text style={[styles.kidTitle, { color: colors.text }]}>{t("Escolha uma aventura", "Choose an adventure")}</Text></View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={styles.kidGalleryContent}>
+            {kidPictures.map((item) => <Pressable key={item.pt} onPress={() => void chooseKidPicture(item)} style={({ pressed }) => [styles.kidPicture, { borderColor: imageUri?.includes("kids-") ? `${colors.primary}50` : `${colors.accent}35` }, pressed && styles.kidPressed]}>
+              <Image source={item.source} style={styles.kidImage} contentFit="cover" />
+              <Text numberOfLines={2} style={[styles.kidName, { color: colors.text }]}>{t(item.pt, item.en)}</Text>
+            </Pressable>)}
+          </ScrollView>
+          <View style={styles.orDivider}><View style={[styles.orLine, { backgroundColor: `${colors.muted}28` }]} /><Text style={[styles.orText, { color: colors.muted }]}>{t("OU USE UMA FOTO", "OR USE A PHOTO")}</Text><View style={[styles.orLine, { backgroundColor: `${colors.muted}28` }]} /></View>
+        </View> : null}
 
         {imageUri ? (
           <View className="gap-3">
@@ -228,6 +270,17 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
+  kidGallery: { gap: 12 },
+  kidHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
+  kidTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 19 },
+  kidGalleryContent: { paddingHorizontal: 20, gap: 12 },
+  kidPicture: { width: 148, borderRadius: 22, borderWidth: 1.5, padding: 7, gap: 8 },
+  kidImage: { width: "100%", aspectRatio: 1, borderRadius: 16 },
+  kidName: { minHeight: 38, fontFamily: "Inter_700Bold", fontSize: 13, lineHeight: 17, paddingHorizontal: 5 },
+  kidPressed: { opacity: .72, transform: [{ scale: .98 }] },
+  orDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  orText: { fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.1 },
   detectedFormat: { minHeight: 68, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 10 },
   detectedFormatIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   detectedFormatCopy: { flex: 1, minWidth: 0 },

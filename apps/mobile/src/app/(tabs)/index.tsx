@@ -10,7 +10,7 @@ import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export default function HomeScreen() {
-  const { puzzles, t, theme } = useApp();
+  const { ageGroup, puzzles, t, theme } = useApp();
   const colors = mobileThemes[theme];
   const active = puzzles.find((puzzle) => !puzzle.session.completedAt);
   const completed = puzzles.filter((puzzle) => puzzle.session.completedAt).slice(0, 5);
@@ -18,18 +18,18 @@ export default function HomeScreen() {
   return (
     <Screen>
       <AppHeader />
-      <SectionHeader title={t("Continue", "Continue")} />
+      <SectionHeader title={ageGroup === "child" ? t("Vamos brincar?", "Ready to play?") : t("Continue", "Continue")} />
       {active ? <ContinueCard puzzle={active} /> : (
         <LinearGradient colors={[`${colors.accent}22`, `${colors.primary}24`]} style={[styles.emptyHero, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
           <Ionicons name="sparkles" size={28} color={colors.accent} />
-          <Text maxFontSizeMultiplier={1.2} style={[styles.emptyTitle, { color: colors.text }]}>{t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.emptyTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Escolha uma aventura bem colorida!", "Choose a colorful adventure!") : t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
           <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text maxFontSizeMultiplier={1.2} style={styles.compactCtaText}>{t("Criar puzzle", "Create puzzle")}</Text></Pressable>
         </LinearGradient>
       )}
 
       <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
-        <View style={{ flex: 1 }}><Text maxFontSizeMultiplier={1.2} style={[styles.kicker, { color: colors.primary }]}>{t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.challengeTitle, { color: colors.text }]}>{t("Nebulosa Neon", "Neon Nebula")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
-        <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name="extension-puzzle" size={30} color={colors.accent} /></View>
+        <View style={{ flex: 1 }}><Text maxFontSizeMultiplier={1.2} style={[styles.kicker, { color: colors.primary }]}>{ageGroup === "child" ? t("MISSÃO DE HOJE", "TODAY'S MISSION") : t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.challengeTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Mundo Arco-Íris", "Rainbow World") : t("Nebulosa Neon", "Neon Nebula")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
+        <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name={ageGroup === "child" ? "star" : "extension-puzzle"} size={30} color={colors.accent} /></View>
       </LinearGradient>
 
       <View style={styles.quickRow}>

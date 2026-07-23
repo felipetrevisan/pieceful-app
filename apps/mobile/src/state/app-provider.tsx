@@ -4,6 +4,8 @@ import {
   type Camera,
   type PuzzlePiece,
   type PuzzleSession,
+  type PuzzleTimelapseFrame,
+  type PuzzleTimelapsePiece,
 } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
 import {
@@ -17,6 +19,7 @@ import {
 } from "react";
 
 export type AppLanguage = "pt-BR" | "en";
+export type AgeGroup = "child" | "teen" | "adult";
 export type MobileTheme = "cosmic" | "candy" | "jungle" | "rainbow" | "ocean" | "arcade" | "castle" | "storybook" | "cyberpunk" | "hologram" | "space";
 export interface MobilePreferences { sound: boolean; haptics: boolean; highContrast: boolean; reducedMotion: boolean }
 
@@ -44,10 +47,14 @@ interface AppState {
   tourOpen: boolean;
   tourCompleted: boolean;
   language: AppLanguage;
+  ageGroup: AgeGroup | null;
+  ageGateCompleted: boolean;
   theme: MobileTheme;
   preferences: MobilePreferences;
   puzzles: MobilePuzzle[];
   setLanguage: (language: AppLanguage) => void;
+  setAgeGroup: (ageGroup: AgeGroup) => void;
+  resetAgeGroup: () => void;
   setTheme: (theme: MobileTheme) => void;
   setDrawerOpen: (open: boolean) => void;
   startTour: () => void;
@@ -57,8 +64,10 @@ interface AppState {
   updatePuzzlePieces: (id: string, pieces: PuzzlePiece[]) => void;
   updatePuzzleCamera: (id: string, camera: Camera) => void;
   updatePuzzleElapsedTime: (id: string, elapsedTime: number) => void;
+  incrementPuzzleHints: (id: string) => void;
   renamePuzzle: (id: string, name: string) => void;
   deletePuzzle: (id: string) => void;
+  deleteLocalPuzzles: () => void;
   mergeRemotePuzzles: (puzzles: MobilePuzzle[]) => void;
   t: (portuguese: string, english: string) => string;
 }
@@ -67,6 +76,46 @@ const STORAGE_KEY = "pieceful-mobile-state-v1";
 const defaultPreferences: MobilePreferences = { sound: true, haptics: true, highContrast: false, reducedMotion: false };
 
 const AppContext = createContext<AppState | null>(null);
+
+function timelapseState(piece: PuzzlePiece): PuzzleTimelapsePiece {
+  return {
+    id: piece.id,
+    x: piece.currentPosition.x,
+    y: piece.currentPosition.y,
+    rotation: piece.currentPosition.rotation,
+    isPlaced: piece.isPlaced,
+    visible: piece.trayId === null,
+  };
+}
+
+function changedTimelapsePieces(previous: PuzzlePiece[], next: PuzzlePiece[]) {
+  const previousById = new Map(previous.map((piece) => [piece.id, piece]));
+  return next.flatMap((piece) => {
+    const before = previousById.get(piece.id);
+    if (
+      before &&
+      before.currentPosition.x === piece.currentPosition.x &&
+      before.currentPosition.y === piece.currentPosition.y &&
+      before.currentPosition.rotation === piece.currentPosition.rotation &&
+      before.isPlaced === piece.isPlaced &&
+      (before.trayId === null) === (piece.trayId === null)
+    ) return [];
+    return [timelapseState(piece)];
+  });
+}
+
+function appendTimelapseFrame(
+  frames: PuzzleTimelapseFrame[],
+  elapsedTime: number,
+  changes: PuzzleTimelapsePiece[],
+) {
+  if (changes.length === 0) return frames;
+  const last = frames.at(-1);
+  const at = Math.max(elapsedTime, (last?.at ?? 0) + 0.12);
+  const next = [...frames, { at, changes }];
+  // Keeps long sessions reasonably small without losing the final assembly state.
+  return next.length <= 1800 ? next : next.filter((_, index) => index % 2 === 0 || index === next.length - 1);
+}
 
 function shuffledTraySlots(length: number, seed: number) {
   const slots = Array.from({ length }, (_, index) => index);
@@ -91,6 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tourOpen, setTourOpen] = useState(false);
   const [tourCompleted, setTourCompleted] = useState(false);
   const [language, setLanguageState] = useState<AppLanguage>("pt-BR");
+  const [ageGroup, setAgeGroupState] = useState<AgeGroup | null>(null);
   const [theme, setThemeState] = useState<MobileTheme>("cosmic");
   const [preferences, setPreferences] = useState(defaultPreferences);
   const [puzzles, setPuzzles] = useState<MobilePuzzle[]>([]);
@@ -104,6 +154,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         const parsed = JSON.parse(stored) as Partial<{
           language: AppLanguage;
+          ageGroup: AgeGroup;
           theme: MobileTheme;
           puzzles: MobilePuzzle[];
           preferences: MobilePreferences;
@@ -112,6 +163,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (parsed.language === "en" || parsed.language === "pt-BR") {
           setLanguageState(parsed.language);
         }
+        if (["child", "teen", "adult"].includes(parsed.ageGroup ?? "")) setAgeGroupState(parsed.ageGroup as AgeGroup);
         if (["cosmic", "candy", "jungle", "rainbow", "ocean", "arcade", "castle", "storybook", "cyberpunk", "hologram", "space"].includes(parsed.theme ?? "")) {
           setThemeState(parsed.theme as MobileTheme);
         }
@@ -127,10 +179,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ language, theme, puzzles, preferences, tourCompleted }));
-  }, [language, preferences, puzzles, ready, theme, tourCompleted]);
+    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ageGroup, language, theme, puzzles, preferences, tourCompleted }));
+  }, [ageGroup, language, preferences, puzzles, ready, theme, tourCompleted]);
 
   const setLanguage = useCallback((next: AppLanguage) => setLanguageState(next), []);
+  const setAgeGroup = useCallback((next: AgeGroup) => {
+    setAgeGroupState(next);
+    if (next === "child") setThemeState("candy");
+  }, []);
+  const resetAgeGroup = useCallback(() => setAgeGroupState(null), []);
   const setTheme = useCallback((next: MobileTheme) => setThemeState(next), []);
   const startTour = useCallback(() => setTourOpen(true), []);
   const completeTour = useCallback(() => {
@@ -178,14 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeRegion: null,
         completedAt: null,
         timelapse: {
-          initial: pieces.map((piece) => ({
-            id: piece.id,
-            x: piece.currentPosition.x,
-            y: piece.currentPosition.y,
-            rotation: piece.currentPosition.rotation,
-            isPlaced: false,
-            visible: piece.trayId === null,
-          })),
+          initial: pieces.map(timelapseState),
           frames: [],
         },
       },
@@ -199,6 +249,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       current.map((puzzle) => {
         if (puzzle.id !== id) return puzzle;
         const completed = pieces.every((piece) => piece.isPlaced);
+        const changes = changedTimelapsePieces(puzzle.session.pieces, pieces);
+        const currentTimelapse = puzzle.session.timelapse ?? {
+          initial: puzzle.session.pieces.map(timelapseState),
+          frames: [],
+        };
         return {
           ...puzzle,
           updatedAt: new Date().toISOString(),
@@ -206,6 +261,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...puzzle.session,
             pieces,
             completedAt: completed ? new Date().toISOString() : null,
+            timelapse: {
+              ...currentTimelapse,
+              frames: appendTimelapseFrame(currentTimelapse.frames, puzzle.session.elapsedTime, changes),
+            },
           },
         };
       }),
@@ -239,9 +298,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const incrementPuzzleHints = useCallback((id: string) => {
+    setPuzzles((current) => current.map((puzzle) => puzzle.id === id
+      ? { ...puzzle, session: { ...puzzle.session, hintsUsed: puzzle.session.hintsUsed + 1 } }
+      : puzzle));
+  }, []);
+
   const deletePuzzle = useCallback((id: string) => {
     setPuzzles((current) => current.filter((puzzle) => puzzle.id !== id));
   }, []);
+
+  const deleteLocalPuzzles = useCallback(() => setPuzzles([]), []);
 
   const renamePuzzle = useCallback((id: string, name: string) => {
     const trimmedName = name.trim();
@@ -271,10 +338,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tourOpen,
       tourCompleted,
       language,
+      ageGroup,
+      ageGateCompleted: ageGroup !== null,
       theme,
       preferences,
       puzzles,
       setLanguage,
+      setAgeGroup,
+      resetAgeGroup,
       setTheme,
       setDrawerOpen,
       startTour,
@@ -284,8 +355,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updatePuzzlePieces,
       updatePuzzleCamera,
       updatePuzzleElapsedTime,
+      incrementPuzzleHints,
       renamePuzzle,
       deletePuzzle,
+      deleteLocalPuzzles,
       mergeRemotePuzzles,
       t: (portuguese, english) => (language === "en" ? english : portuguese),
     }),
@@ -293,14 +366,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createPuzzle,
       completeTour,
       deletePuzzle,
+      deleteLocalPuzzles,
       mergeRemotePuzzles,
       renamePuzzle,
       drawerOpen,
       language,
+      ageGroup,
       puzzles,
       preferences,
       ready,
       setLanguage,
+      setAgeGroup,
+      resetAgeGroup,
       setTheme,
       theme,
       tourCompleted,
@@ -309,6 +386,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updatePuzzlePieces,
       updatePuzzleCamera,
       updatePuzzleElapsedTime,
+      incrementPuzzleHints,
       updatePreference,
     ],
   );
