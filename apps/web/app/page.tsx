@@ -1,11 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { useId } from "react";
 import { Icon } from "@/components/icons";
 import { RecentPuzzleBackdrop } from "@/components/recent-puzzle-backdrop";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { useI18n } from "@/lib/i18n";
+import appIcon from "./icon.png";
 
 const journey = [
   {
@@ -33,6 +36,10 @@ const journey = [
 
 export default function Home() {
   const { language, t } = useI18n();
+  const mobileAppTitleId = useId();
+  const androidAppUrl =
+    process.env.NEXT_PUBLIC_ANDROID_APP_URL ??
+    "https://play.google.com/store/apps/details?id=app.perazzo.pieceful";
   return (
     <div className="site-shell home-shell">
       <RecentPuzzleBackdrop />
@@ -54,9 +61,17 @@ export default function Home() {
                 "Bring your memories to life with a tactile, immersive experience. Rebuild your favorite moments piece by piece in a beautiful digital space.",
               )}
             </p>
-            <Link href="/create" className="primary-button">
-              <Icon name="play" size={16} /> {t("Criar meu quebra-cabeça", "Create my puzzle")}
-            </Link>
+            <div className="hero-actions">
+              <Link href="/create" className="primary-button">
+                <Icon name="play" size={16} /> {t("Criar meu quebra-cabeça", "Create my puzzle")}
+              </Link>
+              <a href={androidAppUrl} className="secondary-button" target="_blank" rel="noreferrer">
+                <span className="google-play-mark" aria-hidden="true">
+                  ▶
+                </span>
+                {t("Baixar para Android", "Download for Android")}
+              </a>
+            </div>
           </div>
           <div
             className="hero-art"
@@ -90,6 +105,47 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </section>
+        <section className="mobile-app-promo" aria-labelledby={mobileAppTitleId}>
+          <div className="mobile-app-logo" aria-hidden="true">
+            <Image src={appIcon} alt="" priority={false} />
+          </div>
+          <div className="mobile-app-copy">
+            <span className="section-kicker">
+              {t("PIECEFUL NO SEU CELULAR", "PIECEFUL ON YOUR PHONE")}
+            </span>
+            <h2 id={mobileAppTitleId}>
+              {t("A melhor experiência para jogar com o toque", "The best touch-first way to play")}
+            </h2>
+            <p>
+              {t(
+                "Jogue offline, use gestos nativos, desbloqueie conquistas e baixe aventuras infantis grátis diretamente no app.",
+                "Play offline, use native gestures, unlock achievements, and download free kids adventures directly in the app.",
+              )}
+            </p>
+            <ul
+              className="mobile-app-features"
+              aria-label={t("Recursos do aplicativo", "App features")}
+            >
+              <li>{t("Funciona offline", "Works offline")}</li>
+              <li>{t("Controles por toque", "Touch controls")}</li>
+              <li>{t("Pacotes grátis", "Free packs")}</li>
+            </ul>
+          </div>
+          <a
+            href={androidAppUrl}
+            className="primary-button mobile-app-download"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="google-play-mark" aria-hidden="true">
+              ▶
+            </span>
+            <span>
+              <small>{t("DISPONÍVEL NO", "GET IT ON")}</small>
+              <strong>Google Play</strong>
+            </span>
+          </a>
         </section>
         <section className="journey">
           <h2>{t("A jornada da montagem", "The puzzle journey")}</h2>

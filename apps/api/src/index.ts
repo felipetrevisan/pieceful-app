@@ -1,5 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, t } from "elysia";
+import { adminRoutes } from "./admin";
 
 interface UnsplashPhoto {
   id: string;
@@ -28,7 +29,15 @@ const unsplashHeaders = () => ({
 });
 
 const app = new Elysia()
-  .use(cors({ origin: [...configuredOrigins, localNetworkOrigin], credentials: false }))
+  .use(
+    cors({
+      origin: [...configuredOrigins, localNetworkOrigin],
+      credentials: false,
+      allowedHeaders: ["Content-Type", "Authorization"],
+      methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    }),
+  )
+  .use(adminRoutes)
   .onError(({ code, set }) => {
     set.status = code === "VALIDATION" ? 400 : 500;
     return {

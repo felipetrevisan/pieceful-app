@@ -15,7 +15,7 @@ export default function AccountDeletionPage() {
         <h1>{t("Excluir conta do Pieceful", "Delete your Pieceful account")}</h1>
         <p>
           {t(
-            "A exclusão é permanente e remove o perfil, puzzles e fotos sincronizados, amizades e conquistas vinculados à conta.",
+            "A exclusão é permanente e remove o perfil, quebra-cabeças e fotos sincronizados, amizades e conquistas vinculados à conta.",
             "Deletion is permanent and removes the profile, synced puzzles and photos, friendships, and achievements linked to the account.",
           )}
         </p>

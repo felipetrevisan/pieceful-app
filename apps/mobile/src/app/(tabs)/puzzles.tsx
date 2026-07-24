@@ -43,7 +43,7 @@ export default function PuzzlesScreen() {
     Alert.alert(t("Ordenar coleção", "Sort collection"), undefined, options.map((text, index) => ({ text, onPress: () => choose(index) })));
   }
 
-  function remove(id: string, name: string) { Alert.alert(t("Excluir puzzle?", "Delete puzzle?"), t(`“${name}” e seu progresso serão apagados.`, `“${name}” and its progress will be deleted.`), [{ text: t("Cancelar", "Cancel"), style: "cancel" }, { text: t("Excluir", "Delete"), style: "destructive", onPress: () => deletePuzzle(id) }]); }
+  function remove(id: string, name: string) { Alert.alert(t("Excluir quebra-cabeça?", "Delete puzzle?"), t(`“${name}” e seu progresso serão apagados.`, `“${name}” and its progress will be deleted.`), [{ text: t("Cancelar", "Cancel"), style: "cancel" }, { text: t("Excluir", "Delete"), style: "destructive", onPress: () => deletePuzzle(id) }]); }
   function openRename(id: string, name: string) {
     setRenameDraft(name);
     setRenameTarget({ id, name });
@@ -56,8 +56,8 @@ export default function PuzzlesScreen() {
   return <>
     <Screen>
       <AppHeader title={t("Coleção", "Collection")} showTitle />
-      <View style={styles.filterRow}><Text style={[styles.count, { color: colors.muted }]}>{puzzles.length} {t("puzzles", "puzzles")}</Text><Pressable accessibilityRole="button" accessibilityState={{ disabled: !canSort }} disabled={!canSort} onPress={openSort} style={({ pressed }) => [styles.sort, { opacity: !canSort ? 0.35 : pressed ? 0.65 : 1 }]}><View style={styles.sortContent}><Ionicons name="options-outline" size={19} color={canSort ? colors.accent : colors.muted} /><Text numberOfLines={1} style={[styles.sortText, { color: canSort ? colors.accent : colors.muted }]}>{t("ORDENAR", "SORT")}</Text></View></Pressable></View>
-      {puzzles.length === 0 ? <View style={[styles.empty, { borderColor: `${colors.accent}30` }]}><Ionicons name="albums-outline" size={45} color={colors.accent} /><Text style={[styles.title, { color: colors.text }]}>{t("Sua coleção está vazia", "Your collection is empty")}</Text><PrimaryButton onPress={() => router.push("/(tabs)/create")}>{t("Criar primeiro puzzle", "Create first puzzle")}</PrimaryButton></View> : (
+      <View style={styles.filterRow}><Text style={[styles.count, { color: colors.muted }]}>{puzzles.length} {t("quebra-cabeças", "puzzles")}</Text><Pressable accessibilityRole="button" accessibilityState={{ disabled: !canSort }} disabled={!canSort} onPress={openSort} style={({ pressed }) => [styles.sort, { opacity: !canSort ? 0.35 : pressed ? 0.65 : 1 }]}><View style={styles.sortContent}><Ionicons name="options-outline" size={19} color={canSort ? colors.accent : colors.muted} /><Text numberOfLines={1} style={[styles.sortText, { color: canSort ? colors.accent : colors.muted }]}>{t("ORDENAR", "SORT")}</Text></View></Pressable></View>
+      {puzzles.length === 0 ? <View style={[styles.empty, { borderColor: `${colors.accent}30` }]}><Ionicons name="albums-outline" size={45} color={colors.accent} /><Text style={[styles.title, { color: colors.text }]}>{t("Sua coleção está vazia", "Your collection is empty")}</Text><PrimaryButton onPress={() => router.push("/(tabs)/create")}>{t("Criar primeiro quebra-cabeça", "Create first puzzle")}</PrimaryButton></View> : (
         <View style={{ gap: 18 }}>{sortedPuzzles.map((puzzle) => {
           const placed = puzzle.session.pieces.filter((piece) => piece.isPlaced).length;
           const progress = Math.round((placed / puzzle.session.pieces.length) * 100);
@@ -80,7 +80,7 @@ export default function PuzzlesScreen() {
         <Pressable accessibilityLabel={t("Fechar diálogo", "Close dialog")} style={StyleSheet.absoluteFill} onPress={() => setRenameTarget(null)} />
         <View style={[styles.dialog, { backgroundColor: colors.panel, borderColor: `${colors.accent}55`, borderRadius: Math.max(18, colors.radius + 8) }]}>
           <View style={[styles.dialogIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name="pencil" size={24} color={colors.accent} /></View>
-          <Text style={[styles.dialogTitle, { color: colors.text }]}>{t("Renomear puzzle", "Rename puzzle")}</Text>
+          <Text style={[styles.dialogTitle, { color: colors.text }]}>{t("Renomear quebra-cabeça", "Rename puzzle")}</Text>
           <Text style={[styles.dialogDescription, { color: colors.muted }]}>{t("Escolha um nome fácil de reconhecer na sua coleção.", "Choose a name that is easy to recognize in your collection.")}</Text>
           <TextInput
             autoFocus
@@ -90,7 +90,7 @@ export default function PuzzlesScreen() {
             returnKeyType="done"
             selectTextOnFocus
             onSubmitEditing={confirmRename}
-            placeholder={t("Nome do puzzle", "Puzzle name")}
+            placeholder={t("Nome do quebra-cabeça", "Puzzle name")}
             placeholderTextColor={colors.muted}
             style={[styles.renameInput, { color: colors.text, backgroundColor: colors.panelAlt, borderColor: `${colors.accent}55` }]}
           />

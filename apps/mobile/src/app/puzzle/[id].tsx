@@ -85,19 +85,43 @@ export default function PuzzleScreen() {
     );
   }
 
-  function releasePiece(id: string, x: number, y: number, rotation: number) {
+  function releasePieces(ids: string[], x: number, y: number) {
+    if (!puzzle) return;
+    const released = pieces.filter((piece) => ids.includes(piece.id));
+    if (!released.length) return;
+
+    const gridColumns = Math.ceil(Math.sqrt(released.length));
+    const gridRows = Math.ceil(released.length / gridColumns);
+    const horizontalRange = Math.max(0, puzzle.configuration.columns - 0.7);
+    const verticalRange = Math.max(0, puzzle.configuration.rows - 0.7);
+    const horizontalStep = gridColumns > 1 ? Math.min(0.72, horizontalRange / (gridColumns - 1)) : 0;
+    const verticalStep = gridRows > 1 ? Math.min(0.72, verticalRange / (gridRows - 1)) : 0;
+    const groupWidth = horizontalStep * (gridColumns - 1);
+    const groupHeight = verticalStep * (gridRows - 1);
+    const minimumX = -0.15;
+    const minimumY = -0.15;
+    const maximumX = puzzle.configuration.columns - 0.85;
+    const maximumY = puzzle.configuration.rows - 0.85;
+    const startX = Math.max(minimumX, Math.min(maximumX - groupWidth, x - groupWidth / 2));
+    const startY = Math.max(minimumY, Math.min(maximumY - groupHeight, y - groupHeight / 2));
+    const releasedIds = new Set(ids);
+
     savePieces(
-      pieces.map((piece) =>
-        piece.id === id
-          ? {
-              ...piece,
-              isPlaced: false,
-              trayId: null,
-              groupId: null,
-              currentPosition: { x, y, rotation },
-            }
-          : piece,
-      ),
+      pieces.map((piece) => {
+        if (!releasedIds.has(piece.id)) return piece;
+        const index = released.findIndex((candidate) => candidate.id === piece.id);
+        return {
+          ...piece,
+          isPlaced: false,
+          trayId: null,
+          groupId: null,
+          currentPosition: {
+            x: startX + (index % gridColumns) * horizontalStep,
+            y: startY + Math.floor(index / gridColumns) * verticalStep,
+            rotation: piece.currentPosition.rotation,
+          },
+        };
+      }),
     );
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
   }
@@ -126,9 +150,7 @@ export default function PuzzleScreen() {
               <View style={styles.timerRow}><Ionicons name="timer-outline" size={15} color={colors.muted} /><Text style={[styles.timerText, { color: colors.muted }]}>{formatElapsed(elapsedTime)}</Text></View>
             ) : null}
           </View>
-          {puzzle.configuration.referenceEnabled ? (
-            <IconButton icon="image-outline" label={t("Ver referência", "View reference")} onPress={() => setShowReference(true)} />
-          ) : null}
+          <IconButton round icon="image-outline" label={t("Ver imagem original", "View original image")} onPress={() => setShowReference(true)} />
         </View>
       </View>
 
@@ -175,19 +197,31 @@ export default function PuzzleScreen() {
         boardZoom={boardZoom}
         boardPanX={boardPan.x}
         boardPanY={boardPan.y}
-        onReleasePiece={releasePiece}
+        onReleasePieces={releasePieces}
         onStorageFrameChange={setStorageFrame}
       />
 
-      <Modal visible={showReference} transparent animationType="fade" onRequestClose={() => setShowReference(false)}>
-        <Pressable className="flex-1 items-center justify-center bg-black/90 px-5" onPress={() => setShowReference(false)}>
-          <Image
-            source={{ uri: puzzle.imageUri }}
-            style={{ width: "100%", aspectRatio: puzzle.configuration.columns / puzzle.configuration.rows, maxHeight: "72%", borderRadius: 22 }}
-            contentFit="contain"
-            transition={180}
-          />
-          <Text className="mt-5 text-base font-bold text-white">{t("Toque para fechar", "Tap to close")}</Text>
+      <Modal visible={showReference} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowReference(false)}>
+        <Pressable style={styles.referenceBackdrop} onPress={() => setShowReference(false)}>
+          <Pressable
+            accessibilityRole="image"
+            onPress={(event) => event.stopPropagation()}
+            style={[styles.referenceCard, { backgroundColor: colors.panel, borderColor: `${colors.accent}70` }]}
+          >
+            <View style={styles.referenceHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.referenceTitle, { color: colors.text }]}>{t("Imagem original", "Original image")}</Text>
+                <Text style={[styles.referenceSubtitle, { color: colors.muted }]}>{t("Use como referência durante a montagem", "Use it as a reference while assembling")}</Text>
+              </View>
+              <IconButton round icon="close" label={t("Fechar imagem", "Close image")} onPress={() => setShowReference(false)} />
+            </View>
+            <Image
+              source={{ uri: puzzle.imageUri }}
+              style={[styles.referenceImage, { aspectRatio: puzzle.configuration.columns / puzzle.configuration.rows }]}
+              contentFit="contain"
+              transition={180}
+            />
+          </Pressable>
         </Pressable>
       </Modal>
     </SafeAreaView>
@@ -207,4 +241,10 @@ const styles = StyleSheet.create({
   toolbar: { marginHorizontal: 12, marginTop: 6, borderRadius: 25, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, overflow: "hidden" },
   timerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   timerText: { fontFamily: "Inter_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] },
+  referenceBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 18, backgroundColor: "rgba(2,5,16,.84)" },
+  referenceCard: { width: "100%", maxWidth: 560, maxHeight: "82%", padding: 14, borderRadius: 26, borderWidth: 1, shadowColor: "#000", shadowOpacity: .35, shadowRadius: 24, shadowOffset: { width: 0, height: 14 }, elevation: 18 },
+  referenceHeader: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
+  referenceTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 19 },
+  referenceSubtitle: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
+  referenceImage: { width: "100%", maxHeight: "70%", borderRadius: 18, overflow: "hidden" },
 });

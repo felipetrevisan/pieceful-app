@@ -677,6 +677,118 @@ canvas:focus-visible {
   line-height: 1.65;
   font-size: 17px;
 }
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.google-play-mark {
+  display: inline-grid;
+  place-items: center;
+  font-size: 16px;
+  transform: rotate(-90deg);
+}
+.mobile-app-promo {
+  width: min(1160px, calc(100% - 40px));
+  margin: 0 auto 76px;
+  padding: 28px 32px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 26px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--cyan) 32%, transparent);
+  border-radius: 30px;
+  background:
+    radial-gradient(
+      circle at 12% 50%,
+      color-mix(in srgb, var(--cyan) 18%, transparent),
+      transparent 27%
+    ),
+    linear-gradient(
+      125deg,
+      color-mix(in srgb, var(--panel) 92%, transparent),
+      color-mix(in srgb, var(--primary) 12%, var(--panel))
+    );
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.24),
+    inset 0 1px rgba(255, 255, 255, 0.08);
+}
+.mobile-app-promo::after {
+  content: "";
+  width: 220px;
+  height: 220px;
+  position: absolute;
+  right: -80px;
+  bottom: -130px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary-light) 18%, transparent);
+  filter: blur(6px);
+  pointer-events: none;
+}
+.mobile-app-logo {
+  width: 92px;
+  height: 92px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent);
+  border-radius: 25px;
+  background: rgba(5, 12, 29, 0.55);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--cyan) 15%, transparent);
+}
+.mobile-app-logo img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: 18px;
+}
+.mobile-app-copy h2 {
+  margin: 5px 0 7px;
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -0.035em;
+}
+.mobile-app-copy p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.mobile-app-features {
+  margin-top: 14px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+}
+.mobile-app-features li {
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 22%, transparent);
+  border-radius: 999px;
+  color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 7%, transparent);
+  font-size: 11px;
+  font-weight: 750;
+}
+.mobile-app-download {
+  min-width: 184px;
+  position: relative;
+  z-index: 1;
+}
+.mobile-app-download > span:last-child {
+  display: grid;
+  text-align: left;
+  line-height: 1.05;
+}
+.mobile-app-download small {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+.mobile-app-download strong {
+  font-size: 16px;
+}
 .primary-button,
 .secondary-button {
   min-height: 48px;
@@ -3091,6 +3203,18 @@ html[data-theme] .delete-puzzle-button:active {
   .secondary-button {
     width: 100%;
   }
+  .hero-actions {
+    width: min(100%, 420px);
+    margin-inline: auto;
+  }
+  .mobile-app-promo {
+    grid-template-columns: auto minmax(0, 1fr);
+    text-align: left;
+  }
+  .mobile-app-download {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
   .hero {
     grid-template-columns: 1fr;
     padding-top: 56px;
@@ -3154,6 +3278,21 @@ html[data-theme] .delete-puzzle-button:active {
   .hero-art {
     transform: scale(0.82);
     margin: -20px 0;
+  }
+  .mobile-app-promo {
+    width: calc(100% - 32px);
+    margin-bottom: 54px;
+    padding: 24px;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    border-radius: 25px;
+  }
+  .mobile-app-copy p {
+    font-size: 14px;
+  }
+  .mobile-app-features {
+    justify-content: center;
   }
   .journey-grid {
     gap: 14px;

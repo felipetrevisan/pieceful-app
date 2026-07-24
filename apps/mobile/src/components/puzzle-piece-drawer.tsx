@@ -4,7 +4,7 @@ import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -33,7 +33,7 @@ interface PuzzlePieceDrawerProps {
   boardZoom: number;
   boardPanX: number;
   boardPanY: number;
-  onReleasePiece: (id: string, x: number, y: number, rotation: number) => void;
+  onReleasePieces: (ids: string[], x: number, y: number) => void;
   onStorageFrameChange: (frame: ScreenFrame | null) => void;
 }
 
@@ -80,7 +80,7 @@ export function PuzzlePieceDrawer({
   boardZoom,
   boardPanX,
   boardPanY,
-  onReleasePiece,
+  onReleasePieces,
   onStorageFrameChange,
 }: PuzzlePieceDrawerProps) {
   const { height, width } = useWindowDimensions();
@@ -96,8 +96,19 @@ export function PuzzlePieceDrawer({
   const translateY = useSharedValue(closedY);
   const dragStart = useSharedValue(closedY);
   const [open, setOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const storageRef = useRef<View>(null);
   const pieceSize = Math.max(38, Math.min(50, (width - 48) / 7));
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    if (preferences.haptics) void Haptics.selectionAsync();
+  }
+
+  function releaseSelected(ids: string[], x: number, y: number) {
+    onReleasePieces(ids, x, y);
+    setSelectedIds((current) => current.filter((id) => !ids.includes(id)));
+  }
 
   useEffect(() => {
     translateY.set(withSpring(open ? 0 : closedY, { damping: 20, stiffness: 220 }));
@@ -171,8 +182,23 @@ export function PuzzlePieceDrawer({
           <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}1b` }]}><Ionicons name="file-tray-full-outline" size={22} color={colors.accent} /></View>
           <View style={styles.headerCopy}>
             <Text style={[styles.title, { color: colors.text }]}>{t("Bandeja de peças", "Piece tray")}</Text>
-            <Text style={[styles.meta, { color: colors.muted }]}>{storedPieces.length} {t("guardadas · deslize para", "stored · swipe")} {open ? t("baixo", "down") : t("cima", "up")}</Text>
+            <Text style={[styles.meta, { color: colors.muted }]}>
+              {selectedIds.length
+                ? `${selectedIds.length} ${t("selecionadas · segure para arrastar", "selected · hold to drag")}`
+                : `${storedPieces.length} ${t("guardadas · toque para selecionar", "stored · tap to select")}`}
+            </Text>
           </View>
+          {selectedIds.length ? (
+            <Pressable
+              accessibilityLabel={t("Limpar seleção", "Clear selection")}
+              hitSlop={8}
+              onPress={() => setSelectedIds([])}
+              style={[styles.selectionBadge, { backgroundColor: colors.accent }]}
+            >
+              <Text style={[styles.selectionCount, { color: colors.background }]}>{selectedIds.length}</Text>
+              <Ionicons name="close" size={14} color={colors.background} />
+            </Pressable>
+          ) : null}
           <View style={[styles.storage, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}70` }]}>
             <Ionicons name="archive-outline" size={22} color={colors.accent} />
           </View>
@@ -195,7 +221,10 @@ export function PuzzlePieceDrawer({
               boardZoom={boardZoom}
               boardPanX={boardPanX}
               boardPanY={boardPanY}
-              onRelease={onReleasePiece}
+              selected={selectedIds.includes(piece.id)}
+              selectedIds={selectedIds}
+              onToggleSelected={toggleSelected}
+              onRelease={releaseSelected}
             />
           ))}
         </ScrollView>
@@ -216,6 +245,9 @@ function DrawerPiece({
   boardZoom,
   boardPanX,
   boardPanY,
+  selected,
+  selectedIds,
+  onToggleSelected,
   onRelease,
 }: {
   piece: PuzzlePiece;
@@ -227,7 +259,10 @@ function DrawerPiece({
   boardZoom: number;
   boardPanX: number;
   boardPanY: number;
-  onRelease: (id: string, x: number, y: number, rotation: number) => void;
+  selected: boolean;
+  selectedIds: string[];
+  onToggleSelected: (id: string) => void;
+  onRelease: (ids: string[], x: number, y: number) => void;
 }) {
   const margin = size * 0.24;
   const extent = size + margin * 2;
@@ -258,7 +293,7 @@ function DrawerPiece({
         if (insideBoard) {
           const x = Math.max(-0.15, Math.min(columns - 0.85, ((event.absoluteX - visualX) / visualWidth) * columns - 0.5));
           const y = Math.max(-0.15, Math.min(rows - 0.85, ((event.absoluteY - visualY) / visualHeight) * rows - 0.5));
-          runOnJS(onRelease)(piece.id, x, y, piece.currentPosition.rotation);
+          runOnJS(onRelease)(selected ? selectedIds : [piece.id], x, y);
           translateX.set(0);
           translateY.set(0);
           dragging.set(0);
@@ -269,6 +304,12 @@ function DrawerPiece({
       translateY.set(withSpring(0));
       dragging.set(0);
     });
+  const tap = Gesture.Tap()
+    .maxDuration(260)
+    .onEnd((_event, success) => {
+      if (success) runOnJS(onToggleSelected)(piece.id);
+    });
+  const gesture = Gesture.Exclusive(pan, tap);
   const animatedStyle = useAnimatedStyle(() => ({
     zIndex: dragging.get() ? 100 : 1,
     transform: [
@@ -277,10 +318,17 @@ function DrawerPiece({
       { scale: dragging.get() ? 1.15 : 1 },
     ],
   }));
+  const stackStyle = useAnimatedStyle(() => ({ opacity: dragging.get() }));
 
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={gesture}>
       <Animated.View style={[{ width: extent, height: extent }, animatedStyle]}>
+        {selected && selectedIds.length > 1 ? (
+          <>
+            <Animated.View pointerEvents="none" style={[styles.stackLayer, styles.stackLayerBack, { borderColor: "rgba(255,255,255,.55)" }, stackStyle]} />
+            <Animated.View pointerEvents="none" style={[styles.stackLayer, styles.stackLayerMiddle, { borderColor: "rgba(255,255,255,.7)" }, stackStyle]} />
+          </>
+        ) : null}
         <Svg width={extent} height={extent}>
           <Defs><ClipPath id={clipId}><Path d={path} /></ClipPath></Defs>
           <SvgImage
@@ -294,6 +342,11 @@ function DrawerPiece({
           />
           <Path d={path} fill="transparent" stroke="rgba(255,255,255,.72)" strokeWidth={1.2} />
         </Svg>
+        {selected ? (
+          <View pointerEvents="none" style={styles.selectedOutline}>
+            <View style={styles.selectedCheck}><Ionicons name="checkmark" size={12} color="#071126" /></View>
+          </View>
+        ) : null}
       </Animated.View>
     </GestureDetector>
   );
@@ -309,8 +362,15 @@ const styles = StyleSheet.create({
   title: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 15 },
   meta: { fontFamily: "Inter_600SemiBold", fontSize: 9, marginTop: 2 },
   storage: { width: 43, height: 43, borderRadius: 14, borderWidth: 1.5, borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  selectionBadge: { minWidth: 42, height: 32, paddingHorizontal: 8, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
+  selectionCount: { fontFamily: "Inter_700Bold", fontSize: 12 },
   divider: { height: 1 },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-around", gap: 4, paddingHorizontal: 8, paddingTop: 10, paddingBottom: 32 },
+  stackLayer: { position: "absolute", inset: 7, borderRadius: 12, borderWidth: 1.5, backgroundColor: "rgba(18,27,55,.88)" },
+  stackLayerBack: { transform: [{ translateX: 8 }, { translateY: -7 }, { rotate: "7deg" }] },
+  stackLayerMiddle: { transform: [{ translateX: 4 }, { translateY: -4 }, { rotate: "3deg" }] },
+  selectedOutline: { position: "absolute", inset: 2, borderRadius: 14, borderWidth: 2, borderColor: "#67edf3" },
+  selectedCheck: { position: "absolute", top: -7, right: -7, width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#67edf3" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 9 },
   emptyText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
 });

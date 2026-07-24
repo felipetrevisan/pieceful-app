@@ -18,7 +18,7 @@ export default function TouchHelpScreen() {
   return (
     <Screen>
       <AppHeader title={t("Gestos touch", "Touch gestures")} showTitle back />
-      <Text style={[styles.intro, { color: colors.muted }]}>{t("Use gestos naturais para montar o puzzle sem cobrir os controles da tela.", "Use natural gestures to assemble the puzzle without covering on-screen controls.")}</Text>
+      <Text style={[styles.intro, { color: colors.muted }]}>{t("Use gestos naturais para montar o quebra-cabeça sem cobrir os controles da tela.", "Use natural gestures to assemble the puzzle without covering on-screen controls.")}</Text>
       <Card style={{ padding: 0, overflow: "hidden" }}>
         {gestures.map(([icon, ptTitle, ptDescription, enTitle, enDescription], index) => (
           <View key={ptTitle} style={[styles.row, { borderBottomColor: `${colors.muted}28`, borderBottomWidth: index === gestures.length - 1 ? 0 : StyleSheet.hairlineWidth }]}>

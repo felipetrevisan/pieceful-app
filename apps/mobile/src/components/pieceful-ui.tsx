@@ -5,6 +5,7 @@ import {
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Children, useEffect, type ReactNode } from "react";
 import {
@@ -109,11 +110,34 @@ export function AppHeader({ title, showTitle = false, back = false }: { title?: 
       {back ? (
         <IconButton round icon="chevron-back" label={t("Voltar", "Back")} onPress={() => router.back()} />
       ) : (
-        <Pressable accessibilityLabel={t("Abrir menu", "Open menu")} onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.headerAvatar, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45`, opacity: pressed ? 0.7 : 1 }]}>
-          <Ionicons name="extension-puzzle" size={23} color={colors.accent} />
-        </Pressable>
+        <View style={[styles.headerAvatar, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}70` }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("Abrir menu", "Open menu")}
+            android_ripple={{ color: `${colors.accent}30`, radius: 24 }}
+            hitSlop={8}
+            onPress={() => setDrawerOpen(true)}
+            style={styles.headerAvatarPressable}
+          >
+            <LinearGradient colors={[`${colors.accent}28`, `${colors.primary}38`]} style={StyleSheet.absoluteFill} />
+            <Image
+              accessibilityIgnoresInvertColors
+              source={require("../../assets/images/pieceful-logo.png")}
+              style={styles.headerLogo}
+              contentFit="contain"
+            />
+          </Pressable>
+        </View>
       )}
-      <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[showTitle ? styles.headerTitle : styles.headerGreeting, { color: colors.text }]}>{title ?? t("Boa noite", "Good evening")}</Text>
+      <Text
+        adjustsFontSizeToFit={showTitle}
+        maxFontSizeMultiplier={1.2}
+        minimumFontScale={0.7}
+        numberOfLines={1}
+        style={[showTitle ? styles.headerTitle : styles.headerGreeting, { color: colors.text }]}
+      >
+        {title ?? t("Boa noite", "Good evening")}
+      </Text>
       <IconButton round icon="notifications-outline" label={t("Notificações", "Notifications")} />
     </View>
   );
@@ -410,7 +434,9 @@ const styles = StyleSheet.create({
   ambientGlow: { position: "absolute", right: -110, top: 130, width: 240, height: 240, borderRadius: 120, overflow: "hidden" },
   atmosphereIcon: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   appHeader: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 22 },
-  headerAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  headerAvatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden", shadowColor: "#000", shadowOpacity: .18, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  headerAvatarPressable: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
+  headerLogo: { width: 37, height: 37 },
   headerGreeting: { flex: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
   headerTitle: { flex: 1, fontFamily: "BricolageGrotesque_800ExtraBold", fontSize: 27, textAlign: "center" },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },

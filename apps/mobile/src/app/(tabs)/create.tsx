@@ -6,8 +6,8 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import {
@@ -18,7 +18,9 @@ import {
   type PuzzleDifficulty,
 } from "@puzzled/shared";
 import { AppHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
+import { KidPackLibrary } from "@/components/kid-pack-library";
 import { mobileThemes } from "@/constants/pieceful-theme";
+import { getInstalledImagePacks, type ImagePack } from "@/services/image-packs";
 import { useApp } from "@/state/app-provider";
 
 const presets = DIFFICULTIES;
@@ -27,7 +29,23 @@ const kidPictures = [
   { source: require("../../../assets/images/kids/happy-space.png"), pt: "Viagem espacial", en: "Space trip" },
   { source: require("../../../assets/images/kids/ocean-friends.png"), pt: "Amigos do oceano", en: "Ocean friends" },
   { source: require("../../../assets/images/kids/rainbow-castle.png"), pt: "Castelo arco-íris", en: "Rainbow castle" },
+  { source: require("../../../assets/images/kids/dragon-bakery.png"), pt: "Confeitaria dos dragões", en: "Dragon bakery" },
+  { source: require("../../../assets/images/kids/animal-train.png"), pt: "Trem dos animais", en: "Animal train" },
+  { source: require("../../../assets/images/kids/robot-workshop.png"), pt: "Oficina de robôs", en: "Robot workshop" },
+  { source: require("../../../assets/images/kids/jungle-orchestra.png"), pt: "Orquestra da selva", en: "Jungle orchestra" },
+  { source: require("../../../assets/images/kids/penguin-festival.png"), pt: "Festival dos pinguins", en: "Penguin festival" },
+  { source: require("../../../assets/images/kids/friendly-city.png"), pt: "Cidade dos amigos", en: "Friendly city" },
+  { source: require("../../../assets/images/kids/magical-garden.png"), pt: "Jardim encantado", en: "Magical garden" },
 ] as const;
+
+interface KidPicture {
+  key: string;
+  source: number | string;
+  pt: string;
+  en: string;
+  width: number;
+  height: number;
+}
 
 const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
   beginner: ["Iniciante", "Beginner"],
@@ -43,11 +61,18 @@ const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
 
 export default function CreateScreen() {
   const { ageGroup, createPuzzle, preferences, t, theme } = useApp();
+  const { width } = useWindowDimensions();
   const colors = mobileThemes[theme];
+  const kidCardWidth = Math.min(282, width - 92);
+  const kidCarouselStep = kidCardWidth + 12;
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [difficulty, setDifficulty] = useState<PuzzleDifficulty>("normal");
+  const [kidCarouselIndex, setKidCarouselIndex] = useState(0);
+  const [selectedKidPicture, setSelectedKidPicture] = useState<string | null>(null);
+  const [installedPacks, setInstalledPacks] = useState<ImagePack[]>([]);
+  const [showPackLibrary, setShowPackLibrary] = useState(false);
   const [configuration, setConfiguration] = useState<PuzzleConfiguration>({
     rows: 6,
     columns: 8,
@@ -62,6 +87,24 @@ export default function CreateScreen() {
     () => presets.find((preset) => preset.pieces === configuration.totalPieces),
     [configuration.totalPieces],
   );
+  const availableKidPictures = useMemo<KidPicture[]>(() => [
+    ...kidPictures.map((picture) => ({ ...picture, key: `built-in-${picture.en}`, width: 627, height: 627 })),
+    ...installedPacks.flatMap((pack) => pack.pictures
+      .filter((picture) => picture.localUri)
+      .map((picture) => ({
+        key: `${pack.id}-${picture.id}`,
+        source: picture.localUri as string,
+        pt: picture.titlePt,
+        en: picture.titleEn,
+        width: picture.width,
+        height: picture.height,
+      }))),
+  ], [installedPacks]);
+  const updateInstalledPacks = useCallback((packs: ImagePack[]) => setInstalledPacks(packs), []);
+
+  useEffect(() => {
+    void getInstalledImagePacks().then(setInstalledPacks);
+  }, []);
   const resolvedOrientation = resolvePuzzleOrientation(
     "automatic",
     imageDimensions?.width,
@@ -102,6 +145,7 @@ export default function CreateScreen() {
         permanentUri = destination.uri;
       }
       setImageUri(permanentUri);
+      setSelectedKidPicture(null);
       const dimensions = { width: asset.width, height: asset.height };
       setImageDimensions(dimensions);
       const nextOrientation = resolvePuzzleOrientation(
@@ -123,18 +167,29 @@ export default function CreateScreen() {
     }
   }
 
-  async function chooseKidPicture(item: (typeof kidPictures)[number]) {
+  async function chooseKidPicture(item: KidPicture) {
     try {
-      const asset = Asset.fromModule(item.source);
-      await asset.downloadAsync();
-      const sourceUri = asset.localUri ?? asset.uri;
+      let sourceUri: string;
+      let sourceWidth = item.width;
+      let sourceHeight = item.height;
+      if (typeof item.source === "number") {
+        const asset = Asset.fromModule(item.source);
+        await asset.downloadAsync();
+        sourceUri = asset.localUri ?? asset.uri;
+        sourceWidth = asset.width ?? item.width;
+        sourceHeight = asset.height ?? item.height;
+      } else {
+        sourceUri = item.source;
+      }
       const directory = new Directory(Paths.document, "puzzle-images");
       directory.create({ idempotent: true, intermediates: true });
-      const pictureKey = item.en.toLowerCase().replaceAll(" ", "-");
-      const destination = new File(directory, `kids-${pictureKey}.png`);
+      const pictureKey = item.key.toLowerCase().replaceAll(/[^a-z0-9-]/g, "-");
+      const sourceExtension = sourceUri.split("?")[0].split(".").pop()?.toLowerCase();
+      const destination = new File(directory, `kids-${pictureKey}.${sourceExtension && /^[a-z0-9]{2,5}$/.test(sourceExtension) ? sourceExtension : "jpg"}`);
       await new File(sourceUri).copy(destination, { overwrite: true });
       setImageUri(destination.uri);
-      setImageDimensions({ width: asset.width ?? 627, height: asset.height ?? 627 });
+      setSelectedKidPicture(item.key);
+      setImageDimensions({ width: sourceWidth, height: sourceHeight });
       setName(t(item.pt, item.en));
       setDifficulty("custom");
       setConfiguration((current) => {
@@ -177,7 +232,7 @@ export default function CreateScreen() {
 
   return (
     <Screen>
-      <AppHeader title={t("Novo Puzzle", "New Puzzle")} showTitle />
+      <AppHeader title={t("Novo quebra-cabeça", "New Puzzle")} showTitle />
 
       <Card className="mb-4 gap-4">
         <View className="flex-row items-center gap-3">
@@ -191,13 +246,53 @@ export default function CreateScreen() {
         </View>
 
         {ageGroup === "child" ? <View style={styles.kidGallery}>
-          <View style={styles.kidHeading}><Ionicons name="sparkles" size={19} color={colors.primary} /><Text style={[styles.kidTitle, { color: colors.text }]}>{t("Escolha uma aventura", "Choose an adventure")}</Text></View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={styles.kidGalleryContent}>
-            {kidPictures.map((item) => <Pressable key={item.pt} onPress={() => void chooseKidPicture(item)} style={({ pressed }) => [styles.kidPicture, { borderColor: imageUri?.includes("kids-") ? `${colors.primary}50` : `${colors.accent}35` }, pressed && styles.kidPressed]}>
-              <Image source={item.source} style={styles.kidImage} contentFit="cover" />
-              <Text numberOfLines={2} style={[styles.kidName, { color: colors.text }]}>{t(item.pt, item.en)}</Text>
-            </Pressable>)}
-          </ScrollView>
+          <View style={styles.kidHeading}><Ionicons name="sparkles" size={19} color={colors.primary} /><View style={{ flex: 1 }}><Text style={[styles.kidTitle, { color: colors.text }]}>{t("Escolha uma aventura", "Choose an adventure")}</Text><Text style={[styles.kidSwipeHint, { color: colors.muted }]}>{t("Deslize para ver mais imagens", "Swipe to see more pictures")}</Text></View><Ionicons name="swap-horizontal" size={20} color={colors.accent} /></View>
+          <FlatList
+            data={availableKidPictures}
+            horizontal
+            nestedScrollEnabled
+            directionalLockEnabled
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            disableIntervalMomentum
+            snapToAlignment="start"
+            snapToInterval={kidCarouselStep}
+            style={styles.kidCarousel}
+            contentContainerStyle={styles.kidGalleryContent}
+            keyExtractor={(item) => item.key}
+            onMomentumScrollEnd={(event) => {
+              setKidCarouselIndex(Math.max(0, Math.min(availableKidPictures.length - 1, Math.round(event.nativeEvent.contentOffset.x / kidCarouselStep))));
+            }}
+            renderItem={({ item }) => {
+              const selected = selectedKidPicture === item.key;
+              return (
+                <View style={[styles.kidPictureShell, { width: kidCardWidth, borderColor: selected ? colors.primary : `${colors.accent}35`, backgroundColor: `${colors.panelAlt}a8` }]}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => void chooseKidPicture(item)}
+                    style={styles.kidPicture}
+                  >
+                    <Image source={item.source} style={styles.kidImage} contentFit="cover" />
+                    <View style={styles.kidCardFooter}>
+                      <Text numberOfLines={2} style={[styles.kidName, { color: colors.text }]}>{t(item.pt, item.en)}</Text>
+                      <View style={[styles.kidSelectIcon, { backgroundColor: selected ? colors.primary : colors.panelAlt }]}>
+                        <Ionicons name={selected ? "checkmark" : "add"} size={18} color={selected ? colors.background : colors.accent} />
+                      </View>
+                    </View>
+                  </Pressable>
+                </View>
+              );
+            }}
+          />
+          <View style={styles.kidPagination}>
+            {availableKidPictures.map((item, index) => <View key={item.key} style={[styles.kidDot, { width: index === kidCarouselIndex ? 22 : 7, backgroundColor: index === kidCarouselIndex ? colors.accent : `${colors.muted}55` }]} />)}
+          </View>
+          <Pressable onPress={() => setShowPackLibrary(true)} style={[styles.packLibraryButton, { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}55` }]}>
+            <View style={[styles.packLibraryIcon, { backgroundColor: `${colors.accent}20` }]}><Ionicons name="gift-outline" size={22} color={colors.accent} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.packLibraryTitle, { color: colors.text }]}>{t("Baixar novas aventuras", "Download new adventures")}</Text><Text style={[styles.packLibraryMeta, { color: colors.muted }]}>{installedPacks.length ? `${installedPacks.length} ${t("pacotes disponíveis offline", "packs available offline")}` : t("Novos pacotes grátis, sem atualizar o app", "New free packs, no app update needed")}</Text></View>
+            <Ionicons name="chevron-forward" size={20} color={colors.accent} />
+          </Pressable>
           <View style={styles.orDivider}><View style={[styles.orLine, { backgroundColor: `${colors.muted}28` }]} /><Text style={[styles.orText, { color: colors.muted }]}>{t("OU USE UMA FOTO", "OR USE A PHOTO")}</Text><View style={[styles.orLine, { backgroundColor: `${colors.muted}28` }]} /></View>
         </View> : null}
 
@@ -265,6 +360,7 @@ export default function CreateScreen() {
       </Card>
 
       <PrimaryButton icon="play" onPress={startPuzzle} disabled={!imageUri}>{t("Criar e começar", "Create and start")}</PrimaryButton>
+      <KidPackLibrary visible={showPackLibrary} onClose={() => setShowPackLibrary(false)} onInstalledChange={updateInstalledPacks} />
     </Screen>
   );
 }
@@ -273,11 +369,21 @@ const styles = StyleSheet.create({
   kidGallery: { gap: 12 },
   kidHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
   kidTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 19 },
-  kidGalleryContent: { paddingHorizontal: 20, gap: 12 },
-  kidPicture: { width: 148, borderRadius: 22, borderWidth: 1.5, padding: 7, gap: 8 },
-  kidImage: { width: "100%", aspectRatio: 1, borderRadius: 16 },
-  kidName: { minHeight: 38, fontFamily: "Inter_700Bold", fontSize: 13, lineHeight: 17, paddingHorizontal: 5 },
-  kidPressed: { opacity: .72, transform: [{ scale: .98 }] },
+  kidSwipeHint: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 2 },
+  kidCarousel: { marginHorizontal: -20, overflow: "visible" },
+  kidGalleryContent: { paddingHorizontal: 20, paddingRight: 48, gap: 12 },
+  kidPictureShell: { borderRadius: 24, borderWidth: 2, overflow: "hidden" },
+  kidPicture: { width: "100%", padding: 8 },
+  kidImage: { width: "100%", aspectRatio: 1.45, borderRadius: 17 },
+  kidCardFooter: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 6, paddingTop: 8, paddingBottom: 3 },
+  kidName: { flex: 1, minWidth: 0, fontFamily: "Inter_700Bold", fontSize: 14, lineHeight: 18 },
+  kidSelectIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  kidPagination: { height: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  kidDot: { height: 7, borderRadius: 99 },
+  packLibraryButton: { minHeight: 72, borderRadius: 20, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 10 },
+  packLibraryIcon: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  packLibraryTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 15 },
+  packLibraryMeta: { fontFamily: "Inter_400Regular", fontSize: 10, lineHeight: 14, marginTop: 2 },
   orDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth },
   orText: { fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.1 },
@@ -362,7 +468,7 @@ function DifficultySlider({ selectedIndex, orientation, onSelect }: { selectedIn
         <Animated.View
           accessible
           accessibilityRole="adjustable"
-          accessibilityLabel={t("Dificuldade do puzzle", "Puzzle difficulty")}
+          accessibilityLabel={t("Dificuldade do quebra-cabeça", "Puzzle difficulty")}
           accessibilityValue={{ min: 1, max: presets.length, now: selectedIndex + 1, text: `${t(ptLabel, enLabel)}, ${preset.pieces} ${t("peças", "pieces")}` }}
           accessibilityActions={[{ name: "increment", label: t("Aumentar dificuldade", "Increase difficulty") }, { name: "decrement", label: t("Diminuir dificuldade", "Decrease difficulty") }]}
           onAccessibilityAction={(event) => adjust(event.nativeEvent.actionName === "increment" ? 1 : -1)}

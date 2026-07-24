@@ -19,14 +19,14 @@ const steps = [
     icon: "sparkles-outline",
     eyebrow: ["BEM-VINDO", "WELCOME"],
     title: ["Seu espaço para montar memórias", "Your place to piece memories together"],
-    description: ["Transforme qualquer foto em um puzzle, acompanhe seu progresso e continue quando quiser.", "Turn any photo into a puzzle, track your progress, and continue whenever you like."],
+    description: ["Transforme qualquer foto em um quebra-cabeça, acompanhe seu progresso e continue quando quiser.", "Turn any photo into a puzzle, track your progress, and continue whenever you like."],
     tips: [["image-outline", "Escolha sua foto", "Choose your photo"], ["color-palette-outline", "Use o tema que combina com você", "Pick a theme that feels like you"]],
   },
   {
     icon: "add-circle-outline",
     eyebrow: ["CRIE EM SEGUNDOS", "CREATE IN SECONDS"],
     title: ["A foto define o formato", "Your photo defines the shape"],
-    description: ["Escolha uma imagem e ajuste a dificuldade. O app detecta automaticamente se o puzzle é vertical, horizontal ou quadrado.", "Choose an image and set the difficulty. The app automatically detects portrait, landscape, or square format."],
+    description: ["Escolha uma imagem e ajuste a dificuldade. O app detecta automaticamente se o quebra-cabeça é vertical, horizontal ou quadrado.", "Choose an image and set the difficulty. The app automatically detects portrait, landscape, or square format."],
     tips: [["sync-outline", "Rotação: as peças começam giradas e exigem dois toques para alinhar", "Rotation: pieces start turned and need a double tap to align"], ["bulb-outline", "Dicas: encaixam automaticamente uma peça quando você precisar", "Hints: automatically place one piece when you need help"], ["timer-outline", "Cronômetro: registra quanto tempo você levou para concluir", "Timer: records how long you take to finish"]],
   },
   {
@@ -47,14 +47,14 @@ const steps = [
     icon: "trophy-outline",
     eyebrow: ["SUA EVOLUÇÃO", "YOUR PROGRESS"],
     title: ["XP mostra sua experiência", "XP shows your experience"],
-    description: ["Você ganha XP ao encaixar peças e concluir puzzles. A cada 1.000 XP seu nível aumenta e você pode comparar sua evolução com amigos.", "You earn XP by placing pieces and completing puzzles. Every 1,000 XP raises your level, and you can compare progress with friends."],
+    description: ["Você ganha XP ao encaixar peças e concluir quebra-cabeças. A cada 1.000 XP seu nível aumenta e você pode comparar sua evolução com amigos.", "You earn XP by placing pieces and completing puzzles. Every 1,000 XP raises your level, and you can compare progress with friends."],
     tips: [["star-outline", "XP mede sua progressão no Pieceful", "XP tracks your Pieceful progression"], ["ribbon-outline", "Conquistas celebram marcos e desafios especiais", "Achievements celebrate milestones and special challenges"]],
   },
   {
     icon: "albums-outline",
     eyebrow: ["TUDO ORGANIZADO", "EVERYTHING ORGANIZED"],
     title: ["Seu progresso fica salvo", "Your progress stays saved"],
-    description: ["Encontre puzzles em andamento e concluídos na Coleção. Ao terminar, gere o timelapse e compartilhe sua conquista.", "Find active and completed puzzles in Collection. When finished, create a timelapse and share your achievement."],
+    description: ["Encontre quebra-cabeças em andamento e concluídos na Coleção. Ao terminar, gere o timelapse e compartilhe sua conquista.", "Find active and completed puzzles in Collection. When finished, create a timelapse and share your achievement."],
     tips: [["trophy-outline", "Ganhe conquistas e XP", "Earn achievements and XP"], ["videocam-outline", "Gere o vídeo após concluir", "Create a video after completing"]],
   },
 ] as const;

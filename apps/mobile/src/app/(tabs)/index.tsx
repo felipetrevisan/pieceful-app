@@ -23,7 +23,7 @@ export default function HomeScreen() {
         <LinearGradient colors={[`${colors.accent}22`, `${colors.primary}24`]} style={[styles.emptyHero, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
           <Ionicons name="sparkles" size={28} color={colors.accent} />
           <Text maxFontSizeMultiplier={1.2} style={[styles.emptyTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Escolha uma aventura bem colorida!", "Choose a colorful adventure!") : t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
-          <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text maxFontSizeMultiplier={1.2} style={styles.compactCtaText}>{t("Criar puzzle", "Create puzzle")}</Text></Pressable>
+          <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text adjustsFontSizeToFit maxFontSizeMultiplier={1.2} minimumFontScale={0.86} numberOfLines={1} style={styles.compactCtaText}>{t("Criar quebra-cabeça", "Create puzzle")}</Text></Pressable>
         </LinearGradient>
       )}
 
@@ -33,7 +33,7 @@ export default function HomeScreen() {
       </LinearGradient>
 
       <View style={styles.quickRow}>
-        <QuickAction icon="add-outline" label={t("Novo puzzle", "New puzzle")} onPress={() => router.push("/(tabs)/create")} />
+        <QuickAction icon="add-outline" label={t("Novo quebra-cabeça", "New puzzle")} onPress={() => router.push("/(tabs)/create")} />
         <QuickAction icon="search-outline" label={t("Explorar", "Browse")} onPress={() => router.push("/(tabs)/puzzles")} />
       </View>
 
@@ -43,7 +43,7 @@ export default function HomeScreen() {
           {completed.map((puzzle) => <CompletedCard key={puzzle.id} puzzle={puzzle} />)}
         </ScrollView>
       ) : (
-        <Card style={{ alignItems: "center", gap: 8 }}><Ionicons name="images-outline" size={29} color={colors.accent} /><Text maxFontSizeMultiplier={1.2} style={[styles.cardTitle, { color: colors.text }]}>{t("Nenhum puzzle concluído ainda", "No completed puzzles yet")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, styles.emptyGalleryCopy, { color: colors.muted }]}>{t("Seus puzzles concluídos aparecerão aqui.", "Your completed puzzles will appear here.")}</Text></Card>
+        <Card style={{ alignItems: "center", gap: 8 }}><Ionicons name="images-outline" size={29} color={colors.accent} /><Text maxFontSizeMultiplier={1.2} style={[styles.cardTitle, { color: colors.text }]}>{t("Nenhum quebra-cabeça concluído ainda", "No completed puzzles yet")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, styles.emptyGalleryCopy, { color: colors.muted }]}>{t("Seus quebra-cabeças concluídos aparecerão aqui.", "Your completed puzzles will appear here.")}</Text></Card>
       )}
     </Screen>
   );
@@ -81,8 +81,8 @@ function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.gly
 }
 
 function CompletedCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"][number] }) {
-  const { theme } = useApp(); const colors = mobileThemes[theme];
-  return <Pressable onPress={() => router.push(`/result/${puzzle.id}` as never)} style={[styles.completedCard, { backgroundColor: colors.panel, borderRadius: colors.radius }]}><Image source={{ uri: puzzle.imageUri }} style={styles.completedImage} contentFit="cover" /><Text numberOfLines={1} style={[styles.completedName, { color: colors.text }]}>{puzzle.name}</Text><Text style={[styles.completedMeta, { color: colors.muted }]}>{puzzle.configuration.totalPieces} pieces · 100%</Text></Pressable>;
+  const { t, theme } = useApp(); const colors = mobileThemes[theme];
+  return <Pressable onPress={() => router.push(`/result/${puzzle.id}` as never)} style={[styles.completedCard, { backgroundColor: colors.panel, borderRadius: colors.radius }]}><Image source={{ uri: puzzle.imageUri }} style={styles.completedImage} contentFit="cover" /><Text numberOfLines={1} style={[styles.completedName, { color: colors.text }]}>{puzzle.name}</Text><Text style={[styles.completedMeta, { color: colors.muted }]}>{puzzle.configuration.totalPieces} {t("peças", "pieces")} · 100%</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({
@@ -96,8 +96,8 @@ const styles = StyleSheet.create({
   heroMeta: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 3 },
   emptyHero: { minHeight: 190, borderRadius: 28, borderWidth: 1, padding: 22, justifyContent: "center", gap: 12, marginBottom: 18 },
   emptyTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 23, maxWidth: 280 },
-  compactCta: { alignSelf: "flex-start", borderRadius: 99, paddingHorizontal: 18, paddingVertical: 11 },
-  compactCtaText: { color: "#00363a", fontFamily: "Inter_700Bold" },
+  compactCta: { alignSelf: "stretch", minHeight: 48, borderRadius: 99, paddingHorizontal: 18, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
+  compactCtaText: { color: "#00363a", fontFamily: "Inter_700Bold", fontSize: 15, textAlign: "center" },
   challenge: { flexDirection: "row", minHeight: 116, borderRadius: 23, borderWidth: 1, padding: 18, alignItems: "center", marginBottom: 22 },
   kicker: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.2 },
   challengeTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20, marginTop: 5 },

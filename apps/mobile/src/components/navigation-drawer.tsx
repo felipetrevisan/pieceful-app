@@ -41,7 +41,7 @@ export function NavigationDrawer() {
   const Surface = glass ? GlassView : View;
   const childMode = ageGroup === "child";
   const visibleMenu = childMode ? menu.filter((item) => item[1] !== "Amigos" && item[1] !== "Perfil") : menu;
-  const profileName = (childMode ? t("Pequeno Puzzler", "Little Puzzler") : profile.displayName.trim())
+  const profileName = (childMode ? t("Pequeno Montador", "Little Puzzler") : profile.displayName.trim())
     || String(session?.user.user_metadata?.full_name ?? session?.user.user_metadata?.name ?? "").trim()
     || session?.user.email?.split("@")[0]
     || t("Jogador", "Player");
@@ -138,7 +138,7 @@ export function NavigationDrawer() {
                   </LinearGradient>
                   <View style={styles.profileCopy}>
                     <Text numberOfLines={1} style={[styles.profileName, { color: colors.text }]}>{profileName}</Text>
-                    <Text style={[styles.profileLevel, { color: colors.muted }]}>{childMode ? t("Modo infantil", "Kids mode") : `Level ${level} · ${t("Mestre Puzzler", "Master Puzzler")}`}</Text>
+                    <Text style={[styles.profileLevel, { color: colors.muted }]}>{childMode ? t("Modo infantil", "Kids mode") : `Level ${level} · ${t("Mestre dos Quebra-cabeças", "Master Puzzler")}`}</Text>
                   </View>
                 </Pressable>
               </View>
@@ -153,7 +153,7 @@ export function NavigationDrawer() {
                     const active = isActive(path, index);
                     return (
                       <Animated.View key={pt} entering={FadeInDown.delay(70 + index * 35).duration(320)} style={styles.menuTileShell}>
-                        <Pressable onPress={() => navigate(path)} style={({ pressed }) => pressed ? styles.pressed : null}>
+                        <Pressable onPress={() => navigate(path)} style={styles.menuTilePressable}>
                           <View style={[styles.menuTile, { backgroundColor: active ? colors.panelAlt : `${colors.panelAlt}66`, borderColor: active ? colors.accent : `${colors.muted}22`, borderRadius: Math.max(8, colors.radius - 4) }]}>
                             <LinearGradient colors={active ? [...colors.gradient] : [`${colors.accent}22`, `${colors.primary}1a`]} style={[styles.menuIcon, { borderRadius: Math.max(7, colors.radius - 8) }]}>
                               <Ionicons name={icon} size={23} color={active ? colors.background : colors.accent} />
@@ -206,9 +206,10 @@ const styles = StyleSheet.create({
   progress: { height: "100%", borderRadius: 99 },
   scrollContent: { paddingTop: 16, paddingBottom: 24 },
   menuKicker: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 1.4, marginBottom: 10 },
-  menuGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  menuTileShell: { width: "48%" },
-  menuTile: { minHeight: 92, borderWidth: 1, padding: 11, justifyContent: "space-between" },
+  menuGrid: { width: "100%", flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  menuTileShell: { width: "48%", height: 104, marginBottom: 12 },
+  menuTilePressable: { width: "100%", height: "100%" },
+  menuTile: { flex: 1, width: "100%", borderWidth: 1, padding: 11, justifyContent: "space-between" },
   menuIcon: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
   menuLabel: { fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 8 },
   activeDot: { position: "absolute", width: 7, height: 7, borderRadius: 4, top: 12, right: 12 },

@@ -89,7 +89,7 @@ export default function SettingsScreen() {
     Alert.alert(
       t("Excluir conta e dados?", "Delete account and data?"),
       t(
-        "Isso excluirá permanentemente seu perfil, puzzles sincronizados, fotos, amizades e conquistas. Essa ação não pode ser desfeita.",
+        "Isso excluirá permanentemente seu perfil, quebra-cabeças sincronizados, fotos, amizades e conquistas. Essa ação não pode ser desfeita.",
         "This permanently deletes your profile, synced puzzles, photos, friendships, and achievements. This action cannot be undone.",
       ),
       [
@@ -339,15 +339,15 @@ export default function SettingsScreen() {
           <View style={[styles.rowIcon, { backgroundColor: colors.panelAlt }]}>
             <Ionicons name="people-outline" size={21} color={colors.accent} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.settingText, { color: colors.text }]}>
+          <View style={styles.ageCopy}>
+            <Text maxFontSizeMultiplier={1.2} style={[styles.ageTitle, { color: colors.text }]}>
               {ageGroup === "child"
                 ? t("Até 12 anos", "12 or younger")
                 : ageGroup === "teen"
                   ? t("13 a 17 anos", "13 to 17")
                   : t("18 anos ou mais", "18 or older")}
             </Text>
-            <Text style={[styles.ageDescription, { color: colors.muted }]}>
+            <Text maxFontSizeMultiplier={1.2} style={[styles.ageDescription, { color: colors.muted }]}>
               {t("Alterar configuração", "Change setting")}
             </Text>
           </View>
@@ -428,9 +428,9 @@ export default function SettingsScreen() {
         disabled={puzzles.length === 0}
         onPress={() =>
           Alert.alert(
-            t("Excluir puzzles deste aparelho?", "Delete puzzles from this device?"),
+            t("Excluir quebra-cabeças deste aparelho?", "Delete puzzles from this device?"),
             t(
-              "Os puzzles e seus históricos de montagem locais serão removidos. Os dados sincronizados da sua conta não serão apagados.",
+              "Os quebra-cabeças e seus históricos de montagem locais serão removidos. Os dados sincronizados da sua conta não serão apagados.",
               "Local puzzles and their assembly histories will be removed. Synced account data will not be deleted.",
             ),
             [
@@ -446,7 +446,7 @@ export default function SettingsScreen() {
         ]}
       >
         <Text style={[styles.dangerText, { color: colors.danger }]}>
-          {t("Excluir puzzles deste aparelho", "Delete puzzles from this device")}
+          {t("Excluir quebra-cabeças deste aparelho", "Delete puzzles from this device")}
         </Text>
         <Ionicons name="trash-outline" size={22} color={colors.danger} />
       </Pressable>
@@ -716,12 +716,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   ageCard: {
-    minHeight: 72,
+    minHeight: 82,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  ageDescription: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 2 },
+  ageCopy: { flex: 1, minWidth: 0, justifyContent: "center" },
+  ageTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, lineHeight: 21 },
+  ageDescription: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
 });

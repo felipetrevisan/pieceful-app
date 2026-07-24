@@ -21,7 +21,7 @@ export function AuthGate() {
           </View>
           <Text maxFontSizeMultiplier={1.2} style={styles.eyebrow}>{t("SUA JORNADA COMEÇA AQUI", "YOUR JOURNEY STARTS HERE")}</Text>
           <Text maxFontSizeMultiplier={1.2} style={styles.title}>{t("Entre no Pieceful", "Welcome to Pieceful")}</Text>
-          <Text maxFontSizeMultiplier={1.2} style={styles.subtitle}>{t("Salve seus puzzles, conquistas e XP e continue de qualquer dispositivo.", "Save your puzzles, achievements and XP, and continue from any device.")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={styles.subtitle}>{t("Salve seus quebra-cabeças, conquistas e XP e continue de qualquer dispositivo.", "Save your puzzles, achievements and XP, and continue from any device.")}</Text>
         </View>
 
         <View style={styles.panelShell}>

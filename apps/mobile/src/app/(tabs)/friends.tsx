@@ -22,7 +22,7 @@ export default function FriendsScreen() {
   const inviteFriends = async () => {
     await Share.share({
       message: t(
-        "Venha montar puzzles comigo no Pieceful e compare nosso XP!",
+        "Venha montar quebra-cabeças comigo no Pieceful e compare nosso XP!",
         "Join me on Pieceful to solve puzzles and compare our XP!",
       ),
       title: t("Convite Pieceful", "Pieceful invitation"),

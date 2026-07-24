@@ -25,12 +25,12 @@ export default function ResultScreen() {
   }, []);
 
   if (!puzzle) {
-    return <SafeAreaView style={[styles.missing, { backgroundColor: colors.background }]}><Text style={{ color: colors.text }}>{t("Puzzle não encontrado", "Puzzle not found")}</Text></SafeAreaView>;
+    return <SafeAreaView style={[styles.missing, { backgroundColor: colors.background }]}><Text style={{ color: colors.text }}>{t("Quebra-cabeça não encontrado", "Puzzle not found")}</Text></SafeAreaView>;
   }
 
   const shareTimelapse = async () => {
     if (!puzzle.session.completedAt && !puzzle.session.pieces.every((piece) => piece.isPlaced)) {
-      Alert.alert(t("Puzzle incompleto", "Incomplete puzzle"), t("Finalize o puzzle para gerar o timelapse.", "Finish the puzzle to create its timelapse."));
+      Alert.alert(t("Quebra-cabeça incompleto", "Incomplete puzzle"), t("Finalize o quebra-cabeça para gerar o timelapse.", "Finish the puzzle to create its timelapse."));
       return;
     }
     setCreating(true); setProgress(0);
@@ -58,7 +58,7 @@ export default function ResultScreen() {
         <View><Image source={{ uri: puzzle.imageUri }} style={[styles.videoImage, { aspectRatio: puzzle.configuration.columns / puzzle.configuration.rows }]} contentFit="cover" /><View style={[styles.play, { backgroundColor: `${colors.background}CC` }]}>{creating ? <ActivityIndicator color={colors.accent} /> : <Ionicons name="videocam" size={24} color={colors.accent} />}</View></View>
         {creating && <View style={styles.generationStatus}><View style={[styles.generationTrack, { backgroundColor: `${colors.muted}25` }]}><View style={[styles.generationFill, { backgroundColor: colors.accent, width: `${progress}%` }]} /></View><Text style={[styles.generationText, { color: colors.muted }]}>{t(`Criando vídeo… ${progress}%`, `Creating video… ${progress}%`)}</Text></View>}
       </View>
-      <PrimaryButton icon="add-circle-outline" onPress={() => router.replace("/(tabs)/create")}>{t("Criar novo puzzle", "Create new puzzle")}</PrimaryButton>
+      <PrimaryButton icon="add-circle-outline" onPress={() => router.replace("/(tabs)/create")}>{t("Criar novo quebra-cabeça", "Create new puzzle")}</PrimaryButton>
       <SecondaryButton icon="share-social-outline" disabled={creating} onPress={shareTimelapse}>{creating ? t("Criando vídeo…", "Creating video…") : t("Gerar e compartilhar vídeo", "Create and share video")}</SecondaryButton>
       <SecondaryButton icon="albums-outline" onPress={() => router.replace("/(tabs)/puzzles")}>{t("Voltar para coleção", "Back to collection")}</SecondaryButton>
     </ScrollView>
