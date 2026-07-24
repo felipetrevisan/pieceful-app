@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { AppHeader, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
 import { type AppLanguage, type MobileTheme, useApp } from "@/state/app-provider";
@@ -43,6 +43,7 @@ export default function SettingsScreen() {
   } = useMonetization();
   const { busy: accountBusy, deleteAccount, session } = useSocial();
   const colors = mobileThemes[theme];
+  const { showAlert } = usePiecefulAlert();
   const { width: screenWidth } = useWindowDimensions();
   const helpRowWidth = Math.max(0, screenWidth - 40);
   const helpCardWidth = Math.max(0, (helpRowWidth - 12) / 2);
@@ -54,7 +55,7 @@ export default function SettingsScreen() {
 
   function themeChange(next: MobileTheme) {
     if (!premium && ["arcade", "castle", "cyberpunk", "hologram", "space"].includes(next)) {
-      Alert.alert(
+      showAlert(
         t("Tema Premium", "Premium theme"),
         t(
           "Este estilo faz parte do Pieceful Premium.",
@@ -72,7 +73,7 @@ export default function SettingsScreen() {
       void purchasePremium();
       return;
     }
-    Alert.alert(
+    showAlert(
       t("Confirmação do responsável", "Parent or guardian confirmation"),
       t(
         "Entregue o aparelho a um responsável para continuar a compra pela Play Store.",
@@ -86,7 +87,7 @@ export default function SettingsScreen() {
   }
 
   function confirmAccountDeletion() {
-    Alert.alert(
+    showAlert(
       t("Excluir conta e dados?", "Delete account and data?"),
       t(
         "Isso excluirá permanentemente seu perfil, quebra-cabeças sincronizados, fotos, amizades e conquistas. Essa ação não pode ser desfeita.",
@@ -101,13 +102,13 @@ export default function SettingsScreen() {
             void deleteAccount()
               .then(() => {
                 deleteLocalPuzzles();
-                Alert.alert(
+                showAlert(
                   t("Conta excluída", "Account deleted"),
                   t("Seus dados da conta foram removidos.", "Your account data has been removed."),
                 );
               })
               .catch(() =>
-                Alert.alert(
+                showAlert(
                   t("Não foi possível excluir", "Unable to delete"),
                   t(
                     "Tente novamente ou fale com perazzolabs@gmail.com.",
@@ -315,7 +316,7 @@ export default function SettingsScreen() {
       <Section title={t("FAIXA ETÁRIA", "AGE RANGE")}>
         <Pressable
           onPress={() =>
-            Alert.alert(
+            showAlert(
               t("Alterar faixa etária?", "Change age range?"),
               t(
                 "A experiência e a configuração de anúncios serão atualizadas.",
@@ -427,7 +428,7 @@ export default function SettingsScreen() {
       <Pressable
         disabled={puzzles.length === 0}
         onPress={() =>
-          Alert.alert(
+          showAlert(
             t("Excluir quebra-cabeças deste aparelho?", "Delete puzzles from this device?"),
             t(
               "Os quebra-cabeças e seus históricos de montagem locais serão removidos. Os dados sincronizados da sua conta não serão apagados.",

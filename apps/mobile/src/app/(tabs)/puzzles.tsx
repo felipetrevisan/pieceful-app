@@ -3,7 +3,8 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActionSheetIOS, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { AppHeader, IconButton, PrimaryButton, ProgressBar, Screen } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
@@ -11,6 +12,7 @@ import { useApp } from "@/state/app-provider";
 export default function PuzzlesScreen() {
   const { deletePuzzle, puzzles, renamePuzzle, t, theme } = useApp();
   const colors = mobileThemes[theme];
+  const { showAlert } = usePiecefulAlert();
   const [sortBy, setSortBy] = useState<"recent" | "name" | "progress">("recent");
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -33,17 +35,13 @@ export default function PuzzlesScreen() {
       if (index === 1) setSortBy("name");
       if (index === 2) setSortBy("progress");
     };
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: [...options, t("Cancelar", "Cancel")], cancelButtonIndex: 3, title: t("Ordenar coleção", "Sort collection") },
-        choose,
-      );
-      return;
-    }
-    Alert.alert(t("Ordenar coleção", "Sort collection"), undefined, options.map((text, index) => ({ text, onPress: () => choose(index) })));
+    showAlert(t("Ordenar coleção", "Sort collection"), undefined, [
+      ...options.map((text, index) => ({ text, onPress: () => choose(index) })),
+      { text: t("Cancelar", "Cancel"), style: "cancel" },
+    ]);
   }
 
-  function remove(id: string, name: string) { Alert.alert(t("Excluir quebra-cabeça?", "Delete puzzle?"), t(`“${name}” e seu progresso serão apagados.`, `“${name}” and its progress will be deleted.`), [{ text: t("Cancelar", "Cancel"), style: "cancel" }, { text: t("Excluir", "Delete"), style: "destructive", onPress: () => deletePuzzle(id) }]); }
+  function remove(id: string, name: string) { showAlert(t("Excluir quebra-cabeça?", "Delete puzzle?"), t(`“${name}” e seu progresso serão apagados.`, `“${name}” and its progress will be deleted.`), [{ text: t("Cancelar", "Cancel"), style: "cancel" }, { text: t("Excluir", "Delete"), style: "destructive", onPress: () => deletePuzzle(id) }]); }
   function openRename(id: string, name: string) {
     setRenameDraft(name);
     setRenameTarget({ id, name });

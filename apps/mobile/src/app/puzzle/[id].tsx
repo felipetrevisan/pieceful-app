@@ -4,12 +4,13 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativePuzzleBoard } from "@/components/native-puzzle-board";
+import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { PuzzlePieceDrawer, type ScreenFrame } from "@/components/puzzle-piece-drawer";
-import { IconButton, PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
+import { IconButton, PrimaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 import { useMonetization } from "@/state/monetization-provider";
@@ -18,6 +19,7 @@ export default function PuzzleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { incrementPuzzleHints, puzzles, setDrawerOpen, t, theme, updatePuzzleCamera, updatePuzzleElapsedTime, updatePuzzlePieces } = useApp();
   const { premium, showRewardedHint } = useMonetization();
+  const { showAlert } = usePiecefulAlert();
   const colors = mobileThemes[theme];
   const puzzle = puzzles.find((item) => item.id === id);
   const [pieces, setPieces] = useState<PuzzlePiece[]>(puzzle?.session.pieces ?? []);
@@ -72,14 +74,14 @@ export default function PuzzleScreen() {
       placeHint();
       return;
     }
-    Alert.alert(
+    showAlert(
       t("Ganhar uma dica", "Get a hint"),
       t("Assista a um anúncio recompensado para encaixar uma peça. O anúncio só abre se você confirmar.", "Watch a rewarded ad to place one piece. The ad only opens after you confirm."),
       [
         { text: t("Agora não", "Not now"), style: "cancel" },
         { text: t("Assistir anúncio", "Watch ad"), onPress: () => void showRewardedHint().then((earned) => {
           if (earned) placeHint();
-          else Alert.alert(t("Anúncio indisponível", "Ad unavailable"), t("Não foi possível carregar o anúncio. Tente novamente mais tarde.", "The ad couldn't be loaded. Try again later."));
+          else showAlert(t("Anúncio indisponível", "Ad unavailable"), t("Não foi possível carregar o anúncio. Tente novamente mais tarde.", "The ad couldn't be loaded. Try again later."));
         }) },
       ],
     );
@@ -184,7 +186,19 @@ export default function PuzzleScreen() {
           }}
         />
         {puzzle.configuration.hintsEnabled && progress < 100 ? (
-          <SecondaryButton className="mt-4" icon={premium ? "bulb-outline" : "play-circle-outline"} onPress={useHint}>{premium ? t("Usar dica Premium", "Use Premium hint") : t("Assistir anúncio para ganhar dica", "Watch ad to get a hint")}</SecondaryButton>
+          <View style={styles.hintArea}>
+            <Pressable
+              accessibilityHint={premium ? t("Encaixa uma peça", "Places one piece") : t("Abre um anúncio recompensado", "Opens a rewarded ad")}
+              accessibilityLabel={premium ? t("Usar dica", "Use hint") : t("Assistir anúncio para ganhar dica", "Watch ad to get a hint")}
+              accessibilityRole="button"
+              onPress={useHint}
+              style={({ pressed }) => [styles.hintButton, { borderColor: `${colors.accent}90`, shadowColor: colors.accent, transform: [{ scale: pressed ? .92 : 1 }] }]}
+            >
+              <LinearGradient colors={[colors.primary, colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <View style={styles.hintShine} />
+              <Ionicons name="bulb" size={34} color={colors.background} />
+            </Pressable>
+          </View>
         ) : null}
       </ScrollView>
 
@@ -241,6 +255,9 @@ const styles = StyleSheet.create({
   toolbar: { marginHorizontal: 12, marginTop: 6, borderRadius: 25, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, overflow: "hidden" },
   timerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   timerText: { fontFamily: "Inter_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] },
+  hintArea: { width: "100%", alignItems: "center", justifyContent: "center", paddingTop: 18, paddingBottom: 4 },
+  hintButton: { width: 70, height: 70, borderRadius: 35, borderWidth: 2, overflow: "hidden", alignItems: "center", justifyContent: "center", shadowOpacity: .55, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 15 },
+  hintShine: { position: "absolute", top: 7, left: 12, width: 25, height: 12, borderRadius: 10, backgroundColor: "rgba(255,255,255,.38)", transform: [{ rotate: "-18deg" }] },
   referenceBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 18, backgroundColor: "rgba(2,5,16,.84)" },
   referenceCard: { width: "100%", maxWidth: 560, maxHeight: "82%", padding: 14, borderRadius: 26, borderWidth: 1, shadowColor: "#000", shadowOpacity: .35, shadowRadius: 24, shadowOffset: { width: 0, height: 14 }, elevation: 18 },
   referenceHeader: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },

@@ -7,7 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@puzzled/shared";
 import { AppHeader, Card, Label, MutedText, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { KidPackLibrary } from "@/components/kid-pack-library";
+import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { getInstalledImagePacks, type ImagePack } from "@/services/image-packs";
 import { useApp } from "@/state/app-provider";
@@ -63,6 +64,7 @@ export default function CreateScreen() {
   const { ageGroup, createPuzzle, preferences, t, theme } = useApp();
   const { width } = useWindowDimensions();
   const colors = mobileThemes[theme];
+  const { showAlert } = usePiecefulAlert();
   const kidCardWidth = Math.min(282, width - 92);
   const kidCarouselStep = kidCardWidth + 12;
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -114,7 +116,7 @@ export default function CreateScreen() {
   async function choosePhoto() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
+      showAlert(
         t("Permissão necessária", "Permission required"),
         t("Permita o acesso às fotos para criar um quebra-cabeça.", "Allow photo access to create a puzzle."),
       );
@@ -160,7 +162,7 @@ export default function CreateScreen() {
       setName(asset.fileName?.replace(/\.[^.]+$/, "") ?? t("Minha memória", "My memory"));
       if (preferences.haptics) await Haptics.selectionAsync();
     } catch {
-      Alert.alert(
+      showAlert(
         t("Não foi possível salvar a foto", "Could not save the photo"),
         t("Escolha a imagem novamente ou confira a permissão da galeria.", "Choose the image again or check photo permissions."),
       );
@@ -174,7 +176,7 @@ export default function CreateScreen() {
       let sourceHeight = item.height;
       if (typeof item.source === "number") {
         const asset = Asset.fromModule(item.source);
-        await asset.downloadAsync();
+        if (!asset.localUri && /^https?:\/\//.test(asset.uri)) await asset.downloadAsync();
         sourceUri = asset.localUri ?? asset.uri;
         sourceWidth = asset.width ?? item.width;
         sourceHeight = asset.height ?? item.height;
@@ -185,9 +187,15 @@ export default function CreateScreen() {
       directory.create({ idempotent: true, intermediates: true });
       const pictureKey = item.key.toLowerCase().replaceAll(/[^a-z0-9-]/g, "-");
       const sourceExtension = sourceUri.split("?")[0].split(".").pop()?.toLowerCase();
-      const destination = new File(directory, `kids-${pictureKey}.${sourceExtension && /^[a-z0-9]{2,5}$/.test(sourceExtension) ? sourceExtension : "jpg"}`);
-      await new File(sourceUri).copy(destination, { overwrite: true });
-      setImageUri(destination.uri);
+      const embeddedAndroidResource = sourceUri.startsWith("file:///android_res/");
+      const canCopy = !embeddedAndroidResource && (sourceUri.startsWith("file://") || sourceUri.startsWith("content://"));
+      let permanentUri = sourceUri;
+      if (canCopy) {
+        const destination = new File(directory, `kids-${pictureKey}.${sourceExtension && /^[a-z0-9]{2,5}$/.test(sourceExtension) ? sourceExtension : "jpg"}`);
+        await new File(sourceUri).copy(destination, { overwrite: true });
+        permanentUri = destination.uri;
+      }
+      setImageUri(permanentUri);
       setSelectedKidPicture(item.key);
       setImageDimensions({ width: sourceWidth, height: sourceHeight });
       setName(t(item.pt, item.en));
@@ -198,7 +206,7 @@ export default function CreateScreen() {
       });
       if (preferences.haptics) await Haptics.selectionAsync();
     } catch {
-      Alert.alert(t("Não foi possível abrir a imagem", "Couldn't open the picture"), t("Tente novamente.", "Try again."));
+      showAlert(t("Não foi possível abrir a imagem", "Couldn't open the picture"), t("Tente novamente.", "Try again."));
     }
   }
 

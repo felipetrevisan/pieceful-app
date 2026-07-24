@@ -95,7 +95,14 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
     val uri = Uri.parse(value)
     val stream = when (uri.scheme) {
       "content" -> context.contentResolver.openInputStream(uri)
-      "file" -> FileInputStream(requireNotNull(uri.path))
+      "file" -> if (value.startsWith("file:///android_res/")) {
+        val resourceName = requireNotNull(uri.lastPathSegment).substringBeforeLast('.')
+        val resourceId = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
+        require(resourceId != 0) { "Unable to find bundled puzzle image" }
+        context.resources.openRawResource(resourceId)
+      } else {
+        FileInputStream(requireNotNull(uri.path))
+      }
       "http", "https" -> URL(value).openStream()
       else -> FileInputStream(value)
     } ?: error("Unable to read the puzzle image")

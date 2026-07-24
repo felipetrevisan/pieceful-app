@@ -37,6 +37,27 @@ interface ImagePack {
   pack_images: PackImage[];
 }
 
+interface SessionRequest {
+  password: string;
+}
+
+interface CreatePackRequest {
+  slug: string;
+  title_pt: string;
+  title_en: string;
+}
+
+interface UploadImageRequest {
+  file: File;
+  title_pt: string;
+  title_en: string;
+  width: number;
+  height: number;
+  sort_order: number;
+  is_published: boolean;
+  make_cover: boolean;
+}
+
 function configuration() {
   const url = Bun.env.SUPABASE_URL;
   const key = Bun.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -171,11 +192,12 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   .post(
     "/session",
     async ({ body, set }) => {
+      const request = body as SessionRequest;
       if (!configured()) {
         set.status = 503;
         return { ok: false, message: "Configure as variáveis administrativas." };
       }
-      if (!equal(body.password, Bun.env.PIECEFUL_ADMIN_PASSWORD ?? "")) {
+      if (!equal(request.password, Bun.env.PIECEFUL_ADMIN_PASSWORD ?? "")) {
         await Bun.sleep(600);
         set.status = 401;
         return { ok: false, message: "Senha incorreta." };
@@ -191,8 +213,9 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   .post(
     "/packs",
     async ({ headers, body, set }) => {
+      const request = body as CreatePackRequest;
       if (!authorized(headers.authorization)) return unauthorized(set);
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.slug)) {
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.slug)) {
         set.status = 400;
         return { ok: false, message: "Slug inválido." };
       }
@@ -200,7 +223,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         method: "POST",
         headers: { Prefer: "return=representation" },
         body: JSON.stringify({
-          ...body,
+          ...request,
           cover_url: "",
           is_published: false,
           is_free: true,
@@ -216,6 +239,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   .patch(
     "/packs/:id",
     async ({ headers, params, body, set }) => {
+      const request = body as Record<string, unknown>;
       if (!authorized(headers.authorization)) return unauthorized(set);
       const allowed = [
         "slug",
@@ -232,7 +256,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         "minimum_app_version",
       ];
       const values = Object.fromEntries(
-        Object.entries(body).filter(([key]) => allowed.includes(key)),
+        Object.entries(request).filter(([key]) => allowed.includes(key)),
       );
       return { ok: true, pack: await updatePack(params.id, values) };
     },
@@ -250,14 +274,15 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   .post(
     "/packs/:id/images",
     async ({ headers, params, body, set }) => {
+      const request = body as UploadImageRequest;
       if (!authorized(headers.authorization)) return unauthorized(set);
-      const file = body.file;
+      const file = request.file;
       const accepted = ["image/jpeg", "image/png", "image/webp"];
       if (
         !accepted.includes(file.type) ||
         file.size > 15 * 1024 * 1024 ||
-        body.width < 300 ||
-        body.height < 300
+        request.width < 300 ||
+        request.height < 300
       ) {
         set.status = 400;
         return {
@@ -274,18 +299,18 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
           headers: { Prefer: "return=representation" },
           body: JSON.stringify({
             pack_id: params.id,
-            title_pt: body.title_pt,
-            title_en: body.title_en,
+            title_pt: request.title_pt,
+            title_en: request.title_en,
             image_url: imageUrl,
             thumbnail_url: imageUrl,
-            width: body.width,
-            height: body.height,
+            width: request.width,
+            height: request.height,
             bytes: file.size,
-            sort_order: body.sort_order,
-            is_published: body.is_published,
+            sort_order: request.sort_order,
+            is_published: request.is_published,
           }),
         });
-        if (body.make_cover) await updatePack(params.id, { cover_url: imageUrl });
+        if (request.make_cover) await updatePack(params.id, { cover_url: imageUrl });
         await refreshTotal(params.id);
         set.status = 201;
         return { ok: true, image: rows[0] };
@@ -310,10 +335,11 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   .patch(
     "/images/:id",
     async ({ headers, params, body, set }) => {
+      const request = body as Record<string, unknown>;
       if (!authorized(headers.authorization)) return unauthorized(set);
       const allowed = ["title_pt", "title_en", "sort_order", "is_published"];
       const values = Object.fromEntries(
-        Object.entries(body).filter(([key]) => allowed.includes(key)),
+        Object.entries(request).filter(([key]) => allowed.includes(key)),
       );
       const rows = await database<PackImage[]>(
         `pack_images?id=eq.${encodeURIComponent(params.id)}`,

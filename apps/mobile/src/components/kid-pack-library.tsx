@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import {
   downloadImagePack,
@@ -17,6 +18,7 @@ import { useApp } from "@/state/app-provider";
 
 export function KidPackLibrary({ visible, onClose, onInstalledChange }: { visible: boolean; onClose: () => void; onInstalledChange: (packs: ImagePack[]) => void }) {
   const { t, theme } = useApp();
+  const { showAlert } = usePiecefulAlert();
   const colors = mobileThemes[theme];
   const [catalog, setCatalog] = useState<ImagePack[]>([]);
   const [installed, setInstalled] = useState<ImagePack[]>([]);
@@ -55,7 +57,7 @@ export function KidPackLibrary({ visible, onClose, onInstalledChange }: { visibl
       setInstalled(packs);
       onInstalledChange(packs);
     } catch {
-      Alert.alert(t("Download interrompido", "Download interrupted"), t("Confira sua conexão e tente novamente.", "Check your connection and try again."));
+      showAlert(t("Download interrompido", "Download interrupted"), t("Confira sua conexão e tente novamente.", "Check your connection and try again."));
     } finally {
       setProgress((current) => {
         const next = { ...current };
@@ -66,7 +68,7 @@ export function KidPackLibrary({ visible, onClose, onInstalledChange }: { visibl
   }
 
   function confirmRemove(pack: ImagePack) {
-    Alert.alert(
+    showAlert(
       t("Remover pacote?", "Remove pack?"),
       t("As imagens baixadas serão apagadas deste aparelho.", "Downloaded images will be removed from this device."),
       [

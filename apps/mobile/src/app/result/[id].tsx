@@ -3,8 +3,9 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { createAndShareTimelapse } from "@/lib/native-timelapse";
@@ -15,6 +16,7 @@ export default function ResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { puzzles, t, theme, language } = useApp();
   const colors = mobileThemes[theme];
+  const { showAlert } = usePiecefulAlert();
   const puzzle = puzzles.find((item) => item.id === id);
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -30,14 +32,14 @@ export default function ResultScreen() {
 
   const shareTimelapse = async () => {
     if (!puzzle.session.completedAt && !puzzle.session.pieces.every((piece) => piece.isPlaced)) {
-      Alert.alert(t("Quebra-cabeça incompleto", "Incomplete puzzle"), t("Finalize o quebra-cabeça para gerar o timelapse.", "Finish the puzzle to create its timelapse."));
+      showAlert(t("Quebra-cabeça incompleto", "Incomplete puzzle"), t("Finalize o quebra-cabeça para gerar o timelapse.", "Finish the puzzle to create its timelapse."));
       return;
     }
     setCreating(true); setProgress(0);
     try {
       await createAndShareTimelapse(puzzle, language);
     } catch (error) {
-      Alert.alert(t("Não foi possível criar o vídeo", "Couldn't create the video"), error instanceof Error ? error.message : t("Tente novamente.", "Try again."));
+      showAlert(t("Não foi possível criar o vídeo", "Couldn't create the video"), error instanceof Error ? error.message : t("Tente novamente.", "Try again."));
     } finally {
       setCreating(false);
     }

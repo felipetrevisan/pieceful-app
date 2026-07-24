@@ -4,9 +4,10 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Sharing from "expo-sharing";
 import { useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { captureRef } from "react-native-view-shot";
 import { AppHeader, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
+import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 import { useSocial } from "@/state/social-provider";
@@ -15,6 +16,7 @@ export default function ProfileScreen() {
   const { puzzles, t, theme } = useApp();
   const { profile, session, updateProfile, uploadAvatar } = useSocial();
   const colors = mobileThemes[theme];
+  const { showAlert } = usePiecefulAlert();
   const cardRef = useRef<View>(null);
   const [name, setName] = useState<string | null>(null);
   const [bio, setBio] = useState<string | null>(null);
@@ -38,9 +40,9 @@ export default function ProfileScreen() {
       const avatarUrl = visibleAvatar && visibleAvatar !== profile.avatarUrl ? await uploadAvatar(visibleAvatar) : visibleAvatar;
       await updateProfile({ displayName: visibleName.trim(), bio: visibleBio.trim(), avatarUrl });
       setAvatar(avatarUrl);
-      Alert.alert(t("Perfil atualizado", "Profile updated"), t("Suas alterações foram salvas.", "Your changes were saved."));
+      showAlert(t("Perfil atualizado", "Profile updated"), t("Suas alterações foram salvas.", "Your changes were saved."));
     } catch (caught) {
-      Alert.alert(t("Não foi possível salvar", "Unable to save"), caught instanceof Error ? caught.message : t("Tente novamente.", "Try again."));
+      showAlert(t("Não foi possível salvar", "Unable to save"), caught instanceof Error ? caught.message : t("Tente novamente.", "Try again."));
     } finally { setSaving(false); }
   }
 

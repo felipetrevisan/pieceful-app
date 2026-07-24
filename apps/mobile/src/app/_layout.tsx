@@ -17,6 +17,7 @@ import { AgeGate } from "@/components/age-gate";
 import { FrostedScene } from "@/components/frosted-surface";
 import { GuidedTour } from "@/components/guided-tour";
 import { NavigationDrawer } from "@/components/navigation-drawer";
+import { PiecefulAlertProvider } from "@/components/pieceful-alert";
 import { StartupSplash } from "@/components/startup-splash";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { AppProvider, useApp } from "@/state/app-provider";
@@ -90,11 +91,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
-        <SocialProvider>
-          <MonetizationProvider>
-            <RootNavigator />
-          </MonetizationProvider>
-        </SocialProvider>
+        <PiecefulAlertProvider>
+          <SocialProvider>
+            <MonetizationProvider>
+              <RootNavigator />
+            </MonetizationProvider>
+          </SocialProvider>
+        </PiecefulAlertProvider>
       </AppProvider>
     </GestureHandlerRootView>
   );
