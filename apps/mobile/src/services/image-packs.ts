@@ -25,6 +25,9 @@ export interface ImagePack {
   descriptionEn: string;
   coverUrl: string;
   totalBytes: number;
+  audience: "child" | "teen" | "adult" | "all";
+  isFree: boolean;
+  productId: string | null;
   pictures: ImagePackPicture[];
 }
 
@@ -37,6 +40,9 @@ interface PackRow {
   description_en: string;
   cover_url: string;
   total_bytes: number;
+  audience: "child" | "teen" | "adult" | "all";
+  is_free: boolean;
+  store_product_id: string | null;
   sort_order: number;
   pack_images: {
     id: string;
@@ -52,13 +58,14 @@ interface PackRow {
   }[];
 }
 
-export async function listFreeChildImagePacks(): Promise<ImagePack[]> {
+export async function listImagePacks(audience: "child" | "teen" | "adult"): Promise<ImagePack[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("image_packs")
-    .select("id, slug, title_pt, title_en, description_pt, description_en, cover_url, total_bytes, sort_order, pack_images(id, title_pt, title_en, image_url, thumbnail_url, width, height, bytes, sort_order, is_published)")
-    .in("audience", ["child", "all"])
-    .eq("is_free", true)
+    .select(
+      "id, slug, title_pt, title_en, description_pt, description_en, cover_url, total_bytes, audience, is_free, store_product_id, sort_order, pack_images(id, title_pt, title_en, image_url, thumbnail_url, width, height, bytes, sort_order, is_published)",
+    )
+    .in("audience", [audience, "all"])
     .eq("is_published", true)
     .order("sort_order");
   if (error) throw error;
@@ -70,13 +77,18 @@ export async function getInstalledImagePacks(): Promise<ImagePack[]> {
   if (!value) return [];
   try {
     const packs = JSON.parse(value) as ImagePack[];
-    return packs.filter((pack) => pack.pictures.some((picture) => picture.localUri && new File(picture.localUri).exists));
+    return packs.filter((pack) =>
+      pack.pictures.some((picture) => picture.localUri && new File(picture.localUri).exists),
+    );
   } catch {
     return [];
   }
 }
 
-export async function downloadImagePack(pack: ImagePack, onProgress: (progress: number) => void): Promise<ImagePack> {
+export async function downloadImagePack(
+  pack: ImagePack,
+  onProgress: (progress: number) => void,
+): Promise<ImagePack> {
   const directory = new Directory(Paths.document, "pieceful-image-packs", pack.slug);
   directory.create({ idempotent: true, intermediates: true });
   const downloadedPictures: ImagePackPicture[] = [];
@@ -110,7 +122,10 @@ export async function removeImagePack(pack: ImagePack): Promise<void> {
   const directory = new Directory(Paths.document, "pieceful-image-packs", pack.slug);
   if (directory.exists) directory.delete();
   const installed = await getInstalledImagePacks();
-  await AsyncStorage.setItem(INSTALLED_PACKS_KEY, JSON.stringify(installed.filter((item) => item.id !== pack.id)));
+  await AsyncStorage.setItem(
+    INSTALLED_PACKS_KEY,
+    JSON.stringify(installed.filter((item) => item.id !== pack.id)),
+  );
 }
 
 function mapPackRow(row: PackRow): ImagePack {
@@ -123,6 +138,9 @@ function mapPackRow(row: PackRow): ImagePack {
     descriptionEn: row.description_en,
     coverUrl: row.cover_url,
     totalBytes: Number(row.total_bytes),
+    audience: row.audience,
+    isFree: row.is_free,
+    productId: row.store_product_id,
     pictures: row.pack_images
       .filter((picture) => picture.is_published)
       .sort((left, right) => left.sort_order - right.sort_order)

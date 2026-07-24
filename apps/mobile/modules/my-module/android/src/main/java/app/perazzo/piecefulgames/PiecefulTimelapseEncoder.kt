@@ -172,11 +172,30 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
   }
 
   private fun encodeFrames(file: File, totalFrames: Int, render: (Int, Bitmap) -> Unit) {
+    val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+    val supportedFormats = codec.codecInfo
+      .getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
+      .colorFormats
+      .toSet()
+    val qcomSemiPlanar = 0x7FA30C00
+    val colorFormat = when {
+      MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar in supportedFormats ->
+        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
+      qcomSemiPlanar in supportedFormats -> qcomSemiPlanar
+      MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar in supportedFormats ->
+        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar
+      MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible in supportedFormats ->
+        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
+      else -> error("The device video encoder does not support YUV 4:2:0 input")
+    }
+    val semiPlanar = colorFormat == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar || colorFormat == qcomSemiPlanar
     val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
-      setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
+      setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
+      setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT601_NTSC)
+      setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+      setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO)
       setInteger(MediaFormat.KEY_BIT_RATE, 5_000_000); setInteger(MediaFormat.KEY_FRAME_RATE, fps); setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
     }
-    val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
     val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
     var track = -1; var started = false
     val info = MediaCodec.BufferInfo(); val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -204,7 +223,7 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
       for (frame in 0 until totalFrames) {
         render(frame, bitmap)
         val input = nextInputBuffer()
-        toI420(bitmap, pixels, yuv)
+        toYuv420(bitmap, pixels, yuv, semiPlanar)
         codec.getInputBuffer(input)!!.apply { clear(); put(yuv) }
         codec.queueInputBuffer(input, 0, width * height * 3 / 2, frame * 1_000_000L / fps, 0)
         drain(false)
@@ -220,15 +239,25 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
     }
   }
 
-  private fun toI420(bitmap: Bitmap, pixels: IntArray, result: ByteArray) {
+  private fun toYuv420(bitmap: Bitmap, pixels: IntArray, result: ByteArray, semiPlanar: Boolean) {
     bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-    var yIndex = 0; var uIndex = width * height; var vIndex = uIndex + width * height / 4
+    var yIndex = 0
+    var uIndex = width * height
+    var vIndex = uIndex + width * height / 4
+    var chromaIndex = width * height
     for (row in 0 until height) for (col in 0 until width) {
       val color = pixels[row * width + col]; val r = Color.red(color); val g = Color.green(color); val b = Color.blue(color)
       result[yIndex++] = ((66*r + 129*g + 25*b + 128 shr 8) + 16).coerceIn(0,255).toByte()
       if (row % 2 == 0 && col % 2 == 0) {
-        result[uIndex++] = ((-38*r - 74*g + 112*b + 128 shr 8) + 128).coerceIn(0,255).toByte()
-        result[vIndex++] = ((112*r - 94*g - 18*b + 128 shr 8) + 128).coerceIn(0,255).toByte()
+        val u = ((-38*r - 74*g + 112*b + 128 shr 8) + 128).coerceIn(0,255).toByte()
+        val v = ((112*r - 94*g - 18*b + 128 shr 8) + 128).coerceIn(0,255).toByte()
+        if (semiPlanar) {
+          result[chromaIndex++] = u
+          result[chromaIndex++] = v
+        } else {
+          result[uIndex++] = u
+          result[vIndex++] = v
+        }
       }
     }
   }

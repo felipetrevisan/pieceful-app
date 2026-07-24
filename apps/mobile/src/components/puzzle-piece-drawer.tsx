@@ -4,17 +4,26 @@ import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import Svg, { ClipPath, Defs, Image as SvgImage, Path } from "react-native-svg";
-import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
+import Svg, { ClipPath, Defs, Path, Image as SvgImage } from "react-native-svg";
 import { FrostedBackdrop } from "@/components/frosted-surface";
+import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export interface ScreenFrame {
@@ -22,6 +31,12 @@ export interface ScreenFrame {
   y: number;
   width: number;
   height: number;
+}
+
+export interface TrayDragPreview {
+  piece: PuzzlePiece;
+  count: number;
+  size: number;
 }
 
 interface PuzzlePieceDrawerProps {
@@ -33,6 +48,9 @@ interface PuzzlePieceDrawerProps {
   boardZoom: number;
   boardPanX: number;
   boardPanY: number;
+  dragScreenX: SharedValue<number>;
+  dragScreenY: SharedValue<number>;
+  onDragPreviewChange: (preview: TrayDragPreview | null) => void;
   onReleasePieces: (ids: string[], x: number, y: number) => void;
   onStorageFrameChange: (frame: ScreenFrame | null) => void;
 }
@@ -71,6 +89,14 @@ function drawerOrder(id: string) {
   return Math.imul(hash ^ (hash >>> 16), 2246822507) >>> 0;
 }
 
+type TrayFilter = "all" | "edges" | "corners";
+
+function flatEdgeCount(piece: PuzzlePiece) {
+  return (["top", "right", "bottom", "left"] as const).filter(
+    (edge) => piece.shape[edge] === "flat",
+  ).length;
+}
+
 export function PuzzlePieceDrawer({
   imageUri,
   rows,
@@ -80,6 +106,9 @@ export function PuzzlePieceDrawer({
   boardZoom,
   boardPanX,
   boardPanY,
+  dragScreenX,
+  dragScreenY,
+  onDragPreviewChange,
   onReleasePieces,
   onStorageFrameChange,
 }: PuzzlePieceDrawerProps) {
@@ -87,7 +116,10 @@ export function PuzzlePieceDrawer({
   const { preferences, t, theme } = useApp();
   const colors = mobileThemes[theme];
   const storedPieces = useMemo(
-    () => pieces.filter((piece) => !piece.isPlaced && piece.trayId !== null).sort((left, right) => drawerOrder(left.id) - drawerOrder(right.id)),
+    () =>
+      pieces
+        .filter((piece) => !piece.isPlaced && piece.trayId !== null)
+        .sort((left, right) => drawerOrder(left.id) - drawerOrder(right.id)),
     [pieces],
   );
   const sheetHeight = Math.min(540, height * 0.62);
@@ -97,11 +129,20 @@ export function PuzzlePieceDrawer({
   const dragStart = useSharedValue(closedY);
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [filter, setFilter] = useState<TrayFilter>("all");
   const storageRef = useRef<View>(null);
   const pieceSize = Math.max(38, Math.min(50, (width - 48) / 7));
+  const filteredPieces = useMemo(() => {
+    if (filter === "all") return storedPieces;
+    return storedPieces.filter((piece) =>
+      filter === "corners" ? flatEdgeCount(piece) >= 2 : flatEdgeCount(piece) >= 1,
+    );
+  }, [filter, storedPieces]);
 
   function toggleSelected(id: string) {
-    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
     if (preferences.haptics) void Haptics.selectionAsync();
   }
 
@@ -131,16 +172,19 @@ export function PuzzlePieceDrawer({
       translateY.set(Math.max(0, Math.min(closedY, dragStart.get() + event.translationY)));
     })
     .onEnd((event) => {
-      const nextOpen = event.velocityY < -500 || (event.velocityY <= 500 && translateY.get() < closedY * 0.48);
+      const nextOpen =
+        event.velocityY < -500 || (event.velocityY <= 500 && translateY.get() < closedY * 0.48);
       translateY.set(withSpring(nextOpen ? 0 : closedY, { damping: 20, stiffness: 230 }));
       runOnJS(settle)(nextOpen);
     });
-  const sheetTap = Gesture.Tap().maxDuration(260).onEnd((_event, success) => {
-    if (!success) return;
-    const nextOpen = !open;
-    translateY.set(withSpring(nextOpen ? 0 : closedY, { damping: 20, stiffness: 230 }));
-    runOnJS(settle)(nextOpen);
-  });
+  const sheetTap = Gesture.Tap()
+    .maxDuration(260)
+    .onEnd((_event, success) => {
+      if (!success) return;
+      const nextOpen = !open;
+      translateY.set(withSpring(nextOpen ? 0 : closedY, { damping: 20, stiffness: 230 }));
+      runOnJS(settle)(nextOpen);
+    });
   const headerGesture = Gesture.Race(sheetPan, sheetTap);
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.get() }] }));
 
@@ -166,22 +210,40 @@ export function PuzzlePieceDrawer({
           tint={isLightMobileTheme(theme) ? "light" : "dark"}
           style={StyleSheet.absoluteFill}
         />
-      ) : <FrostedBackdrop intensity={88} />}
+      ) : (
+        <FrostedBackdrop intensity={88} />
+      )}
       <View
         pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: isLightMobileTheme(theme) ? `${colors.panel}c4` : `${colors.background}b8` },
+          {
+            backgroundColor: isLightMobileTheme(theme)
+              ? `${colors.panel}c4`
+              : `${colors.background}b8`,
+          },
         ]}
       />
-      <LinearGradient colors={[`${colors.accent}25`, `${colors.panel}a8`, `${colors.primary}24`]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={[`${colors.accent}25`, `${colors.panel}a8`, `${colors.primary}24`]}
+        style={StyleSheet.absoluteFill}
+      />
       <GestureDetector gesture={headerGesture}>
         <Animated.View style={styles.header}>
-          <View ref={storageRef} collapsable={false} pointerEvents="none" style={styles.storageDropZone} />
+          <View
+            ref={storageRef}
+            collapsable={false}
+            pointerEvents="none"
+            style={styles.storageDropZone}
+          />
           <View style={[styles.grabber, { backgroundColor: `${colors.muted}80` }]} />
-          <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}1b` }]}><Ionicons name="file-tray-full-outline" size={22} color={colors.accent} /></View>
+          <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}1b` }]}>
+            <Ionicons name="file-tray-full-outline" size={22} color={colors.accent} />
+          </View>
           <View style={styles.headerCopy}>
-            <Text style={[styles.title, { color: colors.text }]}>{t("Bandeja de peças", "Piece tray")}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {t("Bandeja de peças", "Piece tray")}
+            </Text>
             <Text style={[styles.meta, { color: colors.muted }]}>
               {selectedIds.length
                 ? `${selectedIds.length} ${t("selecionadas · segure para arrastar", "selected · hold to drag")}`
@@ -195,11 +257,18 @@ export function PuzzlePieceDrawer({
               onPress={() => setSelectedIds([])}
               style={[styles.selectionBadge, { backgroundColor: colors.accent }]}
             >
-              <Text style={[styles.selectionCount, { color: colors.background }]}>{selectedIds.length}</Text>
+              <Text style={[styles.selectionCount, { color: colors.background }]}>
+                {selectedIds.length}
+              </Text>
               <Ionicons name="close" size={14} color={colors.background} />
             </Pressable>
           ) : null}
-          <View style={[styles.storage, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}70` }]}>
+          <View
+            style={[
+              styles.storage,
+              { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}70` },
+            ]}
+          >
             <Ionicons name="archive-outline" size={22} color={colors.accent} />
           </View>
           <Ionicons name={open ? "chevron-down" : "chevron-up"} size={22} color={colors.muted} />
@@ -208,28 +277,85 @@ export function PuzzlePieceDrawer({
 
       <View style={[styles.divider, { backgroundColor: `${colors.accent}30` }]} />
       {storedPieces.length ? (
-        <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-          {storedPieces.map((piece) => (
-            <DrawerPiece
-              key={piece.id}
-              piece={piece}
-              imageUri={imageUri}
-              rows={rows}
-              columns={columns}
-              size={pieceSize}
-              boardFrame={boardFrame}
-              boardZoom={boardZoom}
-              boardPanX={boardPanX}
-              boardPanY={boardPanY}
-              selected={selectedIds.includes(piece.id)}
-              selectedIds={selectedIds}
-              onToggleSelected={toggleSelected}
-              onRelease={releaseSelected}
-            />
-          ))}
-        </ScrollView>
+        <>
+          <View style={styles.filters}>
+            {(
+              [
+                ["all", t("Todas", "All")],
+                ["edges", t("Bordas", "Edges")],
+                ["corners", t("Cantos", "Corners")],
+              ] as const
+            ).map(([id, label]) => {
+              const active = filter === id;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  key={id}
+                  onPress={() => setFilter(id)}
+                  style={[
+                    styles.filterButton,
+                    {
+                      backgroundColor: active ? colors.accent : colors.panelAlt,
+                      borderColor: active ? colors.accent : `${colors.muted}38`,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterLabel,
+                      { color: active ? colors.background : colors.text },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {filteredPieces.length ? (
+            <ScrollView
+              contentContainerStyle={styles.grid}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
+              {filteredPieces.map((piece) => (
+                <DrawerPiece
+                  key={piece.id}
+                  piece={piece}
+                  imageUri={imageUri}
+                  rows={rows}
+                  columns={columns}
+                  size={pieceSize}
+                  boardFrame={boardFrame}
+                  boardZoom={boardZoom}
+                  boardPanX={boardPanX}
+                  boardPanY={boardPanY}
+                  dragScreenX={dragScreenX}
+                  dragScreenY={dragScreenY}
+                  selected={selectedIds.includes(piece.id)}
+                  selectedIds={selectedIds}
+                  onDragPreviewChange={onDragPreviewChange}
+                  onToggleSelected={toggleSelected}
+                  onRelease={releaseSelected}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.empty}>
+              <Ionicons name="filter-outline" size={31} color={colors.accent} />
+              <Text style={[styles.emptyText, { color: colors.muted }]}>
+                {t("Nenhuma peça neste filtro", "No pieces in this filter")}
+              </Text>
+            </View>
+          )}
+        </>
       ) : (
-        <View style={styles.empty}><Ionicons name="sparkles-outline" size={34} color={colors.accent} /><Text style={[styles.emptyText, { color: colors.muted }]}>{t("Nenhuma peça guardada", "No stored pieces")}</Text></View>
+        <View style={styles.empty}>
+          <Ionicons name="sparkles-outline" size={34} color={colors.accent} />
+          <Text style={[styles.emptyText, { color: colors.muted }]}>
+            {t("Nenhuma peça guardada", "No stored pieces")}
+          </Text>
+        </View>
       )}
     </Animated.View>
   );
@@ -245,8 +371,11 @@ function DrawerPiece({
   boardZoom,
   boardPanX,
   boardPanY,
+  dragScreenX,
+  dragScreenY,
   selected,
   selectedIds,
+  onDragPreviewChange,
   onToggleSelected,
   onRelease,
 }: {
@@ -259,25 +388,35 @@ function DrawerPiece({
   boardZoom: number;
   boardPanX: number;
   boardPanY: number;
+  dragScreenX: SharedValue<number>;
+  dragScreenY: SharedValue<number>;
   selected: boolean;
   selectedIds: string[];
+  onDragPreviewChange: (preview: TrayDragPreview | null) => void;
   onToggleSelected: (id: string) => void;
   onRelease: (ids: string[], x: number, y: number) => void;
 }) {
   const margin = size * 0.24;
   const extent = size + margin * 2;
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
   const dragging = useSharedValue(0);
   const path = useMemo(() => piecePath(piece.shape, size, margin), [margin, piece.shape, size]);
   const clipId = `drawer-clip-${piece.id}`;
 
   const pan = Gesture.Pan()
     .activateAfterLongPress(120)
-    .onStart(() => dragging.set(1))
+    .onStart((event) => {
+      dragging.set(1);
+      dragScreenX.set(event.absoluteX);
+      dragScreenY.set(event.absoluteY);
+      runOnJS(onDragPreviewChange)({
+        piece,
+        count: selected ? Math.max(1, selectedIds.length) : 1,
+        size,
+      });
+    })
     .onUpdate((event) => {
-      translateX.set(event.translationX);
-      translateY.set(event.translationY);
+      dragScreenX.set(event.absoluteX);
+      dragScreenY.set(event.absoluteY);
     })
     .onEnd((event) => {
       if (boardFrame) {
@@ -291,18 +430,22 @@ function DrawerPiece({
           event.absoluteY >= visualY &&
           event.absoluteY <= visualY + visualHeight;
         if (insideBoard) {
-          const x = Math.max(-0.15, Math.min(columns - 0.85, ((event.absoluteX - visualX) / visualWidth) * columns - 0.5));
-          const y = Math.max(-0.15, Math.min(rows - 0.85, ((event.absoluteY - visualY) / visualHeight) * rows - 0.5));
+          const x = Math.max(
+            -0.15,
+            Math.min(columns - 0.85, ((event.absoluteX - visualX) / visualWidth) * columns - 0.5),
+          );
+          const y = Math.max(
+            -0.15,
+            Math.min(rows - 0.85, ((event.absoluteY - visualY) / visualHeight) * rows - 0.5),
+          );
           runOnJS(onRelease)(selected ? selectedIds : [piece.id], x, y);
-          translateX.set(0);
-          translateY.set(0);
           dragging.set(0);
+          runOnJS(onDragPreviewChange)(null);
           return;
         }
       }
-      translateX.set(withSpring(0));
-      translateY.set(withSpring(0));
       dragging.set(0);
+      runOnJS(onDragPreviewChange)(null);
     });
   const tap = Gesture.Tap()
     .maxDuration(260)
@@ -312,11 +455,8 @@ function DrawerPiece({
   const gesture = Gesture.Exclusive(pan, tap);
   const animatedStyle = useAnimatedStyle(() => ({
     zIndex: dragging.get() ? 100 : 1,
-    transform: [
-      { translateX: translateX.get() },
-      { translateY: translateY.get() },
-      { scale: dragging.get() ? 1.15 : 1 },
-    ],
+    opacity: dragging.get() ? 0.28 : 1,
+    transform: [{ scale: dragging.get() ? 0.9 : 1 }],
   }));
   const stackStyle = useAnimatedStyle(() => ({ opacity: dragging.get() }));
 
@@ -325,12 +465,32 @@ function DrawerPiece({
       <Animated.View style={[{ width: extent, height: extent }, animatedStyle]}>
         {selected && selectedIds.length > 1 ? (
           <>
-            <Animated.View pointerEvents="none" style={[styles.stackLayer, styles.stackLayerBack, { borderColor: "rgba(255,255,255,.55)" }, stackStyle]} />
-            <Animated.View pointerEvents="none" style={[styles.stackLayer, styles.stackLayerMiddle, { borderColor: "rgba(255,255,255,.7)" }, stackStyle]} />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.stackLayer,
+                styles.stackLayerBack,
+                { borderColor: "rgba(255,255,255,.55)" },
+                stackStyle,
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.stackLayer,
+                styles.stackLayerMiddle,
+                { borderColor: "rgba(255,255,255,.7)" },
+                stackStyle,
+              ]}
+            />
           </>
         ) : null}
         <Svg width={extent} height={extent}>
-          <Defs><ClipPath id={clipId}><Path d={path} /></ClipPath></Defs>
+          <Defs>
+            <ClipPath id={clipId}>
+              <Path d={path} />
+            </ClipPath>
+          </Defs>
           <SvgImage
             href={{ uri: imageUri }}
             x={margin - piece.column * size}
@@ -344,7 +504,9 @@ function DrawerPiece({
         </Svg>
         {selected ? (
           <View pointerEvents="none" style={styles.selectedOutline}>
-            <View style={styles.selectedCheck}><Ionicons name="checkmark" size={12} color="#071126" /></View>
+            <View style={styles.selectedCheck}>
+              <Ionicons name="checkmark" size={12} color="#071126" />
+            </View>
           </View>
         ) : null}
       </Animated.View>
@@ -352,25 +514,223 @@ function DrawerPiece({
   );
 }
 
+export function PuzzlePieceDragOverlay({
+  preview,
+  imageUri,
+  rows,
+  columns,
+  screenX,
+  screenY,
+  screenOffsetY,
+  accent,
+}: {
+  preview: TrayDragPreview | null;
+  imageUri: string;
+  rows: number;
+  columns: number;
+  screenX: SharedValue<number>;
+  screenY: SharedValue<number>;
+  screenOffsetY: number;
+  accent: string;
+}) {
+  const size = preview?.size ?? 48;
+  const margin = size * 0.24;
+  const extent = size + margin * 2;
+  const path = useMemo(
+    () => (preview ? piecePath(preview.piece.shape, size, margin) : ""),
+    [margin, preview, size],
+  );
+  const overlayStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: screenX.get() - extent / 2 },
+      { translateY: screenY.get() - screenOffsetY - extent / 2 },
+      { scale: 1.16 },
+    ],
+  }));
+
+  if (!preview) return null;
+  const clipId = `tray-drag-${preview.piece.id}`;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.dragOverlay,
+        { width: extent, height: extent, shadowColor: accent },
+        overlayStyle,
+      ]}
+    >
+      {preview.count > 1 ? (
+        <>
+          <View style={[styles.dragStack, styles.dragStackBack, { borderColor: `${accent}b8` }]} />
+          <View style={[styles.dragStack, styles.dragStackMiddle, { borderColor: accent }]} />
+          <View style={[styles.dragCount, { backgroundColor: accent }]}>
+            <Text style={styles.dragCountText}>{preview.count}</Text>
+          </View>
+        </>
+      ) : null}
+      <Svg width={extent} height={extent}>
+        <Defs>
+          <ClipPath id={clipId}>
+            <Path d={path} />
+          </ClipPath>
+        </Defs>
+        <SvgImage
+          href={{ uri: imageUri }}
+          x={margin - preview.piece.column * size}
+          y={margin - preview.piece.row * size}
+          width={columns * size}
+          height={rows * size}
+          preserveAspectRatio="xMidYMid slice"
+          clipPath={`url(#${clipId})`}
+        />
+        <Path d={path} fill="transparent" stroke="rgba(255,255,255,.9)" strokeWidth={1.5} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
-  sheet: { position: "absolute", left: 8, right: 8, bottom: 0, zIndex: 80, borderWidth: 1.5, borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: "hidden", shadowOpacity: .28, shadowRadius: 24, shadowOffset: { width: 0, height: -10 }, elevation: 18 },
-  header: { height: 68, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingTop: 7 },
+  sheet: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: 0,
+    zIndex: 80,
+    borderWidth: 1.5,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    overflow: "hidden",
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -10 },
+    elevation: 18,
+  },
+  header: {
+    height: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 7,
+  },
   storageDropZone: { position: "absolute", inset: 0 },
   grabber: { position: "absolute", top: 6, left: "42%", right: "42%", height: 4, borderRadius: 99 },
-  headerIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerCopy: { flex: 1, minWidth: 0 },
   title: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 15 },
   meta: { fontFamily: "Inter_600SemiBold", fontSize: 9, marginTop: 2 },
-  storage: { width: 43, height: 43, borderRadius: 14, borderWidth: 1.5, borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
-  selectionBadge: { minWidth: 42, height: 32, paddingHorizontal: 8, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
+  storage: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectionBadge: {
+    minWidth: 42,
+    height: 32,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
   selectionCount: { fontFamily: "Inter_700Bold", fontSize: 12 },
   divider: { height: 1 },
-  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-around", gap: 4, paddingHorizontal: 8, paddingTop: 10, paddingBottom: 32 },
-  stackLayer: { position: "absolute", inset: 7, borderRadius: 12, borderWidth: 1.5, backgroundColor: "rgba(18,27,55,.88)" },
+  filters: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
+  filterButton: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  filterLabel: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 32,
+  },
+  stackLayer: {
+    position: "absolute",
+    inset: 7,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(18,27,55,.88)",
+  },
   stackLayerBack: { transform: [{ translateX: 8 }, { translateY: -7 }, { rotate: "7deg" }] },
   stackLayerMiddle: { transform: [{ translateX: 4 }, { translateY: -4 }, { rotate: "3deg" }] },
-  selectedOutline: { position: "absolute", inset: 2, borderRadius: 14, borderWidth: 2, borderColor: "#67edf3" },
-  selectedCheck: { position: "absolute", top: -7, right: -7, width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#67edf3" },
+  selectedOutline: {
+    position: "absolute",
+    inset: 2,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#67edf3",
+  },
+  selectedCheck: {
+    position: "absolute",
+    top: -7,
+    right: -7,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#67edf3",
+  },
+  dragOverlay: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    zIndex: 300,
+    elevation: 30,
+    shadowOpacity: 0.55,
+    shadowRadius: 13,
+    shadowOffset: { width: 0, height: 7 },
+  },
+  dragStack: {
+    position: "absolute",
+    inset: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(12,20,44,.92)",
+  },
+  dragStackBack: { transform: [{ translateX: 10 }, { translateY: -8 }, { rotate: "8deg" }] },
+  dragStackMiddle: { transform: [{ translateX: 5 }, { translateY: -4 }, { rotate: "4deg" }] },
+  dragCount: {
+    position: "absolute",
+    right: -10,
+    top: -10,
+    zIndex: 4,
+    minWidth: 25,
+    height: 25,
+    borderRadius: 13,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dragCountText: { color: "#071126", fontFamily: "Inter_800ExtraBold", fontSize: 11 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 9 },
   emptyText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
 });

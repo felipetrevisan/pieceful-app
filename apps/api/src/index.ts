@@ -1,6 +1,7 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, t } from "elysia";
 import { adminRoutes } from "./admin";
+import { configuredWebOrigins, isAllowedWebOrigin } from "./origins";
 
 interface UnsplashPhoto {
   id: string;
@@ -16,12 +17,7 @@ interface UnsplashSearchResponse {
   results: UnsplashPhoto[];
 }
 
-const localNetworkOrigin =
-  /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(?::\d+)?$/;
-const configuredOrigins = (Bun.env.WEB_ORIGIN ?? "http://localhost:3000")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const configuredOrigins = configuredWebOrigins(Bun.env.WEB_ORIGIN);
 
 const unsplashHeaders = () => ({
   Authorization: `Client-ID ${Bun.env.UNSPLASH_ACCESS_KEY}`,
@@ -31,7 +27,8 @@ const unsplashHeaders = () => ({
 const app = new Elysia()
   .use(
     cors({
-      origin: [...configuredOrigins, localNetworkOrigin],
+      origin: (request) =>
+        isAllowedWebOrigin(request.headers.get("Origin") ?? "", configuredOrigins),
       credentials: false,
       allowedHeaders: ["Content-Type", "Authorization"],
       methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],

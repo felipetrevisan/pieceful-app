@@ -11,6 +11,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { AnimatedAuroraBackground } from "@/components/animated-aurora-background";
 import { useApp } from "@/state/app-provider";
 
 const BRAND_CYAN = "#63edf2";
@@ -31,39 +32,31 @@ export function StartupSplash({
   const startedAt = useRef<number | null>(null);
   const progress = useSharedValue(0.06);
   const pulse = useSharedValue(0);
-  const backgroundDrift = useSharedValue(0);
   const [percentage, setPercentage] = useState(6);
 
   useEffect(() => {
     startedAt.current = Date.now();
     progress.set(withTiming(0.9, { duration: 3000, easing: Easing.out(Easing.cubic) }));
-    pulse.set(withRepeat(
-      withSequence(
-        withTiming(1, { duration: 850, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 850, easing: Easing.inOut(Easing.sin) }),
+    pulse.set(
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 850, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0, { duration: 850, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        true,
       ),
-      -1,
-      true,
-    ));
-    backgroundDrift.set(withRepeat(
-      withSequence(
-        withTiming(1, { duration: 5200, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 5200, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      true,
-    ));
+    );
     const percentageTimer = setInterval(
-      () => setPercentage((current) => current >= 90 ? current : Math.min(90, current + 2)),
+      () => setPercentage((current) => (current >= 90 ? current : Math.min(90, current + 2))),
       75,
     );
 
     return () => {
       clearInterval(percentageTimer);
       pulse.set(0);
-      backgroundDrift.set(0);
     };
-  }, [backgroundDrift, progress, pulse]);
+  }, [progress, pulse]);
 
   useEffect(() => {
     if (!resourcesReady) return;
@@ -71,46 +64,36 @@ export function StartupSplash({
     const remainingFakeLoadingTime = Math.max(0, MINIMUM_SPLASH_TIME - elapsed);
     const timeout = setTimeout(() => {
       setPercentage(100);
-      progress.set(withTiming(1, { duration: 480, easing: Easing.out(Easing.cubic) }, (finished) => {
-        if (finished) runOnJS(onFinished)();
-      }));
+      progress.set(
+        withTiming(1, { duration: 480, easing: Easing.out(Easing.cubic) }, (finished) => {
+          if (finished) runOnJS(onFinished)();
+        }),
+      );
     }, remainingFakeLoadingTime);
     return () => clearTimeout(timeout);
   }, [onFinished, progress, resourcesReady]);
 
   const progressStyle = useAnimatedStyle(() => ({ width: `${progress.get() * 100}%` }));
   const logoStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + pulse.get() * 0.055 }] }));
-  const backgroundStyle = useAnimatedStyle(() => ({
-    opacity: 0.9 + backgroundDrift.get() * 0.1,
-    transform: [
-      { translateX: -8 + backgroundDrift.get() * 16 },
-      { translateY: -14 + backgroundDrift.get() * 28 },
-      { scale: 1.08 + backgroundDrift.get() * 0.035 },
-    ],
-  }));
-
   return (
     <View style={[styles.container, { backgroundColor: SPLASH_BACKGROUND }]}>
-      <Animated.Image
-        source={require("../../assets/images/splash-background.png")}
-        resizeMode="cover"
-        style={[styles.backgroundImage, backgroundStyle]}
-      />
-      <LinearGradient
-        colors={["rgba(4,10,28,.18)", "rgba(4,10,28,.42)", "rgba(4,10,28,.78)"]}
-        locations={[0, 0.48, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+      <AnimatedAuroraBackground />
 
       <View style={styles.brandArea}>
         <Animated.View style={[styles.logoHalo, logoStyle]}>
-          <Image source={require("../../assets/images/pieceful-logo.png")} style={styles.logoAsset} contentFit="contain" />
+          <Image
+            source={require("../../assets/images/pieceful-logo.png")}
+            style={styles.logoAsset}
+            contentFit="contain"
+          />
           <View style={[styles.sparkle, styles.sparkleTop]} />
           <View style={[styles.sparkle, styles.sparkleRight]} />
         </Animated.View>
 
         <Text style={[styles.title, fontsLoaded ? styles.titleFont : null]}>Pieceful</Text>
-        <Text style={[styles.tagline, fontsLoaded ? styles.taglineFont : null]}>One piece at a time.</Text>
+        <Text style={[styles.tagline, fontsLoaded ? styles.taglineFont : null]}>
+          One piece at a time.
+        </Text>
       </View>
 
       <View style={styles.loadingArea}>
@@ -118,7 +101,9 @@ export function StartupSplash({
           <Text style={[styles.loadingText, fontsLoaded ? styles.loadingFont : null]}>
             {language === "en" ? "Preparing your pieces" : "Preparando suas peças"}
           </Text>
-          <Text style={[styles.percentage, fontsLoaded ? styles.percentageFont : null]}>{percentage}%</Text>
+          <Text style={[styles.percentage, fontsLoaded ? styles.percentageFont : null]}>
+            {percentage}%
+          </Text>
         </View>
         <View
           accessibilityLabel={language === "en" ? "Loading application" : "Carregando aplicativo"}
@@ -127,7 +112,12 @@ export function StartupSplash({
           style={styles.track}
         >
           <Animated.View style={[styles.progress, progressStyle]}>
-            <LinearGradient colors={[BRAND_CYAN, BRAND_LAVENDER]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              colors={[BRAND_CYAN, BRAND_LAVENDER]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+            />
           </Animated.View>
         </View>
       </View>
@@ -142,15 +132,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
     paddingHorizontal: 32,
-  },
-  backgroundImage: {
-    position: "absolute",
-    left: -30,
-    right: -30,
-    top: -48,
-    bottom: -48,
-    width: undefined,
-    height: undefined,
   },
   brandArea: {
     alignItems: "center",

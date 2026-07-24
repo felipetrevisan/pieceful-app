@@ -10,11 +10,14 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "app.perazzo.pieceful",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSPhotoLibraryAddUsageDescription": "Pieceful saves your completed puzzle timelapse to your photo library."
+      }
     },
     "android": {
       "package": "app.perazzo.pieceful",
-      "versionCode": 8,
+      "versionCode": 9,
       "intentFilters": [
         {
           "action": "VIEW",
@@ -29,8 +32,8 @@
         }
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#071126",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#070c29",
+        "foregroundImage": "./assets/images/icon.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false

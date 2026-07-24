@@ -2,6 +2,7 @@ import ExpoModulesCore
 import GameKit
 import UIKit
 import AVFoundation
+import Photos
 
 private final class PiecefulGameCenterDelegate: NSObject, GKGameCenterControllerDelegate {
   func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
@@ -73,6 +74,30 @@ public class PiecefulGameServicesModule: Module {
           promise.resolve(uri)
         } catch {
           promise.reject("ERR_TIMELAPSE", error.localizedDescription)
+        }
+      }
+    }
+
+    AsyncFunction("saveVideoToGallery") { (value: String, promise: Promise) in
+      guard let url = URL(string: value) else {
+        promise.reject("ERR_SAVE_VIDEO", "Invalid video URL")
+        return
+      }
+      PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+        guard status == .authorized || status == .limited else {
+          promise.reject("ERR_PHOTO_PERMISSION", "Photo library permission was denied")
+          return
+        }
+        PHPhotoLibrary.shared().performChanges({
+          PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+        }) { saved, error in
+          if let error {
+            promise.reject("ERR_SAVE_VIDEO", error.localizedDescription)
+          } else if saved {
+            promise.resolve(value)
+          } else {
+            promise.reject("ERR_SAVE_VIDEO", "Unable to save the video")
+          }
         }
       }
     }

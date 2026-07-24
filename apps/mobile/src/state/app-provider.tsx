@@ -1,13 +1,13 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  generatePieces,
   type Camera,
+  generatePieces,
   type PuzzlePiece,
   type PuzzleSession,
   type PuzzleTimelapseFrame,
   type PuzzleTimelapsePiece,
 } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createContext,
   type ReactNode,
@@ -20,8 +20,24 @@ import {
 
 export type AppLanguage = "pt-BR" | "en";
 export type AgeGroup = "child" | "teen" | "adult";
-export type MobileTheme = "cosmic" | "candy" | "jungle" | "rainbow" | "ocean" | "arcade" | "castle" | "storybook" | "cyberpunk" | "hologram" | "space";
-export interface MobilePreferences { sound: boolean; haptics: boolean; highContrast: boolean; reducedMotion: boolean }
+export type MobileTheme =
+  | "cosmic"
+  | "candy"
+  | "jungle"
+  | "rainbow"
+  | "ocean"
+  | "arcade"
+  | "castle"
+  | "storybook"
+  | "cyberpunk"
+  | "hologram"
+  | "space";
+export interface MobilePreferences {
+  sound: boolean;
+  haptics: boolean;
+  highContrast: boolean;
+  reducedMotion: boolean;
+}
 
 export interface MobilePuzzle {
   id: string;
@@ -52,6 +68,7 @@ interface AppState {
   theme: MobileTheme;
   preferences: MobilePreferences;
   puzzles: MobilePuzzle[];
+  notificationCount: number;
   setLanguage: (language: AppLanguage) => void;
   setAgeGroup: (ageGroup: AgeGroup) => void;
   resetAgeGroup: () => void;
@@ -59,6 +76,7 @@ interface AppState {
   setDrawerOpen: (open: boolean) => void;
   startTour: () => void;
   completeTour: () => void;
+  markNotificationsRead: () => void;
   updatePreference: (key: keyof MobilePreferences, value: boolean) => void;
   createPuzzle: (input: CreatePuzzleInput) => MobilePuzzle;
   updatePuzzlePieces: (id: string, pieces: PuzzlePiece[]) => void;
@@ -73,7 +91,12 @@ interface AppState {
 }
 
 const STORAGE_KEY = "pieceful-mobile-state-v1";
-const defaultPreferences: MobilePreferences = { sound: true, haptics: true, highContrast: false, reducedMotion: false };
+const defaultPreferences: MobilePreferences = {
+  sound: true,
+  haptics: true,
+  highContrast: false,
+  reducedMotion: false,
+};
 
 const AppContext = createContext<AppState | null>(null);
 
@@ -99,7 +122,8 @@ function changedTimelapsePieces(previous: PuzzlePiece[], next: PuzzlePiece[]) {
       before.currentPosition.rotation === piece.currentPosition.rotation &&
       before.isPlaced === piece.isPlaced &&
       (before.trayId === null) === (piece.trayId === null)
-    ) return [];
+    )
+      return [];
     return [timelapseState(piece)];
   });
 }
@@ -114,7 +138,9 @@ function appendTimelapseFrame(
   const at = Math.max(elapsedTime, (last?.at ?? 0) + 0.12);
   const next = [...frames, { at, changes }];
   // Keeps long sessions reasonably small without losing the final assembly state.
-  return next.length <= 1800 ? next : next.filter((_, index) => index % 2 === 0 || index === next.length - 1);
+  return next.length <= 1800
+    ? next
+    : next.filter((_, index) => index % 2 === 0 || index === next.length - 1);
 }
 
 function shuffledTraySlots(length: number, seed: number) {
@@ -144,6 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<MobileTheme>("cosmic");
   const [preferences, setPreferences] = useState(defaultPreferences);
   const [puzzles, setPuzzles] = useState<MobilePuzzle[]>([]);
+  const [lastNotificationsReadAt, setLastNotificationsReadAt] = useState<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -159,17 +186,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
           puzzles: MobilePuzzle[];
           preferences: MobilePreferences;
           tourCompleted: boolean;
+          lastNotificationsReadAt: string;
         }>;
         if (parsed.language === "en" || parsed.language === "pt-BR") {
           setLanguageState(parsed.language);
         }
-        if (["child", "teen", "adult"].includes(parsed.ageGroup ?? "")) setAgeGroupState(parsed.ageGroup as AgeGroup);
-        if (["cosmic", "candy", "jungle", "rainbow", "ocean", "arcade", "castle", "storybook", "cyberpunk", "hologram", "space"].includes(parsed.theme ?? "")) {
+        if (["child", "teen", "adult"].includes(parsed.ageGroup ?? ""))
+          setAgeGroupState(parsed.ageGroup as AgeGroup);
+        if (
+          [
+            "cosmic",
+            "candy",
+            "jungle",
+            "rainbow",
+            "ocean",
+            "arcade",
+            "castle",
+            "storybook",
+            "cyberpunk",
+            "hologram",
+            "space",
+          ].includes(parsed.theme ?? "")
+        ) {
           setThemeState(parsed.theme as MobileTheme);
         }
         if (Array.isArray(parsed.puzzles)) setPuzzles(parsed.puzzles);
         if (parsed.preferences) setPreferences({ ...defaultPreferences, ...parsed.preferences });
         const completed = parsed.tourCompleted === true;
+        if (typeof parsed.lastNotificationsReadAt === "string") {
+          setLastNotificationsReadAt(parsed.lastNotificationsReadAt);
+        }
         setTourCompleted(completed);
         setTourOpen(!completed);
       })
@@ -179,8 +225,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ageGroup, language, theme, puzzles, preferences, tourCompleted }));
-  }, [ageGroup, language, preferences, puzzles, ready, theme, tourCompleted]);
+    void AsyncStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ageGroup,
+        language,
+        theme,
+        puzzles,
+        preferences,
+        tourCompleted,
+        lastNotificationsReadAt,
+      }),
+    );
+  }, [
+    ageGroup,
+    language,
+    lastNotificationsReadAt,
+    preferences,
+    puzzles,
+    ready,
+    theme,
+    tourCompleted,
+  ]);
 
   const setLanguage = useCallback((next: AppLanguage) => setLanguageState(next), []);
   const setAgeGroup = useCallback((next: AgeGroup) => {
@@ -194,6 +260,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTourCompleted(true);
     setTourOpen(false);
   }, []);
+  const markNotificationsRead = useCallback(
+    () => setLastNotificationsReadAt(new Date().toISOString()),
+    [],
+  );
   const updatePreference = useCallback((key: keyof MobilePreferences, value: boolean) => {
     setPreferences((current) => ({ ...current, [key]: value }));
   }, []);
@@ -201,11 +271,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const createPuzzle = useCallback((input: CreatePuzzleInput) => {
     const id = `puzzle-${Date.now()}-${Math.round(Math.random() * 100_000)}`;
     const seed = Math.floor(Math.random() * 0xffffffff);
-    const generated = generatePieces(
-      input.configuration.rows,
-      input.configuration.columns,
-      seed,
-    );
+    const generated = generatePieces(input.configuration.rows, input.configuration.columns, seed);
     const shuffledSlots = shuffledTraySlots(generated.length, seed ^ 0x51f15e);
     const pieces = generated.map((piece, index) => ({
       ...piece,
@@ -263,7 +329,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             completedAt: completed ? new Date().toISOString() : null,
             timelapse: {
               ...currentTimelapse,
-              frames: appendTimelapseFrame(currentTimelapse.frames, puzzle.session.elapsedTime, changes),
+              frames: appendTimelapseFrame(
+                currentTimelapse.frames,
+                puzzle.session.elapsedTime,
+                changes,
+              ),
             },
           },
         };
@@ -299,9 +369,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const incrementPuzzleHints = useCallback((id: string) => {
-    setPuzzles((current) => current.map((puzzle) => puzzle.id === id
-      ? { ...puzzle, session: { ...puzzle.session, hintsUsed: puzzle.session.hintsUsed + 1 } }
-      : puzzle));
+    setPuzzles((current) =>
+      current.map((puzzle) =>
+        puzzle.id === id
+          ? { ...puzzle, session: { ...puzzle.session, hintsUsed: puzzle.session.hintsUsed + 1 } }
+          : puzzle,
+      ),
+    );
   }, []);
 
   const deletePuzzle = useCallback((id: string) => {
@@ -313,9 +387,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const renamePuzzle = useCallback((id: string, name: string) => {
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    setPuzzles((current) => current.map((puzzle) => puzzle.id === id
-      ? { ...puzzle, name: trimmedName, updatedAt: new Date().toISOString() }
-      : puzzle));
+    setPuzzles((current) =>
+      current.map((puzzle) =>
+        puzzle.id === id
+          ? { ...puzzle, name: trimmedName, updatedAt: new Date().toISOString() }
+          : puzzle,
+      ),
+    );
   }, []);
 
   const mergeRemotePuzzles = useCallback((remotePuzzles: MobilePuzzle[]) => {
@@ -327,9 +405,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           merged.set(remote.id, remote);
         }
       }
-      return [...merged.values()].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+      return [...merged.values()].sort(
+        (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+      );
     });
   }, []);
+
+  const readAt = lastNotificationsReadAt ? new Date(lastNotificationsReadAt).getTime() : 0;
+  const todayStartedAt = new Date();
+  todayStartedAt.setHours(0, 0, 0, 0);
+  const dailyChallengeUnread = readAt < todayStartedAt.getTime();
+  const activePuzzleUnread = puzzles.some(
+    (puzzle) => !puzzle.session.completedAt && new Date(puzzle.updatedAt).getTime() > readAt,
+  );
+  const notificationCount = Number(dailyChallengeUnread) + Number(activePuzzleUnread);
 
   const value = useMemo<AppState>(
     () => ({
@@ -343,6 +432,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       theme,
       preferences,
       puzzles,
+      notificationCount,
       setLanguage,
       setAgeGroup,
       resetAgeGroup,
@@ -350,6 +440,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDrawerOpen,
       startTour,
       completeTour,
+      markNotificationsRead,
       updatePreference,
       createPuzzle,
       updatePuzzlePieces,
@@ -368,11 +459,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deletePuzzle,
       deleteLocalPuzzles,
       mergeRemotePuzzles,
+      markNotificationsRead,
       renamePuzzle,
       drawerOpen,
       language,
       ageGroup,
       puzzles,
+      notificationCount,
       preferences,
       ready,
       setLanguage,

@@ -27,6 +27,7 @@ interface AdminImagePack {
   cover_url: string;
   audience: "child" | "teen" | "adult" | "all";
   is_free: boolean;
+  store_product_id: string | null;
   is_published: boolean;
   sort_order: number;
   total_bytes: number;
@@ -44,7 +45,7 @@ interface ApiResult<T = unknown> {
   token?: string;
 }
 
-const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").replace(/\/+$/, "");
 let adminToken = "";
 
 async function api<T = unknown>(url: string, init: RequestInit = {}) {
@@ -189,7 +190,8 @@ export function AdminDashboard() {
                 <span>
                   <strong>{pack.title_pt || pack.slug}</strong>
                   <small>
-                    {pack.pack_images.length} imagens · {formatSize(pack.total_bytes)}
+                    {pack.pack_images.length} imagens · {formatSize(pack.total_bytes)} ·{" "}
+                    {pack.is_free ? "Grátis" : "Pago"}
                   </small>
                 </span>
                 <i className={pack.is_published ? styles.live : styles.draft}>
@@ -350,6 +352,7 @@ function PackEditor({
           ...Object.fromEntries(form),
           sort_order: Number(form.get("sort_order")),
           is_free: form.get("is_free") === "on",
+          store_product_id: String(form.get("store_product_id") ?? "").trim() || null,
           is_published: form.get("is_published") === "on",
         }),
       });
@@ -407,6 +410,12 @@ function PackEditor({
             defaultValue={pack.minimum_app_version ?? ""}
             pattern="[0-9]+(?:\.[0-9]+){0,2}"
           />
+          <Field
+            label="ID do produto na loja"
+            name="store_product_id"
+            defaultValue={pack.store_product_id ?? ""}
+            placeholder="pieceful.pack.nome-do-pacote"
+          />
           <Area
             label="Descrição em português"
             name="description_pt"
@@ -422,6 +431,10 @@ function PackEditor({
           <label>
             <input name="is_free" type="checkbox" defaultChecked={pack.is_free} /> Gratuito
           </label>
+          <p>
+            Pacotes pagos precisam de um produto único e não consumível no Google Play com o mesmo
+            ID informado acima. O preço é definido pela loja.
+          </p>
           <label>
             <input name="is_published" type="checkbox" defaultChecked={pack.is_published} />{" "}
             Publicado no app
@@ -644,6 +657,7 @@ function Field(props: {
   defaultValue: string;
   type?: string;
   pattern?: string;
+  placeholder?: string;
 }) {
   const { label, ...inputProps } = props;
   return (

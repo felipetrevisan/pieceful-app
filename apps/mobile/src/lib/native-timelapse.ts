@@ -1,7 +1,7 @@
 import type { PuzzlePiece, PuzzleTimelapse, PuzzleTimelapsePiece } from "@puzzled/puzzle-engine";
 import * as Sharing from "expo-sharing";
+import type { AppLanguage, MobilePuzzle } from "@/state/app-provider";
 import PiecefulGameServices from "../../modules/my-module/src/PiecefulGameServicesModule";
-import type { MobilePuzzle, AppLanguage } from "@/state/app-provider";
 
 function finalState(piece: PuzzlePiece): PuzzleTimelapsePiece {
   return {
@@ -35,10 +35,7 @@ function timelineFor(puzzle: MobilePuzzle): PuzzleTimelapse {
   };
 }
 
-export async function createAndShareTimelapse(
-  puzzle: MobilePuzzle,
-  language: AppLanguage,
-) {
+export async function createTimelapse(puzzle: MobilePuzzle, language: AppLanguage) {
   if (!PiecefulGameServices?.createTimelapse) {
     throw new Error(
       language === "en"
@@ -63,14 +60,32 @@ export async function createAndShareTimelapse(
     })),
     timelapse: timeline,
   });
-  const uri = await PiecefulGameServices.createTimelapse(payload);
+  return PiecefulGameServices.createTimelapse(payload);
+}
+
+export async function shareTimelapse(uri: string, language: AppLanguage) {
   if (!(await Sharing.isAvailableAsync())) {
-    throw new Error(language === "en" ? "Sharing is not available on this device." : "O compartilhamento não está disponível neste aparelho.");
+    throw new Error(
+      language === "en"
+        ? "Sharing is not available on this device."
+        : "O compartilhamento não está disponível neste aparelho.",
+    );
   }
   await Sharing.shareAsync(uri, {
     mimeType: "video/mp4",
-    dialogTitle: language === "en" ? "Share Pieceful timelapse" : "Compartilhar timelapse do Pieceful",
+    dialogTitle:
+      language === "en" ? "Share Pieceful timelapse" : "Compartilhar timelapse do Pieceful",
     UTI: "public.mpeg-4",
   });
-  return uri;
+}
+
+export async function saveTimelapse(uri: string, language: AppLanguage) {
+  if (!PiecefulGameServices?.saveVideoToGallery) {
+    throw new Error(
+      language === "en"
+        ? "Saving videos requires the latest installed Pieceful app."
+        : "Para salvar vídeos, instale a versão mais recente do Pieceful.",
+    );
+  }
+  return PiecefulGameServices.saveVideoToGallery(uri);
 }

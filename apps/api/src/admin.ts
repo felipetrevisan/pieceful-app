@@ -29,6 +29,7 @@ interface ImagePack {
   cover_url: string;
   audience: "child" | "teen" | "adult" | "all";
   is_free: boolean;
+  store_product_id: string | null;
   is_published: boolean;
   sort_order: number;
   total_bytes: number;
@@ -250,6 +251,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         "cover_url",
         "audience",
         "is_free",
+        "store_product_id",
         "is_published",
         "sort_order",
         "available_from",

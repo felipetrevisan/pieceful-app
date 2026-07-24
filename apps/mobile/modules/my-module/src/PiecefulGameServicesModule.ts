@@ -15,6 +15,7 @@ declare class PiecefulGameServicesModule extends NativeModule<PiecefulGameServic
   reportAchievement(identifier: string, percent: number): Promise<void>;
   showAchievements(): Promise<void>;
   createTimelapse(payload: string): Promise<string>;
+  saveVideoToGallery(uri: string): Promise<string>;
 }
 
 export default requireOptionalNativeModule<PiecefulGameServicesModule>("PiecefulGameServices");

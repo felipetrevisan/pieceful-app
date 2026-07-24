@@ -12,8 +12,8 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { AuthGate } from "@/components/auth-gate";
 import { AgeGate } from "@/components/age-gate";
+import { AuthGate } from "@/components/auth-gate";
 import { FrostedScene } from "@/components/frosted-surface";
 import { GuidedTour } from "@/components/guided-tour";
 import { NavigationDrawer } from "@/components/navigation-drawer";
@@ -21,8 +21,8 @@ import { PiecefulAlertProvider } from "@/components/pieceful-alert";
 import { StartupSplash } from "@/components/startup-splash";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { AppProvider, useApp } from "@/state/app-provider";
-import { SocialProvider, useSocial } from "@/state/social-provider";
 import { MonetizationProvider } from "@/state/monetization-provider";
+import { SocialProvider, useSocial } from "@/state/social-provider";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -62,6 +62,7 @@ function RootNavigator() {
           <Stack.Screen name="auth/callback" />
           <Stack.Screen name="puzzle/[id]" />
           <Stack.Screen name="result/[id]" />
+          <Stack.Screen name="notifications" />
           <Stack.Screen name="settings/accessibility" />
           <Stack.Screen name="help/controller" />
           <Stack.Screen name="help/touch" />
@@ -79,7 +80,11 @@ function RootNavigator() {
       ) : null}
       {showStartupSplash ? (
         <View style={styles.gate}>
-          <StartupSplash resourcesReady={ready && fontsLoaded && socialReady} fontsLoaded={fontsLoaded} onFinished={finishStartup} />
+          <StartupSplash
+            resourcesReady={ready && fontsLoaded && socialReady}
+            fontsLoaded={fontsLoaded}
+            onFinished={finishStartup}
+          />
         </View>
       ) : null}
       {hasAppAccess && !showStartupSplash ? <GuidedTour /> : null}
