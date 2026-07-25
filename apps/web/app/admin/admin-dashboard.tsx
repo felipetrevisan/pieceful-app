@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import styles from "./admin.module.css";
 
 interface AdminPackImage {
@@ -293,6 +293,20 @@ function CreatePackForm({
   onCreated: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  function close() {
+    setOpen(false);
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -303,29 +317,86 @@ function CreatePackForm({
       body: JSON.stringify(Object.fromEntries(form)),
     });
     formElement.reset();
-    setOpen(false);
+    close();
     await onCreated();
   }
-  if (!open)
-    return (
+
+  return (
+    <>
       <button className={styles.newPack} type="button" onClick={() => setOpen(true)}>
         ＋ Novo pacote
       </button>
-    );
-  return (
-    <form className={styles.quickForm} onSubmit={(event) => void submit(event)}>
-      <input name="title_pt" placeholder="Nome em português" required />
-      <input name="title_en" placeholder="Nome em inglês" required />
-      <input name="slug" placeholder="slug-do-pacote" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required />
-      <div>
-        <button type="button" onClick={() => setOpen(false)}>
-          Cancelar
-        </button>
-        <button disabled={disabled} type="submit">
-          Criar
-        </button>
-      </div>
-    </form>
+
+      <dialog
+        ref={dialogRef}
+        className={styles.packDialog}
+        aria-labelledby={titleId}
+        onCancel={(event) => {
+          event.preventDefault();
+          close();
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) close();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            close();
+          }
+        }}
+      >
+        <form className={styles.dialogCard} onSubmit={(event) => void submit(event)}>
+          <header className={styles.dialogHeader}>
+            <span className={styles.dialogIcon}>✦</span>
+            <div>
+              <small>NOVO CONTEÚDO</small>
+              <h2 id={titleId}>Criar pacote</h2>
+              <p>Prepare uma nova coleção para o catálogo do Pieceful.</p>
+            </div>
+            <button
+              className={styles.dialogClose}
+              type="button"
+              onClick={close}
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+          </header>
+
+          <div className={styles.dialogFields}>
+            <label>
+              Nome em português
+              <input autoFocus name="title_pt" placeholder="Ex.: Aventuras no espaço" required />
+            </label>
+            <label>
+              Nome em inglês
+              <input name="title_en" placeholder="Ex.: Space adventures" required />
+            </label>
+            <label>
+              Identificador do pacote
+              <input
+                name="slug"
+                placeholder="aventuras-no-espaco"
+                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                required
+              />
+              <small>
+                Use letras minúsculas, números e hífens. Esse valor não ficará visível no app.
+              </small>
+            </label>
+          </div>
+
+          <footer className={styles.dialogActions}>
+            <button type="button" onClick={close}>
+              Cancelar
+            </button>
+            <button disabled={disabled} type="submit">
+              {disabled ? "Criando…" : "Criar pacote"}
+            </button>
+          </footer>
+        </form>
+      </dialog>
+    </>
   );
 }
 
