@@ -5,7 +5,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -14,11 +13,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
+import { ThemeParallaxBackground } from "@/components/theme-parallax-background";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { getPuzzleXp } from "@/lib/progression";
 import { createTimelapse, saveTimelapse, shareTimelapse } from "@/lib/native-timelapse";
 import { useApp } from "@/state/app-provider";
 import PiecefulGameServices from "../../../modules/my-module/src/PiecefulGameServicesModule";
+import Animated, {
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from "react-native-reanimated";
 
 export default function ResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,6 +34,10 @@ export default function ResultScreen() {
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.set(event.contentOffset.y);
+  });
 
   useEffect(() => {
     const subscription = PiecefulGameServices?.addListener(
@@ -104,11 +112,13 @@ export default function ResultScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={[`${colors.accent}18`, "transparent", `${colors.primary}12`]}
-        style={StyleSheet.absoluteFill}
-      />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ThemeParallaxBackground celebratory scrollY={scrollY} />
+      <Animated.ScrollView
+        contentContainerStyle={styles.content}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
         <LinearGradient
           colors={[`${colors.accent}45`, `${colors.primary}45`]}
           style={styles.achievement}
@@ -219,7 +229,7 @@ export default function ResultScreen() {
         <SecondaryButton icon="albums-outline" onPress={() => router.replace("/(tabs)/puzzles")}>
           {t("Voltar para coleção", "Back to collection")}
         </SecondaryButton>
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }

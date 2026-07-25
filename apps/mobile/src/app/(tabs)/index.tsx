@@ -16,7 +16,7 @@ export default function HomeScreen() {
   const completed = puzzles.filter((puzzle) => puzzle.session.completedAt).slice(0, 5);
 
   return (
-    <Screen>
+    <Screen parallax>
       <AppHeader />
       <SectionHeader title={ageGroup === "child" ? t("Vamos brincar?", "Ready to play?") : t("Continue", "Continue")} />
       <View style={styles.heroStack}>

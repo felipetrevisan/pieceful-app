@@ -3,12 +3,11 @@ import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "ex
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Children, type ReactNode, useEffect } from "react";
+import { Children, type ReactNode } from "react";
 import {
   Platform,
   Pressable,
   type PressableProps,
-  ScrollView,
   StyleSheet,
   Text,
   type TextProps,
@@ -17,21 +16,32 @@ import {
 } from "react-native";
 import Animated, {
   FadeInDown,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FrostedBackdrop } from "@/components/frosted-surface";
-import { isLightMobileTheme, mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
+import { ThemeParallaxBackground } from "@/components/theme-parallax-background";
+import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
-export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+export function Screen({
+  children,
+  parallax = false,
+  scroll = true,
+}: {
+  children: ReactNode;
+  parallax?: boolean;
+  scroll?: boolean;
+}) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.set(event.contentOffset.y);
+  });
   const content = (
     <View style={{ paddingHorizontal: 20, paddingBottom: 126, paddingTop: 8, flexGrow: 1 }}>
       {Children.map(children, (child, index) => (
@@ -41,12 +51,18 @@ export function Screen({ children, scroll = true }: { children: ReactNode; scrol
   );
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <LinearGradient
-        colors={[`${colors.primary}12`, "transparent", `${colors.accent}08`]}
-        style={StyleSheet.absoluteFill}
-      />
-      <AmbientGlow />
-      {scroll ? <ScrollView showsVerticalScrollIndicator={false}>{content}</ScrollView> : content}
+      <ThemeParallaxBackground scrollY={parallax ? scrollY : undefined} />
+      {scroll ? (
+        <Animated.ScrollView
+          onScroll={parallax ? scrollHandler : undefined}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </Animated.ScrollView>
+      ) : (
+        content
+      )}
     </SafeAreaView>
   );
 }
@@ -62,49 +78,6 @@ export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: n
       }
     >
       {children}
-    </Animated.View>
-  );
-}
-
-function AmbientGlow() {
-  const { preferences, theme } = useApp();
-  const colors = mobileThemes[theme];
-  const atmosphereIcon =
-    mobileThemeCatalog.find((item) => item.id === theme)?.icon ?? "sparkles-outline";
-  const drift = useSharedValue(0);
-
-  useEffect(() => {
-    drift.set(
-      withRepeat(
-        withSequence(withTiming(1, { duration: 3600 }), withTiming(0, { duration: 3600 })),
-        -1,
-        true,
-      ),
-    );
-  }, [drift]);
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.18 + drift.value * 0.1,
-    transform: [
-      { translateX: drift.value * -22 },
-      { translateY: drift.value * 34 },
-      { scale: 0.9 + drift.value * 0.18 },
-    ],
-  }));
-
-  if (preferences.reducedMotion) return null;
-
-  return (
-    <Animated.View pointerEvents="none" style={[styles.ambientGlow, glowStyle]}>
-      <LinearGradient
-        colors={[`${colors.accent}05`, `${colors.primary}75`, `${colors.accent}12`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={styles.atmosphereIcon}>
-        <Ionicons name={atmosphereIcon} size={84} color={`${colors.accent}48`} />
-      </View>
     </Animated.View>
   );
 }
@@ -640,24 +613,6 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
   iconButtonPressable: { flex: 1 },
-  ambientGlow: {
-    position: "absolute",
-    right: -110,
-    top: 130,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    overflow: "hidden",
-  },
-  atmosphereIcon: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   appHeader: {
     minHeight: 58,
     flexDirection: "row",

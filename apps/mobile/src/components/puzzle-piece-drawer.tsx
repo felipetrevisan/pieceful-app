@@ -13,14 +13,12 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
 } from "react-native-reanimated";
 import Svg, { ClipPath, Defs, Path, Image as SvgImage } from "react-native-svg";
 import { FrostedBackdrop } from "@/components/frosted-surface";
@@ -113,8 +111,7 @@ export function PuzzlePieceDrawer({
   onReleasePieces,
   onStorageFrameChange,
 }: PuzzlePieceDrawerProps) {
-  const { height, width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { preferences, t, theme } = useApp();
   const colors = mobileThemes[theme];
   const storedPieces = useMemo(
@@ -124,24 +121,42 @@ export function PuzzlePieceDrawer({
         .sort((left, right) => drawerOrder(left.id) - drawerOrder(right.id)),
     [pieces],
   );
-  const sheetHeight = Math.min(540, height * 0.62);
-  const collapsedHeight = 68;
-  const closedY = sheetHeight - collapsedHeight;
-  const translateY = useSharedValue(closedY);
-  const dragStart = useSharedValue(closedY);
-  const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filter, setFilter] = useState<TrayFilter>("all");
+  const [pageIndex, setPageIndex] = useState(0);
   const storageRef = useRef<View>(null);
-  const pieceSize = Math.max(38, Math.min(50, (width - 48) / 7));
+  const listRef = useRef<FlatList<PuzzlePiece[]>>(null);
+  const pageWidth = width - 16;
+  const pieceSize = Math.max(36, Math.min(40, (width - 52) / 7));
   const pieceExtent = pieceSize * 1.48;
-  const trayColumns = Math.max(3, Math.floor((width - 32) / pieceExtent));
+  const trayColumns = Math.max(4, Math.floor((pageWidth - 20) / pieceExtent));
+  const pageSize = trayColumns * 2;
   const filteredPieces = useMemo(() => {
     if (filter === "all") return storedPieces;
     return storedPieces.filter((piece) =>
       filter === "corners" ? flatEdgeCount(piece) >= 2 : flatEdgeCount(piece) >= 1,
     );
   }, [filter, storedPieces]);
+  const pages = useMemo(() => {
+    const next: PuzzlePiece[][] = [];
+    for (let index = 0; index < filteredPieces.length; index += pageSize) {
+      next.push(filteredPieces.slice(index, index + pageSize));
+    }
+    return next.length ? next : [[]];
+  }, [filteredPieces, pageSize]);
+  const trayScrollGesture = Gesture.Pan()
+    .activeOffsetX([-18, 18])
+    .failOffsetY([-16, 16])
+    .onEnd((event) => {
+      if (Math.abs(event.translationX) < 34) return;
+      runOnJS(moveTrayPage)(event.translationX < 0 ? 1 : -1);
+    });
+  function moveTrayPage(direction: number) {
+    setPageIndex((current) =>
+      Math.max(0, Math.min(pages.length - 1, current + direction)),
+    );
+    if (preferences.haptics) void Haptics.selectionAsync();
+  }
 
   function toggleSelected(id: string) {
     setSelectedIds((current) =>
@@ -156,54 +171,48 @@ export function PuzzlePieceDrawer({
   }
 
   useEffect(() => {
-    translateY.set(withSpring(open ? 0 : closedY, { damping: 20, stiffness: 220 }));
-    const timeout = setTimeout(() => {
+    const nextIndex = Math.min(pageIndex, pages.length - 1);
+    const frame = requestAnimationFrame(() => {
+      if (nextIndex !== pageIndex) setPageIndex(nextIndex);
+      listRef.current?.scrollToOffset({ offset: nextIndex * pageWidth, animated: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pageIndex, pageWidth, pages.length]);
+
+  useEffect(() => {
+    const measure = () => {
       storageRef.current?.measureInWindow((x, y, measuredWidth, measuredHeight) => {
         onStorageFrameChange({ x, y, width: measuredWidth, height: measuredHeight });
       });
-    }, 320);
+    };
+    const timeout = setTimeout(measure, 120);
     return () => clearTimeout(timeout);
-  }, [closedY, onStorageFrameChange, open, translateY]);
+  }, [onStorageFrameChange, pageWidth]);
 
-  function settle(nextOpen: boolean) {
-    setOpen(nextOpen);
-    if (preferences.haptics) void Haptics.selectionAsync();
-  }
-
-  const sheetPan = Gesture.Pan()
-    .onStart(() => dragStart.set(translateY.get()))
-    .onUpdate((event) => {
-      translateY.set(Math.max(0, Math.min(closedY, dragStart.get() + event.translationY)));
-    })
-    .onEnd((event) => {
-      const nextOpen =
-        event.velocityY < -500 || (event.velocityY <= 500 && translateY.get() < closedY * 0.48);
-      translateY.set(withSpring(nextOpen ? 0 : closedY, { damping: 20, stiffness: 230 }));
-      runOnJS(settle)(nextOpen);
-    });
-  const sheetTap = Gesture.Tap()
-    .maxDuration(260)
-    .onEnd((_event, success) => {
-      if (!success) return;
-      const nextOpen = !open;
-      translateY.set(withSpring(nextOpen ? 0 : closedY, { damping: 20, stiffness: 230 }));
-      runOnJS(settle)(nextOpen);
-    });
-  const headerGesture = Gesture.Race(sheetPan, sheetTap);
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.get() }] }));
+  const visibleDots = useMemo(() => {
+    if (pages.length <= 7) return pages.map((_, index) => index);
+    const start = Math.max(0, Math.min(pages.length - 7, pageIndex - 3));
+    return Array.from({ length: 7 }, (_, index) => start + index);
+  }, [pageIndex, pages]);
 
   return (
-    <Animated.View
+    <View
+      ref={storageRef}
+      collapsable={false}
+      onLayout={() => {
+        storageRef.current?.measureInWindow((x, y, measuredWidth, measuredHeight) => {
+          onStorageFrameChange({ x, y, width: measuredWidth, height: measuredHeight });
+        });
+      }}
       style={[
         styles.sheet,
         {
-          height: sheetHeight,
-          bottom: Math.max(12, insets.bottom + 8),
+          height: 244,
+          bottom: 8,
           backgroundColor: "transparent",
           borderColor: `${colors.accent}70`,
           shadowColor: colors.accent,
         },
-        sheetStyle,
       ]}
     >
       {Platform.OS === "android" ? (
@@ -233,15 +242,7 @@ export function PuzzlePieceDrawer({
         colors={[`${colors.accent}25`, `${colors.panel}a8`, `${colors.primary}24`]}
         style={StyleSheet.absoluteFill}
       />
-      <GestureDetector gesture={headerGesture}>
-        <Animated.View style={styles.header}>
-          <View
-            ref={storageRef}
-            collapsable={false}
-            pointerEvents="none"
-            style={styles.storageDropZone}
-          />
-          <View style={[styles.grabber, { backgroundColor: `${colors.muted}80` }]} />
+      <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}1b` }]}>
             <Ionicons name="file-tray-full-outline" size={22} color={colors.accent} />
           </View>
@@ -276,9 +277,7 @@ export function PuzzlePieceDrawer({
           >
             <Ionicons name="archive-outline" size={22} color={colors.accent} />
           </View>
-          <Ionicons name={open ? "chevron-down" : "chevron-up"} size={22} color={colors.muted} />
-        </Animated.View>
-      </GestureDetector>
+      </View>
 
       <View style={[styles.divider, { backgroundColor: `${colors.accent}30` }]} />
       {storedPieces.length ? (
@@ -296,7 +295,10 @@ export function PuzzlePieceDrawer({
                 <Pressable
                   accessibilityRole="button"
                   key={id}
-                  onPress={() => setFilter(id)}
+                  onPress={() => {
+                    setFilter(id);
+                    setPageIndex(0);
+                  }}
                   style={[
                     styles.filterButton,
                     {
@@ -318,42 +320,100 @@ export function PuzzlePieceDrawer({
             })}
           </View>
           {filteredPieces.length ? (
-            <FlatList
-              key={trayColumns}
+            <>
+            <GestureDetector gesture={trayScrollGesture}>
+            <View
               style={styles.pieceList}
-              data={filteredPieces}
-              numColumns={trayColumns}
-              keyExtractor={(piece) => piece.id}
-              contentContainerStyle={styles.grid}
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
-              initialNumToRender={trayColumns * 4}
-              maxToRenderPerBatch={trayColumns * 3}
-              updateCellsBatchingPeriod={32}
-              windowSize={5}
-              removeClippedSubviews={Platform.OS === "android"}
-              columnWrapperStyle={styles.gridRow}
-              renderItem={({ item: piece }) => (
-                <DrawerPiece
-                  piece={piece}
-                  imageUri={imageUri}
-                  rows={rows}
-                  columns={columns}
-                  size={pieceSize}
-                  boardFrame={boardFrame}
-                  boardZoom={boardZoom}
-                  boardPanX={boardPanX}
-                  boardPanY={boardPanY}
-                  dragScreenX={dragScreenX}
-                  dragScreenY={dragScreenY}
-                  selected={selectedIds.includes(piece.id)}
-                  selectedIds={selectedIds}
-                  onDragPreviewChange={onDragPreviewChange}
-                  onToggleSelected={toggleSelected}
-                  onRelease={releaseSelected}
-                />
+            >
+            <FlatList
+              ref={listRef}
+              key={`tray-pages-${trayColumns}`}
+              style={styles.pageScroller}
+              data={pages}
+              horizontal
+              scrollEnabled={false}
+              pagingEnabled
+              decelerationRate="fast"
+              snapToInterval={pageWidth}
+              disableIntervalMomentum
+              keyExtractor={(_page, index) => `tray-page-${index}`}
+              showsHorizontalScrollIndicator={false}
+              initialNumToRender={2}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              onMomentumScrollEnd={(event) => {
+                setPageIndex(
+                  Math.max(
+                    0,
+                    Math.min(
+                      pages.length - 1,
+                      Math.round(event.nativeEvent.contentOffset.x / pageWidth),
+                    ),
+                  ),
+                );
+              }}
+              getItemLayout={(_data, index) => ({
+                length: pageWidth,
+                offset: pageWidth * index,
+                index,
+              })}
+              renderItem={({ item: page }) => (
+                <View style={[styles.page, { width: pageWidth }]}>
+                  {page.map((piece) => (
+                    <View
+                      key={piece.id}
+                      style={[
+                        styles.pieceCell,
+                        { width: (pageWidth - 8) / trayColumns },
+                      ]}
+                    >
+                      <DrawerPiece
+                        piece={piece}
+                        imageUri={imageUri}
+                        rows={rows}
+                        columns={columns}
+                        size={pieceSize}
+                        boardFrame={boardFrame}
+                        boardZoom={boardZoom}
+                        boardPanX={boardPanX}
+                        boardPanY={boardPanY}
+                        dragScreenX={dragScreenX}
+                        dragScreenY={dragScreenY}
+                        selected={selectedIds.includes(piece.id)}
+                        selectedIds={selectedIds}
+                        onDragPreviewChange={onDragPreviewChange}
+                        onToggleSelected={toggleSelected}
+                        onRelease={releaseSelected}
+                        scrollGesture={trayScrollGesture}
+                      />
+                    </View>
+                  ))}
+                </View>
               )}
             />
+            </View>
+            </GestureDetector>
+            <View style={styles.pagination}>
+              {visibleDots.map((index) => (
+                <View
+                  key={`tray-dot-${index}`}
+                  style={[
+                    styles.dot,
+                    {
+                      width: index === pageIndex ? 18 : 6,
+                      backgroundColor:
+                        index === pageIndex ? colors.accent : `${colors.muted}65`,
+                    },
+                  ]}
+                />
+              ))}
+              {pages.length > 7 ? (
+                <Text style={[styles.pageCount, { color: colors.muted }]}>
+                  {pageIndex + 1}/{pages.length}
+                </Text>
+              ) : null}
+            </View>
+            </>
           ) : (
             <View style={styles.empty}>
               <Ionicons name="filter-outline" size={31} color={colors.accent} />
@@ -371,7 +431,7 @@ export function PuzzlePieceDrawer({
           </Text>
         </View>
       )}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -392,6 +452,7 @@ function DrawerPiece({
   onDragPreviewChange,
   onToggleSelected,
   onRelease,
+  scrollGesture,
 }: {
   piece: PuzzlePiece;
   imageUri: string;
@@ -409,6 +470,7 @@ function DrawerPiece({
   onDragPreviewChange: (preview: TrayDragPreview | null) => void;
   onToggleSelected: (id: string) => void;
   onRelease: (ids: string[], x: number, y: number) => void;
+  scrollGesture: GestureType;
 }) {
   const margin = size * 0.24;
   const extent = size + margin * 2;
@@ -419,6 +481,7 @@ function DrawerPiece({
   const clipId = `drawer-clip-${piece.id}`;
 
   const pan = Gesture.Pan()
+    .simultaneousWithExternalGesture(scrollGesture)
     .activateAfterLongPress(320)
     .minDistance(8)
     .onStart((event) => {
@@ -471,6 +534,7 @@ function DrawerPiece({
       runOnJS(onDragPreviewChange)(null);
     });
   const tap = Gesture.Tap()
+    .simultaneousWithExternalGesture(scrollGesture)
     .maxDuration(260)
     .onEnd((_event, success) => {
       if (success) runOnJS(onToggleSelected)(piece.id);
@@ -621,8 +685,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 80,
     borderWidth: 1.5,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    borderRadius: 26,
     overflow: "hidden",
     shadowOpacity: 0.28,
     shadowRadius: 24,
@@ -630,15 +693,13 @@ const styles = StyleSheet.create({
     elevation: 18,
   },
   header: {
-    height: 68,
+    height: 54,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 12,
-    paddingTop: 7,
+    paddingVertical: 6,
   },
-  storageDropZone: { position: "absolute", inset: 0 },
-  grabber: { position: "absolute", top: 6, left: "42%", right: "42%", height: 4, borderRadius: 99 },
   headerIcon: {
     width: 42,
     height: 42,
@@ -674,25 +735,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingVertical: 6,
   },
   filterButton: {
     flex: 1,
-    minHeight: 38,
-    borderRadius: 19,
+    minHeight: 30,
+    borderRadius: 15,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
   },
   filterLabel: { fontFamily: "Inter_700Bold", fontSize: 12 },
-  pieceList: { flex: 1 },
-  grid: {
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    paddingBottom: 32,
+  pieceList: { height: 124, flexGrow: 0 },
+  pageScroller: { flex: 1 },
+  page: {
+    height: 124,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignContent: "center",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
-  gridRow: { justifyContent: "space-around" },
+  pieceCell: { alignItems: "center", justifyContent: "center" },
+  pagination: {
+    height: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingBottom: 4,
+  },
+  dot: { height: 6, borderRadius: 99 },
+  pageCount: { marginLeft: 4, fontFamily: "Inter_700Bold", fontSize: 9 },
   stackLayer: {
     position: "absolute",
     inset: 7,

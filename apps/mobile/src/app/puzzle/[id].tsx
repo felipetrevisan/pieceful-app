@@ -279,7 +279,7 @@ export default function PuzzleScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 104, paddingTop: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 268, paddingTop: 12 }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={(event) => {

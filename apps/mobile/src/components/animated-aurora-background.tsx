@@ -4,6 +4,7 @@ import { type DimensionValue, StyleSheet, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -38,11 +39,13 @@ export function AnimatedAuroraBackground({ strongOverlay = false }: { strongOver
   const { preferences } = useApp();
   const drift = useSharedValue(0);
   const aurora = useSharedValue(0);
+  const starDrift = useSharedValue(0);
 
   useEffect(() => {
     if (preferences.reducedMotion) {
       drift.set(0.35);
       aurora.set(0.3);
+      starDrift.set(0);
       return;
     }
     drift.set(
@@ -65,11 +68,22 @@ export function AnimatedAuroraBackground({ strongOverlay = false }: { strongOver
         true,
       ),
     );
+    starDrift.set(
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 11200, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0, { duration: 11200, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        true,
+      ),
+    );
     return () => {
       cancelAnimation(drift);
       cancelAnimation(aurora);
+      cancelAnimation(starDrift);
     };
-  }, [aurora, drift, preferences.reducedMotion]);
+  }, [aurora, drift, preferences.reducedMotion, starDrift]);
 
   const imageStyle = useAnimatedStyle(() => ({
     transform: [
@@ -121,7 +135,14 @@ export function AnimatedAuroraBackground({ strongOverlay = false }: { strongOver
         />
       </Animated.View>
       {!preferences.reducedMotion
-        ? STARS.map((star) => <TwinkleStar key={`${star.left}-${star.top}`} {...star} />)
+        ? STARS.map((star, index) => (
+            <TwinkleStar
+              key={`${star.left}-${star.top}`}
+              {...star}
+              depth={(index % 3) + 1}
+              drift={starDrift}
+            />
+          ))
         : null}
       <LinearGradient
         colors={
@@ -138,11 +159,15 @@ export function AnimatedAuroraBackground({ strongOverlay = false }: { strongOver
 
 function TwinkleStar({
   delay,
+  depth,
+  drift,
   left,
   size,
   top,
 }: {
   delay: number;
+  depth: number;
+  drift: SharedValue<number>;
   left: DimensionValue;
   size: number;
   top: DimensionValue;
@@ -166,7 +191,12 @@ function TwinkleStar({
   }, [delay, pulse]);
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: pulse.get(),
-    transform: [{ scale: 0.65 + pulse.get() * 0.85 }, { rotate: "45deg" }],
+    transform: [
+      { translateX: (drift.get() - 0.5) * depth * 7 },
+      { translateY: (0.5 - drift.get()) * depth * 5 },
+      { scale: 0.65 + pulse.get() * 0.85 },
+      { rotate: "45deg" },
+    ],
   }));
   return (
     <Animated.View
