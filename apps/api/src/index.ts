@@ -106,7 +106,14 @@ const app = new Elysia()
       pieces: t.Integer({ minimum: 6, maximum: 1000 }),
       elapsedTime: t.Integer({ minimum: 0 }),
     }),
-  })
-  .listen(Number(Bun.env.PORT ?? 3001));
+  });
+
+// Vercel invokes the exported Elysia application as a serverless function.
+// Starting a listener there crashes the invocation before CORS can respond.
+if (!Bun.env.VERCEL) {
+  app.listen(Number(Bun.env.PORT ?? 3001));
+}
+
+export default app;
 
 export type Api = typeof app;
