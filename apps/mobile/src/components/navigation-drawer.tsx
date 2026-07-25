@@ -9,6 +9,8 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { isLightMobileTheme, mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
+import { RewardAvatar, RewardFrame } from "@/components/reward-cosmetics";
+import { getLevelRewards, getPlayerProgression } from "@/lib/progression";
 import { FrostedBackdrop } from "@/components/frosted-surface";
 import { useApp } from "@/state/app-provider";
 import { useSocial } from "@/state/social-provider";
@@ -25,7 +27,7 @@ const menu = [
 ] as const;
 
 export function NavigationDrawer() {
-  const { ageGroup, drawerOpen, puzzles, setDrawerOpen, t, theme } = useApp();
+  const { ageGroup, claimedRewardIds, drawerOpen, puzzles, selectedAvatarRewardId, selectedFrameRewardId, setDrawerOpen, t, theme } = useApp();
   const { profile, session } = useSocial();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -33,13 +35,17 @@ export function NavigationDrawer() {
   const colors = mobileThemes[theme];
   const drawerWidth = Math.min(width * 0.88, 410);
   const translateX = useSharedValue(-drawerWidth);
-  const completed = puzzles.filter((puzzle) => puzzle.session.completedAt).length;
-  const xp = completed * 500 + puzzles.reduce((sum, puzzle) => sum + puzzle.session.pieces.filter((piece) => piece.isPlaced).length, 0);
-  const level = Math.max(1, Math.floor(xp / 1000) + 1);
+  const progression = getPlayerProgression(puzzles);
+  const xp = progression.totalXp;
+  const level = progression.level;
   const activeTheme = mobileThemeCatalog.find((item) => item.id === theme) ?? mobileThemeCatalog[0];
   const glass = Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   const Surface = glass ? GlassView : View;
   const childMode = ageGroup === "child";
+  const rewards = getLevelRewards(ageGroup);
+  const selectedAvatar = rewards.find((reward) => reward.id === selectedAvatarRewardId)?.contentKey ?? null;
+  const selectedFrame = rewards.find((reward) => reward.id === selectedFrameRewardId)?.contentKey ?? null;
+  const legendaryTitle = rewards.find((reward) => reward.kind === "title" && claimedRewardIds.includes(reward.id));
   const visibleMenu = childMode ? menu.filter((item) => item[1] !== "Amigos" && item[1] !== "Perfil") : menu;
   const profileName = (childMode ? t("Pequeno Montador", "Little Puzzler") : profile.displayName.trim())
     || String(session?.user.user_metadata?.full_name ?? session?.user.user_metadata?.name ?? "").trim()
@@ -133,18 +139,16 @@ export function NavigationDrawer() {
 
               <View style={styles.profileRow}>
                 <Pressable onPress={() => navigate(childMode ? "/(tabs)/settings" : session ? "/(tabs)/profile" : "/(tabs)/account")} style={({ pressed }) => [styles.profileLink, pressed ? styles.pressed : null]}>
-                  <LinearGradient colors={[colors.accent, colors.primary]} style={styles.avatar}>
-                    {profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} contentFit="cover" /> : <Ionicons name="extension-puzzle" size={29} color="#08101c" />}
-                  </LinearGradient>
+                  <View style={styles.avatarPosition}>{selectedFrame ? <RewardFrame id={selectedFrame} size={60}>{selectedAvatar ? <RewardAvatar id={selectedAvatar} size={52} /> : profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImageFramed} contentFit="cover" /> : <Ionicons name="extension-puzzle" size={27} color={colors.text} />}</RewardFrame> : selectedAvatar ? <RewardAvatar id={selectedAvatar} size={60} /> : <LinearGradient colors={[colors.accent, colors.primary]} style={styles.avatar}>{profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} contentFit="cover" /> : <Ionicons name="extension-puzzle" size={29} color="#08101c" />}</LinearGradient>}</View>
                   <View style={styles.profileCopy}>
                     <Text numberOfLines={1} style={[styles.profileName, { color: colors.text }]}>{profileName}</Text>
-                    <Text style={[styles.profileLevel, { color: colors.muted }]}>{childMode ? t("Modo infantil", "Kids mode") : `Level ${level} · ${t("Mestre dos Quebra-cabeças", "Master Puzzler")}`}</Text>
+                    <Text style={[styles.profileLevel, { color: colors.muted }]}>{legendaryTitle ? t(`Nível ${level} · ${legendaryTitle.titlePt}`, `Level ${level} · ${legendaryTitle.titleEn}`) : childMode ? t(`Nível ${level} · Pequeno Puzzler`, `Level ${level} · Little Puzzler`) : t(`Nível ${level} · Mestre dos Quebra-cabeças`, `Level ${level} · Master Puzzler`)}</Text>
                   </View>
                 </Pressable>
               </View>
 
               <View style={styles.xpHeader}><Text style={[styles.xpText, { color: colors.muted }]}>XP</Text><Text style={[styles.xpText, { color: colors.accent }]}>{xp.toLocaleString()}</Text></View>
-              <View style={[styles.track, { backgroundColor: colors.panelAlt }]}><LinearGradient colors={[colors.primary, colors.accent]} style={[styles.progress, { width: `${xp % 1000 / 10}%` }]} /></View>
+              <View style={[styles.track, { backgroundColor: colors.panelAlt }]}><LinearGradient colors={[colors.primary, colors.accent]} style={[styles.progress, { width: `${progression.progressPercent}%` }]} /></View>
 
               <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
                 <Text style={[styles.menuKicker, { color: colors.muted }]}>{t("EXPLORAR", "EXPLORE")}</Text>
@@ -195,8 +199,10 @@ const styles = StyleSheet.create({
   profileRow: { width: "100%", height: 76, marginTop: 10 },
   profileLink: { width: "100%", height: 76, position: "relative" },
   profileCopy: { position: "absolute", left: 74, right: 0, top: 13, minWidth: 0 },
-  avatar: { position: "absolute", left: 0, top: 8, width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  avatarPosition: { position: "absolute", left: 0, top: 8, width: 60, height: 60 },
+  avatar: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarImage: { width: "100%", height: "100%", borderRadius: 30 },
+  avatarImageFramed: { width: 52, height: 52, borderRadius: 26 },
   profileName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20, lineHeight: 25 },
   profileLevel: { fontFamily: "Inter_600SemiBold", fontSize: 12, marginTop: 3 },
   closeButton: { position: "absolute", right: 14, zIndex: 20, width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", elevation: 12 },

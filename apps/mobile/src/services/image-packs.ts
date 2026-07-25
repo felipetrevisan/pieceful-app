@@ -28,6 +28,7 @@ export interface ImagePack {
   audience: "child" | "teen" | "adult" | "all";
   isFree: boolean;
   productId: string | null;
+  rewardLevel: number | null;
   pictures: ImagePackPicture[];
 }
 
@@ -43,6 +44,7 @@ interface PackRow {
   audience: "child" | "teen" | "adult" | "all";
   is_free: boolean;
   store_product_id: string | null;
+  reward_level?: number | null;
   sort_order: number;
   pack_images: {
     id: string;
@@ -60,14 +62,26 @@ interface PackRow {
 
 export async function listImagePacks(audience: "child" | "teen" | "adult"): Promise<ImagePack[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
+  const initial = await supabase
     .from("image_packs")
     .select(
-      "id, slug, title_pt, title_en, description_pt, description_en, cover_url, total_bytes, audience, is_free, store_product_id, sort_order, pack_images(id, title_pt, title_en, image_url, thumbnail_url, width, height, bytes, sort_order, is_published)",
+      "id, slug, title_pt, title_en, description_pt, description_en, cover_url, total_bytes, audience, is_free, store_product_id, reward_level, sort_order, pack_images(id, title_pt, title_en, image_url, thumbnail_url, width, height, bytes, sort_order, is_published)",
     )
     .in("audience", [audience, "all"])
     .eq("is_published", true)
     .order("sort_order");
+  let data: unknown = initial.data;
+  let error = initial.error;
+  if (error && /reward_level/i.test(error.message)) {
+    const fallback = await supabase
+      .from("image_packs")
+      .select("id, slug, title_pt, title_en, description_pt, description_en, cover_url, total_bytes, audience, is_free, store_product_id, sort_order, pack_images(id, title_pt, title_en, image_url, thumbnail_url, width, height, bytes, sort_order, is_published)")
+      .in("audience", [audience, "all"])
+      .eq("is_published", true)
+      .order("sort_order");
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (error) throw error;
   return ((data ?? []) as PackRow[]).map(mapPackRow);
 }
@@ -141,6 +155,7 @@ function mapPackRow(row: PackRow): ImagePack {
     audience: row.audience,
     isFree: row.is_free,
     productId: row.store_product_id,
+    rewardLevel: row.reward_level ?? null,
     pictures: row.pack_images
       .filter((picture) => picture.is_published)
       .sort((left, right) => left.sort_order - right.sort_order)

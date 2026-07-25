@@ -33,6 +33,7 @@ interface AdminImagePack {
   total_bytes: number;
   available_from: string | null;
   minimum_app_version: string | null;
+  reward_level: number | null;
   pack_images: AdminPackImage[];
 }
 
@@ -353,6 +354,9 @@ function PackEditor({
           sort_order: Number(form.get("sort_order")),
           is_free: form.get("is_free") === "on",
           store_product_id: String(form.get("store_product_id") ?? "").trim() || null,
+          reward_level: String(form.get("reward_level") ?? "").trim()
+            ? Number(form.get("reward_level"))
+            : null,
           is_published: form.get("is_published") === "on",
         }),
       });
@@ -415,6 +419,15 @@ function PackEditor({
             name="store_product_id"
             defaultValue={pack.store_product_id ?? ""}
             placeholder="pieceful.pack.nome-do-pacote"
+          />
+          <Field
+            label="Nível de recompensa (opcional)"
+            name="reward_level"
+            type="number"
+            min="2"
+            max="100"
+            defaultValue={pack.reward_level ? String(pack.reward_level) : ""}
+            placeholder="10, 20, 30…"
           />
           <Area
             label="Descrição em português"
@@ -658,6 +671,8 @@ function Field(props: {
   type?: string;
   pattern?: string;
   placeholder?: string;
+  min?: string;
+  max?: string;
 }) {
   const { label, ...inputProps } = props;
   return (

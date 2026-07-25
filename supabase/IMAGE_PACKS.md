@@ -112,3 +112,11 @@ Keep `is_published = false` while preparing a pack. Publish it only after every 
 - Installed images are inserted into the existing creation carousel.
 - Removing a pack deletes its offline files.
 - A selected picture is copied into the puzzle's own folder, so removing its source pack does not break an existing puzzle.
+
+## Level reward packs
+
+After applying `202607250001_level_reward_packs.sql`, the admin exposes a
+`Nível de recompensa` field. Use a milestone from 2 to 100 (normally 10, 20,
+30, and so on), and keep that pack free and published. The app only allows the
+download after the player reaches that level and claims the matching reward in
+the Achievements screen.

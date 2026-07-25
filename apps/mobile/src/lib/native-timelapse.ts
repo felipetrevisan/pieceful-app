@@ -1,4 +1,5 @@
 import type { PuzzlePiece, PuzzleTimelapse, PuzzleTimelapsePiece } from "@puzzled/puzzle-engine";
+import { Asset } from "expo-asset";
 import * as Sharing from "expo-sharing";
 import type { AppLanguage, MobilePuzzle } from "@/state/app-provider";
 import PiecefulGameServices from "../../modules/my-module/src/PiecefulGameServicesModule";
@@ -16,7 +17,18 @@ function finalState(piece: PuzzlePiece): PuzzleTimelapsePiece {
 
 function timelineFor(puzzle: MobilePuzzle): PuzzleTimelapse {
   const recorded = puzzle.session.timelapse;
-  if (recorded?.frames.length) return recorded;
+  if (recorded?.frames.length) {
+    const orderedFrames = [...recorded.frames].sort((left, right) => left.at - right.at);
+    const activityStartedAt = orderedFrames[0]?.at ?? 0;
+    return {
+      initial: recorded.initial,
+      frames: orderedFrames.map((frame) => ({
+        ...frame,
+        // Waiting before the first moved piece must not become a black video intro.
+        at: Math.max(0, frame.at - activityStartedAt),
+      })),
+    };
+  }
 
   // Older completed puzzles did not record movement. Rebuild them progressively,
   // so their owners can still create a complete video without assembling again.
@@ -44,12 +56,15 @@ export async function createTimelapse(puzzle: MobilePuzzle, language: AppLanguag
     );
   }
   const timeline = timelineFor(puzzle);
+  const logoAsset = Asset.fromModule(require("../../assets/images/pieceful-logo.png"));
+  await logoAsset.downloadAsync();
   const payload = JSON.stringify({
     imageUri: puzzle.imageUri,
+    logoUri: logoAsset.localUri ?? logoAsset.uri,
     name: puzzle.name,
     rows: puzzle.configuration.rows,
     columns: puzzle.configuration.columns,
-    elapsed: Math.max(puzzle.session.elapsedTime, timeline.frames.at(-1)?.at ?? 1),
+    elapsed: Math.max(1, timeline.frames.at(-1)?.at ?? 1),
     language,
     pieces: puzzle.session.pieces.map((piece) => ({
       id: piece.id,

@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { mobileThemes } from "@/constants/pieceful-theme";
+import { getLevelRewards, getPlayerProgression } from "@/lib/progression";
 import {
   downloadImagePack,
   formatPackSize,
@@ -35,7 +36,7 @@ export function ImagePackLibrary({
   onClose: () => void;
   onInstalledChange: (packs: ImagePack[]) => void;
 }) {
-  const { ageGroup, t, theme } = useApp();
+  const { ageGroup, claimedRewardIds, puzzles, t, theme } = useApp();
   const { loadPackProducts, ownedProductIds, packProducts, purchasePack, restorePurchases } =
     useMonetization();
   const { showAlert } = usePiecefulAlert();
@@ -46,6 +47,13 @@ export function ImagePackLibrary({
   const [error, setError] = useState(false);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const installedIds = useMemo(() => new Set(installed.map((pack) => pack.id)), [installed]);
+  const progression = getPlayerProgression(puzzles);
+  const rewards = getLevelRewards(ageGroup);
+  const ownsLevelPack = useCallback((pack: ImagePack) => {
+    if (!pack.rewardLevel) return false;
+    const reward = rewards.find((item) => item.kind === "pack" && item.level === pack.rewardLevel);
+    return progression.level >= pack.rewardLevel && Boolean(reward && claimedRewardIds.includes(reward.id));
+  }, [claimedRewardIds, progression.level, rewards]);
   const visibleInstalled = useMemo(
     () =>
       installed.filter((pack) =>
@@ -103,7 +111,17 @@ export function ImagePackLibrary({
   }
 
   function acquire(pack: ImagePack) {
-    if (pack.isFree || (pack.productId && ownedProductIds.includes(pack.productId))) {
+    if (pack.rewardLevel && !ownsLevelPack(pack)) {
+      showAlert(
+        t("Recompensa ainda bloqueada", "Reward still locked"),
+        t(
+          `Chegue ao nível ${pack.rewardLevel} e resgate o prêmio na tela de Conquistas.`,
+          `Reach level ${pack.rewardLevel} and claim the prize on the Achievements screen.`,
+        ),
+      );
+      return;
+    }
+    if (pack.isFree || ownsLevelPack(pack) || (pack.productId && ownedProductIds.includes(pack.productId))) {
       void download(pack);
       return;
     }
@@ -281,7 +299,9 @@ export function ImagePackLibrary({
                 pack={pack}
                 installed={installedIds.has(pack.id)}
                 owned={
-                  pack.isFree || Boolean(pack.productId && ownedProductIds.includes(pack.productId))
+                  pack.rewardLevel
+                    ? ownsLevelPack(pack)
+                    : pack.isFree || Boolean(pack.productId && ownedProductIds.includes(pack.productId))
                 }
                 price={pack.productId ? packProducts[pack.productId]?.priceString : undefined}
                 colors={colors}
@@ -345,7 +365,11 @@ function PackCard({
             {t(pack.descriptionPt, pack.descriptionEn)}
           </Text>
           <Text style={[styles.meta, { color: colors.accent }]}>
-            {pack.isFree
+            {pack.rewardLevel
+              ? owned
+                ? t("RECOMPENSA", "REWARD")
+                : t(`NÍVEL ${pack.rewardLevel}`, `LEVEL ${pack.rewardLevel}`)
+              : pack.isFree
               ? t("GRÁTIS", "FREE")
               : owned
                 ? t("COMPRADO", "OWNED")
@@ -374,7 +398,7 @@ function PackCard({
             <>
               <Ionicons
                 name={
-                  installed ? "trash-outline" : owned ? "cloud-download-outline" : "cart-outline"
+                  installed ? "trash-outline" : owned ? "cloud-download-outline" : pack.rewardLevel ? "lock-closed-outline" : "cart-outline"
                 }
                 size={20}
                 color={installed ? colors.muted : colors.background}

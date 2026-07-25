@@ -19,18 +19,20 @@ export default function HomeScreen() {
     <Screen>
       <AppHeader />
       <SectionHeader title={ageGroup === "child" ? t("Vamos brincar?", "Ready to play?") : t("Continue", "Continue")} />
-      {active ? <ContinueCard puzzle={active} /> : (
-        <LinearGradient colors={[`${colors.accent}22`, `${colors.primary}24`]} style={[styles.emptyHero, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
-          <Ionicons name="sparkles" size={28} color={colors.accent} />
-          <Text maxFontSizeMultiplier={1.2} style={[styles.emptyTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Escolha uma aventura bem colorida!", "Choose a colorful adventure!") : t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
-          <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text adjustsFontSizeToFit maxFontSizeMultiplier={1.2} minimumFontScale={0.86} numberOfLines={1} style={styles.compactCtaText}>{t("Criar quebra-cabeça", "Create puzzle")}</Text></Pressable>
-        </LinearGradient>
-      )}
+      <View style={styles.heroStack}>
+        {active ? <ContinueCard puzzle={active} /> : (
+          <LinearGradient colors={[`${colors.accent}22`, `${colors.primary}24`]} style={[styles.emptyHero, { borderColor: `${colors.accent}42`, borderRadius: Math.max(24, colors.radius) }]}>
+            <Ionicons name="sparkles" size={28} color={colors.accent} />
+            <Text maxFontSizeMultiplier={1.2} style={[styles.emptyTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Escolha uma aventura bem colorida!", "Choose a colorful adventure!") : t("Sua próxima memória começa aqui", "Your next memory starts here")}</Text>
+            <Pressable onPress={() => router.push("/(tabs)/create")} style={[styles.compactCta, { backgroundColor: colors.accent }]}><Text adjustsFontSizeToFit maxFontSizeMultiplier={1.2} minimumFontScale={0.86} numberOfLines={1} style={styles.compactCtaText}>{t("Criar quebra-cabeça", "Create puzzle")}</Text></Pressable>
+          </LinearGradient>
+        )}
 
-      <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42`, borderRadius: colors.radius }]}>
-        <View style={{ flex: 1 }}><Text maxFontSizeMultiplier={1.2} style={[styles.kicker, { color: colors.primary }]}>{ageGroup === "child" ? t("MISSÃO DE HOJE", "TODAY'S MISSION") : t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.challengeTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Mundo Arco-Íris", "Rainbow World") : t("Nebulosa Neon", "Neon Nebula")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
-        <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name={ageGroup === "child" ? "star" : "extension-puzzle"} size={30} color={colors.accent} /></View>
-      </LinearGradient>
+        <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42`, borderRadius: Math.max(24, colors.radius) }]}>
+          <View style={{ flex: 1 }}><Text maxFontSizeMultiplier={1.2} style={[styles.kicker, { color: colors.primary }]}>{ageGroup === "child" ? t("MISSÃO DE HOJE", "TODAY'S MISSION") : t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.challengeTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Mundo Arco-Íris", "Rainbow World") : t("Nebulosa Neon", "Neon Nebula")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
+          <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name={ageGroup === "child" ? "star" : "extension-puzzle"} size={30} color={colors.accent} /></View>
+        </LinearGradient>
+      </View>
 
       <View style={styles.quickRow}>
         <QuickAction icon="add-outline" label={t("Novo quebra-cabeça", "New puzzle")} onPress={() => router.push("/(tabs)/create")} />
@@ -55,7 +57,7 @@ function ContinueCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"]
   const placed = puzzle.session.pieces.filter((piece) => piece.isPlaced).length;
   const progress = Math.round((placed / puzzle.session.pieces.length) * 100);
   return (
-    <Pressable onPress={() => router.push(`/puzzle/${puzzle.id}`)} style={({ pressed }) => [styles.continueCard, { borderColor: `${colors.accent}40`, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 }]}>
+    <Pressable onPress={() => router.push(`/puzzle/${puzzle.id}`)} style={({ pressed }) => [styles.continueCard, { borderColor: `${colors.accent}40`, borderRadius: Math.max(24, colors.radius), opacity: pressed ? 0.85 : 1 }]}>
       <View style={styles.continueImageWrap}>
         <Image source={{ uri: puzzle.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         <LinearGradient colors={["transparent", "rgba(5,9,20,.5)"]} style={StyleSheet.absoluteFill} />
@@ -86,7 +88,8 @@ function CompletedCard({ puzzle }: { puzzle: ReturnType<typeof useApp>["puzzles"
 }
 
 const styles = StyleSheet.create({
-  continueCard: { minHeight: 248, borderRadius: 28, overflow: "hidden", borderWidth: 1, marginBottom: 18 },
+  heroStack: { width: "100%", gap: 16, marginBottom: 22 },
+  continueCard: { minHeight: 248, borderRadius: 28, overflow: "hidden", borderWidth: 1 },
   continueImageWrap: { width: "100%", height: 128, overflow: "hidden" },
   continueContent: { minHeight: 120, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 15, overflow: "hidden" },
   continueCopy: { minHeight: 50, paddingRight: 64 },
@@ -94,11 +97,11 @@ const styles = StyleSheet.create({
   continueProgress: { marginTop: 9 },
   heroTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20 },
   heroMeta: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 3 },
-  emptyHero: { minHeight: 190, borderRadius: 28, borderWidth: 1, padding: 22, justifyContent: "center", gap: 12, marginBottom: 18 },
+  emptyHero: { minHeight: 190, borderRadius: 28, borderWidth: 1, padding: 22, justifyContent: "center", gap: 12 },
   emptyTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 23, maxWidth: 280 },
   compactCta: { alignSelf: "stretch", minHeight: 48, borderRadius: 99, paddingHorizontal: 18, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   compactCtaText: { color: "#00363a", fontFamily: "Inter_700Bold", fontSize: 15, textAlign: "center" },
-  challenge: { flexDirection: "row", minHeight: 116, borderRadius: 23, borderWidth: 1, padding: 18, alignItems: "center", marginBottom: 22 },
+  challenge: { flexDirection: "row", minHeight: 116, borderRadius: 23, borderWidth: 1, padding: 18, alignItems: "center", overflow: "hidden" },
   kicker: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.2 },
   challengeTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 20, marginTop: 5 },
   body: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 },

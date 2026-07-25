@@ -7,10 +7,13 @@ import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
+import java.io.InputStream
 import java.net.URL
 import kotlin.math.ceil
 import kotlin.math.max
@@ -21,13 +24,15 @@ private data class VideoFrame(val at: Double, val changes: List<VideoState>)
 private data class VideoPiece(val id: String, val row: Int, val column: Int, val shape: JSONObject)
 
 internal class PiecefulTimelapseEncoder(private val context: Context) {
-  private val width = 720
-  private val height = 1280
+  private var width = 720
+  private var height = 1280
   private val fps = 24
   private val speed = 60.0
 
   fun encode(payload: JSONObject, onProgress: (Int) -> Unit): String {
     val source = loadBitmap(payload.getString("imageUri"))
+    val logo = payload.optString("logoUri").takeIf { it.isNotBlank() }
+      ?.let { runCatching { loadBitmap(it) }.getOrNull() }
     val piecesJson = payload.getJSONArray("pieces")
     val pieces = (0 until piecesJson.length()).map { index ->
       val item = piecesJson.getJSONObject(index)
@@ -43,17 +48,24 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
     }.sortedBy { it.at }
     val rows = payload.getInt("rows")
     val columns = payload.getInt("columns")
+    val boardScale = ((1280 / max(rows, columns)) / 16).coerceAtLeast(1) * 16
+    width = columns * boardScale
+    height = rows * boardScale
     val elapsed = max(1.0, payload.optDouble("elapsed", 1.0))
-    val sourceDuration = max(elapsed, frames.lastOrNull()?.at ?: 0.0)
-    val totalFrames = max(2, ceil(sourceDuration / speed * fps).toInt())
+    val sourceStart = frames.firstOrNull()?.at ?: 0.0
+    val sourceEnd = max(sourceStart + 0.12, frames.lastOrNull()?.at ?: elapsed)
+    val sourceDuration = max(0.12, sourceEnd - sourceStart)
+    val assemblyFrames = max(2, ceil(sourceDuration / speed * fps).toInt())
+    val totalFrames = assemblyFrames + fps
     val output = File(context.cacheDir, "pieceful-${System.currentTimeMillis()}.mp4")
     encodeFrames(output, totalFrames) { frameIndex, bitmap ->
-      val sourceTime = sourceDuration * frameIndex / (totalFrames - 1).toDouble()
+      val assemblyIndex = min(frameIndex, assemblyFrames - 1)
+      val sourceTime = sourceStart + sourceDuration * assemblyIndex / (assemblyFrames - 1).toDouble()
       states.clear(); initial.forEach { states[it.id] = it }
       var applied = -1
       frames.forEachIndexed { index, frame -> if (frame.at <= sourceTime) { frame.changes.forEach { states[it.id] = it }; applied = index } }
       val next = frames.getOrNull(applied + 1)
-      if (next != null && frameIndex < totalFrames - 1) {
+      if (next != null && frameIndex < assemblyFrames - 1) {
         val previousTime = if (applied >= 0) frames[applied].at else 0.0
         val amount = ((sourceTime - previousTime) / max(0.001, next.at - previousTime)).coerceIn(0.0, 1.0).toFloat()
         next.changes.forEach { after ->
@@ -61,17 +73,18 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
           if (before != null) states[after.id] = interpolate(before, after, amount)
         }
       }
-      if (frameIndex == totalFrames - 1) {
+      if (frameIndex >= assemblyFrames - 1) {
         piecesJson.let { array -> (0 until array.length()).forEach { index ->
           val item = array.getJSONObject(index)
           val correct = item.getJSONObject("correctPosition")
           states[item.getString("id")] = VideoState(item.getString("id"), correct.getDouble("x").toFloat(), correct.getDouble("y").toFloat(), correct.getDouble("rotation").toFloat(), true, true)
         }}
       }
-      draw(bitmap, source, pieces, states, rows, columns, payload.optString("language", "pt-BR"), elapsed, frameIndex / (totalFrames - 1f))
+      draw(bitmap, source, logo, pieces, states, rows, columns)
       onProgress(((frameIndex + 1) * 100f / totalFrames).toInt())
     }
     source.recycle()
+    logo?.recycle()
     return Uri.fromFile(output).toString()
   }
 
@@ -96,33 +109,70 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
     val stream = when (uri.scheme) {
       "content" -> context.contentResolver.openInputStream(uri)
       "file" -> if (value.startsWith("file:///android_res/")) {
-        val resourceName = requireNotNull(uri.lastPathSegment).substringBeforeLast('.')
-        val resourceId = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
-        require(resourceId != 0) { "Unable to find bundled puzzle image" }
-        context.resources.openRawResource(resourceId)
+        openBundledImage(value, uri) ?: error("Unable to find bundled puzzle image")
       } else {
         FileInputStream(requireNotNull(uri.path))
       }
+      "asset" -> openBundledImage(value, uri)
       "http", "https" -> URL(value).openStream()
-      else -> FileInputStream(value)
+      null, "" -> openBundledImage(value, uri) ?: FileInputStream(value)
+      else -> openBundledImage(value, uri) ?: FileInputStream(value)
     } ?: error("Unable to read the puzzle image")
-    return stream.use { BitmapFactory.decodeStream(it) } ?: error("Unable to decode the puzzle image")
+    val bytes = stream.use { it.readBytes() }
+    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("Unable to decode the puzzle image")
+    val orientation = runCatching {
+      ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(
+        ExifInterface.TAG_ORIENTATION,
+        ExifInterface.ORIENTATION_NORMAL,
+      )
+    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    val matrix = Matrix().apply {
+      when (orientation) {
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> setScale(1f, -1f)
+        ExifInterface.ORIENTATION_TRANSPOSE -> { setRotate(90f); postScale(-1f, 1f) }
+        ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
+        ExifInterface.ORIENTATION_TRANSVERSE -> { setRotate(-90f); postScale(-1f, 1f) }
+        ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(-90f)
+      }
+    }
+    if (orientation == ExifInterface.ORIENTATION_NORMAL || orientation == ExifInterface.ORIENTATION_UNDEFINED) return decoded
+    return Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true).also {
+      if (it !== decoded) decoded.recycle()
+    }
   }
 
-  private fun draw(target: Bitmap, image: Bitmap, pieces: List<VideoPiece>, states: Map<String, VideoState>, rows: Int, columns: Int, language: String, elapsed: Double, progress: Float) {
+  private fun openBundledImage(value: String, uri: Uri): InputStream? {
+    val rawName = uri.lastPathSegment
+      ?: value.substringAfterLast('/')
+    val resourceName = rawName
+      .substringBefore('?')
+      .substringBeforeLast('.')
+      .replace(Regex("[^a-zA-Z0-9_]"), "_")
+      .lowercase()
+    for (type in listOf("drawable", "raw")) {
+      val resourceId = context.resources.getIdentifier(resourceName, type, context.packageName)
+      if (resourceId != 0) return context.resources.openRawResource(resourceId)
+    }
+
+    val assetPath = value
+      .removePrefix("asset://")
+      .removePrefix("asset:/")
+      .removePrefix("/")
+    return runCatching { context.assets.open(assetPath) }.getOrNull()
+  }
+
+  private fun draw(target: Bitmap, image: Bitmap, logo: Bitmap?, pieces: List<VideoPiece>, states: Map<String, VideoState>, rows: Int, columns: Int) {
     val canvas = Canvas(target)
-    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), Paint().apply { shader = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(), intArrayOf(Color.rgb(9,17,37), Color.rgb(23,27,54), Color.rgb(37,24,61)), null, Shader.TileMode.CLAMP) })
-    fun text(value: String, y: Float, size: Float, color: Int, bold: Boolean = false) = canvas.drawText(value, width / 2f, y, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; textSize = size; textAlign = Paint.Align.CENTER; typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT })
-    text("PIECEFUL", 66f, 22f, Color.rgb(76,215,246), true)
-    text(if (language == "en") "A memory, piece by piece" else "Uma memória, peça por peça", 122f, 40f, Color.WHITE, true)
-    text(if (language == "en") "ASSEMBLY TIMELAPSE" else "TIMELAPSE DA MONTAGEM", 158f, 19f, Color.rgb(158,168,197))
-    val cell = min(620f / columns, 760f / rows)
+    canvas.drawColor(Color.rgb(4, 10, 24))
+    val cell = min(width.toFloat() / columns, height.toFloat() / rows)
     val boardW = columns * cell
     val boardH = rows * cell
     val ox = (width - boardW) / 2f
-    val oy = 218f + (760f - boardH) / 2f
-    canvas.drawRoundRect(ox - 14, oy - 14, ox + boardW + 14, oy + boardH + 14, 22f, 22f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(185,4,10,24) })
+    val oy = (height - boardH) / 2f
     val imageDest = RectF(ox, oy, ox + boardW, oy + boardH)
+    val imageSource = centerCropSource(image, boardW / boardH)
     pieces.sortedBy { if (states[it.id]?.placed == true) 0 else 1 }.forEach { piece ->
       val state = states[piece.id] ?: return@forEach
       if (!state.visible) return@forEach
@@ -134,21 +184,34 @@ internal class PiecefulTimelapseEncoder(private val context: Context) {
       canvas.save()
       canvas.clipPath(path)
       val translated = RectF(imageDest).apply { offset((state.x - piece.column) * cell, (state.y - piece.row) * cell) }
-      canvas.drawBitmap(image, null, translated, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+      canvas.drawBitmap(image, imageSource, translated, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
       canvas.restore()
       canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = if (state.placed) 1f else 1.7f; color = if (state.placed) Color.argb(70,255,255,255) else Color.argb(190,255,255,255) })
       canvas.restore()
     }
-    val placed = if (progress >= 1f) pieces.size else states.values.count { it.placed }
-    canvas.drawRoundRect(52f, 1040f, width - 52f, 1172f, 28f, 28f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(205,7,13,31) })
-    val label = "${(placed * 100f / pieces.size).toInt()}% ${if (language == "en") "completed" else "concluído"}"
-    canvas.drawText(label, 82f, 1093f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 34f; typeface = Typeface.DEFAULT_BOLD })
-    canvas.drawText(if (language == "en") "$placed of ${pieces.size} pieces" else "$placed de ${pieces.size} peças", 82f, 1128f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(158,168,197); textSize = 18f })
-    val seconds = (elapsed * progress).toInt(); val time = "%02d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
-    canvas.drawText(time, width - 82f, 1111f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(76,215,246); textSize = 26f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.RIGHT })
-    canvas.drawRect(52f,1204f,width-52f,1214f,Paint().apply { color=Color.argb(25,255,255,255) })
-    canvas.drawRect(52f,1204f,52f+(width-104f)*progress,1214f,Paint().apply { color=Color.rgb(76,215,246) })
-    text(if (language == "en") "Created with Pieceful" else "Criado com Pieceful", 1250f, 16f, Color.rgb(217,221,245), true)
+    logo?.let {
+      val logoSize = min(width, height) * .085f
+      val margin = min(width, height) * .025f
+      canvas.drawBitmap(
+        it,
+        null,
+        RectF(width - margin - logoSize, margin, width - margin, margin + logoSize),
+        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { alpha = 178 },
+      )
+    }
+  }
+
+  private fun centerCropSource(image: Bitmap, destinationAspect: Float): Rect {
+    val sourceAspect = image.width.toFloat() / image.height.toFloat()
+    return if (sourceAspect > destinationAspect) {
+      val cropWidth = (image.height * destinationAspect).toInt().coerceAtLeast(1)
+      val left = (image.width - cropWidth) / 2
+      Rect(left, 0, left + cropWidth, image.height)
+    } else {
+      val cropHeight = (image.width / destinationAspect).toInt().coerceAtLeast(1)
+      val top = (image.height - cropHeight) / 2
+      Rect(0, top, image.width, top + cropHeight)
+    }
   }
 
   private fun piecePath(x: Float, y: Float, size: Float, shape: JSONObject): Path {

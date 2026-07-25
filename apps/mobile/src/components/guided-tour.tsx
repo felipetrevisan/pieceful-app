@@ -47,8 +47,8 @@ const steps = [
     icon: "trophy-outline",
     eyebrow: ["SUA EVOLUÇÃO", "YOUR PROGRESS"],
     title: ["XP mostra sua experiência", "XP shows your experience"],
-    description: ["Você ganha XP ao encaixar peças e concluir quebra-cabeças. A cada 1.000 XP seu nível aumenta e você pode comparar sua evolução com amigos.", "You earn XP by placing pieces and completing puzzles. Every 1,000 XP raises your level, and you can compare progress with friends."],
-    tips: [["star-outline", "XP mede sua progressão no Pieceful", "XP tracks your Pieceful progression"], ["ribbon-outline", "Conquistas celebram marcos e desafios especiais", "Achievements celebrate milestones and special challenges"]],
+    description: ["Você ganha XP ao encaixar peças, superar desafios e concluir quebra-cabeças. Avance até o nível 100 para desbloquear dicas, temas, avatares, molduras e pacotes.", "Earn XP by placing pieces, beating challenges, and completing puzzles. Reach level 100 to unlock hints, themes, avatars, frames, and packs."],
+    tips: [["star-outline", "Cada nível libera uma nova recompensa", "Every level unlocks a new reward"], ["ribbon-outline", "Conquistas celebram marcos e desafios especiais", "Achievements celebrate milestones and special challenges"]],
   },
   {
     icon: "albums-outline",

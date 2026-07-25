@@ -17,6 +17,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { getLevelRewards, getPlayerProgression } from "@/lib/progression";
 
 export type AppLanguage = "pt-BR" | "en";
 export type AgeGroup = "child" | "teen" | "adult";
@@ -68,7 +69,12 @@ interface AppState {
   theme: MobileTheme;
   preferences: MobilePreferences;
   puzzles: MobilePuzzle[];
+  deletedPuzzleIds: string[];
   notificationCount: number;
+  hintCredits: number;
+  claimedRewardIds: string[];
+  selectedAvatarRewardId: string | null;
+  selectedFrameRewardId: string | null;
   setLanguage: (language: AppLanguage) => void;
   setAgeGroup: (ageGroup: AgeGroup) => void;
   resetAgeGroup: () => void;
@@ -77,6 +83,9 @@ interface AppState {
   startTour: () => void;
   completeTour: () => void;
   markNotificationsRead: () => void;
+  claimLevelReward: (rewardId: string) => boolean;
+  consumeHintCredit: () => boolean;
+  equipReward: (kind: "avatar" | "frame", rewardId: string | null) => boolean;
   updatePreference: (key: keyof MobilePreferences, value: boolean) => void;
   createPuzzle: (input: CreatePuzzleInput) => MobilePuzzle;
   updatePuzzlePieces: (id: string, pieces: PuzzlePiece[]) => void;
@@ -86,6 +95,7 @@ interface AppState {
   renamePuzzle: (id: string, name: string) => void;
   deletePuzzle: (id: string) => void;
   deleteLocalPuzzles: () => void;
+  acknowledgeDeletedPuzzles: (ids: string[]) => void;
   mergeRemotePuzzles: (puzzles: MobilePuzzle[]) => void;
   t: (portuguese: string, english: string) => string;
 }
@@ -170,6 +180,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<MobileTheme>("cosmic");
   const [preferences, setPreferences] = useState(defaultPreferences);
   const [puzzles, setPuzzles] = useState<MobilePuzzle[]>([]);
+  const [deletedPuzzleIds, setDeletedPuzzleIds] = useState<string[]>([]);
+  const [hintCredits, setHintCredits] = useState(0);
+  const [claimedRewardIds, setClaimedRewardIds] = useState<string[]>([]);
+  const [selectedAvatarRewardId, setSelectedAvatarRewardId] = useState<string | null>(null);
+  const [selectedFrameRewardId, setSelectedFrameRewardId] = useState<string | null>(null);
   const [lastNotificationsReadAt, setLastNotificationsReadAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -184,9 +199,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ageGroup: AgeGroup;
           theme: MobileTheme;
           puzzles: MobilePuzzle[];
+          deletedPuzzleIds: string[];
           preferences: MobilePreferences;
           tourCompleted: boolean;
           lastNotificationsReadAt: string;
+          hintCredits: number;
+          claimedRewardIds: string[];
+          selectedAvatarRewardId: string;
+          selectedFrameRewardId: string;
         }>;
         if (parsed.language === "en" || parsed.language === "pt-BR") {
           setLanguageState(parsed.language);
@@ -211,6 +231,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setThemeState(parsed.theme as MobileTheme);
         }
         if (Array.isArray(parsed.puzzles)) setPuzzles(parsed.puzzles);
+        if (Array.isArray(parsed.deletedPuzzleIds)) {
+          setDeletedPuzzleIds(
+            parsed.deletedPuzzleIds.filter((id): id is string => typeof id === "string"),
+          );
+        }
+        if (Number.isFinite(parsed.hintCredits)) setHintCredits(Math.max(0, parsed.hintCredits ?? 0));
+        if (Array.isArray(parsed.claimedRewardIds)) {
+          setClaimedRewardIds(
+            parsed.claimedRewardIds.filter((id): id is string => typeof id === "string"),
+          );
+        }
+        if (typeof parsed.selectedAvatarRewardId === "string") setSelectedAvatarRewardId(parsed.selectedAvatarRewardId);
+        if (typeof parsed.selectedFrameRewardId === "string") setSelectedFrameRewardId(parsed.selectedFrameRewardId);
         if (parsed.preferences) setPreferences({ ...defaultPreferences, ...parsed.preferences });
         const completed = parsed.tourCompleted === true;
         if (typeof parsed.lastNotificationsReadAt === "string") {
@@ -232,9 +265,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         language,
         theme,
         puzzles,
+        deletedPuzzleIds,
         preferences,
         tourCompleted,
         lastNotificationsReadAt,
+        hintCredits,
+        claimedRewardIds,
+        selectedAvatarRewardId,
+        selectedFrameRewardId,
       }),
     );
   }, [
@@ -243,6 +281,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lastNotificationsReadAt,
     preferences,
     puzzles,
+    deletedPuzzleIds,
+    hintCredits,
+    claimedRewardIds,
+    selectedAvatarRewardId,
+    selectedFrameRewardId,
     ready,
     theme,
     tourCompleted,
@@ -267,6 +310,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePreference = useCallback((key: keyof MobilePreferences, value: boolean) => {
     setPreferences((current) => ({ ...current, [key]: value }));
   }, []);
+
+  const claimLevelReward = useCallback(
+    (rewardId: string) => {
+      if (claimedRewardIds.includes(rewardId)) return false;
+      const reward = getLevelRewards(ageGroup).find((item) => item.id === rewardId);
+      if (!reward || reward.level > getPlayerProgression(puzzles).level) return false;
+      setClaimedRewardIds((current) =>
+        current.includes(rewardId) ? current : [...current, rewardId],
+      );
+      if (reward.kind === "hints") setHintCredits((current) => current + (reward.amount ?? 1));
+      if (reward.kind === "avatar") setSelectedAvatarRewardId(rewardId);
+      if (reward.kind === "frame") setSelectedFrameRewardId(rewardId);
+      return true;
+    },
+    [ageGroup, claimedRewardIds, puzzles],
+  );
+
+  const consumeHintCredit = useCallback(() => {
+    if (hintCredits <= 0) return false;
+    setHintCredits((current) => Math.max(0, current - 1));
+    return true;
+  }, [hintCredits]);
+
+  const equipReward = useCallback((kind: "avatar" | "frame", rewardId: string | null) => {
+    if (rewardId === null) {
+      if (kind === "avatar") setSelectedAvatarRewardId(null);
+      else setSelectedFrameRewardId(null);
+      return true;
+    }
+    if (!claimedRewardIds.includes(rewardId)) return false;
+    const reward = getLevelRewards(ageGroup).find((item) => item.id === rewardId && item.kind === kind);
+    if (!reward) return false;
+    if (kind === "avatar") setSelectedAvatarRewardId(rewardId);
+    else setSelectedFrameRewardId(rewardId);
+    return true;
+  }, [ageGroup, claimedRewardIds]);
 
   const createPuzzle = useCallback((input: CreatePuzzleInput) => {
     const id = `puzzle-${Date.now()}-${Math.round(Math.random() * 100_000)}`;
@@ -380,9 +459,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deletePuzzle = useCallback((id: string) => {
     setPuzzles((current) => current.filter((puzzle) => puzzle.id !== id));
+    setDeletedPuzzleIds((current) => (current.includes(id) ? current : [...current, id]));
   }, []);
 
-  const deleteLocalPuzzles = useCallback(() => setPuzzles([]), []);
+  const deleteLocalPuzzles = useCallback(() => {
+    const ids = puzzles.map((puzzle) => puzzle.id);
+    setDeletedPuzzleIds((deleted) => [...new Set([...deleted, ...ids])]);
+    setPuzzles([]);
+  }, [puzzles]);
+
+  const acknowledgeDeletedPuzzles = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    const acknowledged = new Set(ids);
+    setDeletedPuzzleIds((current) => current.filter((id) => !acknowledged.has(id)));
+  }, []);
 
   const renamePuzzle = useCallback((id: string, name: string) => {
     const trimmedName = name.trim();
@@ -400,6 +490,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPuzzles((current) => {
       const merged = new Map(current.map((puzzle) => [puzzle.id, puzzle]));
       for (const remote of remotePuzzles) {
+        if (deletedPuzzleIds.includes(remote.id)) continue;
         const local = merged.get(remote.id);
         if (!local || new Date(remote.updatedAt).getTime() > new Date(local.updatedAt).getTime()) {
           merged.set(remote.id, remote);
@@ -409,7 +500,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
       );
     });
-  }, []);
+  }, [deletedPuzzleIds]);
 
   const readAt = lastNotificationsReadAt ? new Date(lastNotificationsReadAt).getTime() : 0;
   const todayStartedAt = new Date();
@@ -432,7 +523,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       theme,
       preferences,
       puzzles,
+      deletedPuzzleIds,
       notificationCount,
+      hintCredits,
+      claimedRewardIds,
+      selectedAvatarRewardId,
+      selectedFrameRewardId,
       setLanguage,
       setAgeGroup,
       resetAgeGroup,
@@ -441,6 +537,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       startTour,
       completeTour,
       markNotificationsRead,
+      claimLevelReward,
+      consumeHintCredit,
+      equipReward,
       updatePreference,
       createPuzzle,
       updatePuzzlePieces,
@@ -450,6 +549,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       renamePuzzle,
       deletePuzzle,
       deleteLocalPuzzles,
+      acknowledgeDeletedPuzzles,
       mergeRemotePuzzles,
       t: (portuguese, english) => (language === "en" ? english : portuguese),
     }),
@@ -458,12 +558,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       completeTour,
       deletePuzzle,
       deleteLocalPuzzles,
+      acknowledgeDeletedPuzzles,
+      claimedRewardIds,
+      claimLevelReward,
+      consumeHintCredit,
+      equipReward,
+      deletedPuzzleIds,
       mergeRemotePuzzles,
       markNotificationsRead,
       renamePuzzle,
       drawerOpen,
       language,
       ageGroup,
+      hintCredits,
+      selectedAvatarRewardId,
+      selectedFrameRewardId,
       puzzles,
       notificationCount,
       preferences,

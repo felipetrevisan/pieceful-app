@@ -5,15 +5,16 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   runOnJS,
   type SharedValue,
@@ -113,6 +114,7 @@ export function PuzzlePieceDrawer({
   onStorageFrameChange,
 }: PuzzlePieceDrawerProps) {
   const { height, width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { preferences, t, theme } = useApp();
   const colors = mobileThemes[theme];
   const storedPieces = useMemo(
@@ -132,6 +134,8 @@ export function PuzzlePieceDrawer({
   const [filter, setFilter] = useState<TrayFilter>("all");
   const storageRef = useRef<View>(null);
   const pieceSize = Math.max(38, Math.min(50, (width - 48) / 7));
+  const pieceExtent = pieceSize * 1.48;
+  const trayColumns = Math.max(3, Math.floor((width - 32) / pieceExtent));
   const filteredPieces = useMemo(() => {
     if (filter === "all") return storedPieces;
     return storedPieces.filter((piece) =>
@@ -194,6 +198,7 @@ export function PuzzlePieceDrawer({
         styles.sheet,
         {
           height: sheetHeight,
+          bottom: Math.max(12, insets.bottom + 8),
           backgroundColor: "transparent",
           borderColor: `${colors.accent}70`,
           shadowColor: colors.accent,
@@ -313,14 +318,23 @@ export function PuzzlePieceDrawer({
             })}
           </View>
           {filteredPieces.length ? (
-            <ScrollView
+            <FlatList
+              key={trayColumns}
+              style={styles.pieceList}
+              data={filteredPieces}
+              numColumns={trayColumns}
+              keyExtractor={(piece) => piece.id}
               contentContainerStyle={styles.grid}
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
-            >
-              {filteredPieces.map((piece) => (
+              initialNumToRender={trayColumns * 4}
+              maxToRenderPerBatch={trayColumns * 3}
+              updateCellsBatchingPeriod={32}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === "android"}
+              columnWrapperStyle={styles.gridRow}
+              renderItem={({ item: piece }) => (
                 <DrawerPiece
-                  key={piece.id}
                   piece={piece}
                   imageUri={imageUri}
                   rows={rows}
@@ -338,8 +352,8 @@ export function PuzzlePieceDrawer({
                   onToggleSelected={toggleSelected}
                   onRelease={releaseSelected}
                 />
-              ))}
-            </ScrollView>
+              )}
+            />
           ) : (
             <View style={styles.empty}>
               <Ionicons name="filter-outline" size={31} color={colors.accent} />
@@ -399,13 +413,18 @@ function DrawerPiece({
   const margin = size * 0.24;
   const extent = size + margin * 2;
   const dragging = useSharedValue(0);
+  const dragOriginX = useSharedValue(0);
+  const dragOriginY = useSharedValue(0);
   const path = useMemo(() => piecePath(piece.shape, size, margin), [margin, piece.shape, size]);
   const clipId = `drawer-clip-${piece.id}`;
 
   const pan = Gesture.Pan()
-    .activateAfterLongPress(120)
+    .activateAfterLongPress(320)
+    .minDistance(8)
     .onStart((event) => {
       dragging.set(1);
+      dragOriginX.set(event.absoluteX);
+      dragOriginY.set(event.absoluteY);
       dragScreenX.set(event.absoluteX);
       dragScreenY.set(event.absoluteY);
       runOnJS(onDragPreviewChange)({
@@ -419,7 +438,11 @@ function DrawerPiece({
       dragScreenY.set(event.absoluteY);
     })
     .onEnd((event) => {
-      if (boardFrame) {
+      const dragDistance = Math.hypot(
+        event.absoluteX - dragOriginX.get(),
+        event.absoluteY - dragOriginY.get(),
+      );
+      if (boardFrame && dragDistance >= 24) {
         const visualWidth = boardFrame.width * boardZoom;
         const visualHeight = boardFrame.height * boardZoom;
         const visualX = boardFrame.x - (visualWidth - boardFrame.width) / 2 + boardPanX * boardZoom;
@@ -663,15 +686,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   filterLabel: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  pieceList: { flex: 1 },
   grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-around",
-    gap: 4,
     paddingHorizontal: 8,
     paddingTop: 10,
     paddingBottom: 32,
   },
+  gridRow: { justifyContent: "space-around" },
   stackLayer: {
     position: "absolute",
     inset: 7,

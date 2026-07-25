@@ -106,6 +106,49 @@ const kidPictures = [
   },
 ] as const;
 
+const starterPictures = [
+  {
+    source: require("../../../assets/images/starter/aurora-lake.png"),
+    pt: "Refúgio sob a aurora",
+    en: "Aurora retreat",
+  },
+  {
+    source: require("../../../assets/images/starter/neon-metropolis.png"),
+    pt: "Metrópole neon",
+    en: "Neon metropolis",
+  },
+  {
+    source: require("../../../assets/images/starter/mediterranean-coast.png"),
+    pt: "Costa mediterrânea",
+    en: "Mediterranean coast",
+  },
+  {
+    source: require("../../../assets/images/starter/tropical-feathers.png"),
+    pt: "Cores tropicais",
+    en: "Tropical colors",
+  },
+  {
+    source: require("../../../assets/images/starter/desert-oasis.png"),
+    pt: "Oásis dourado",
+    en: "Golden oasis",
+  },
+  {
+    source: require("../../../assets/images/starter/cosmic-voyage.png"),
+    pt: "Viagem cósmica",
+    en: "Cosmic voyage",
+  },
+  {
+    source: require("../../../assets/images/starter/grand-library.png"),
+    pt: "Biblioteca encantada",
+    en: "Enchanted library",
+  },
+  {
+    source: require("../../../assets/images/starter/tropical-waterfall.png"),
+    pt: "Jardim das cachoeiras",
+    en: "Waterfall garden",
+  },
+] as const;
+
 interface KidPicture {
   key: string;
   source: number | string;
@@ -160,14 +203,12 @@ export default function CreateScreen() {
   );
   const availableKidPictures = useMemo<KidPicture[]>(
     () => [
-      ...(ageGroup === "child"
-        ? kidPictures.map((picture) => ({
-            ...picture,
-            key: `built-in-${picture.en}`,
-            width: 627,
-            height: 627,
-          }))
-        : []),
+      ...(ageGroup === "child" ? kidPictures : starterPictures).map((picture) => ({
+        ...picture,
+        key: `built-in-${picture.en}`,
+        width: 627,
+        height: 627,
+      })),
       ...installedPacks
         .filter((pack) =>
           pack.audience
@@ -288,7 +329,7 @@ export default function CreateScreen() {
       if (canCopy) {
         const destination = new File(
           directory,
-          `kids-${pictureKey}.${sourceExtension && /^[a-z0-9]{2,5}$/.test(sourceExtension) ? sourceExtension : "jpg"}`,
+          `preset-${pictureKey}.${sourceExtension && /^[a-z0-9]{2,5}$/.test(sourceExtension) ? sourceExtension : "jpg"}`,
         );
         await new File(sourceUri).copy(destination, { overwrite: true });
         permanentUri = destination.uri;
@@ -377,10 +418,15 @@ export default function CreateScreen() {
                 <Text style={[styles.kidTitle, { color: colors.text }]}>
                   {ageGroup === "child"
                     ? t("Escolha uma aventura", "Choose an adventure")
-                    : t("Quebra-cabeças prontos", "Ready-made puzzles")}
+                    : t("Coleção inicial", "Starter collection")}
                 </Text>
                 <Text style={[styles.kidSwipeHint, { color: colors.muted }]}>
-                  {t("Deslize para ver mais imagens", "Swipe to see more pictures")}
+                  {ageGroup === "child"
+                    ? t("Deslize para ver mais imagens", "Swipe to see more pictures")
+                    : t(
+                        "8 imagens inclusas · deslize para explorar",
+                        "8 included pictures · swipe to explore",
+                      )}
                 </Text>
               </View>
               <Ionicons name="swap-horizontal" size={20} color={colors.accent} />

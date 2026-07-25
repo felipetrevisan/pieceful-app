@@ -3,11 +3,19 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
+import { getPuzzleXp } from "@/lib/progression";
 import { createTimelapse, saveTimelapse, shareTimelapse } from "@/lib/native-timelapse";
 import { useApp } from "@/state/app-provider";
 import PiecefulGameServices from "../../../modules/my-module/src/PiecefulGameServicesModule";
@@ -17,6 +25,7 @@ export default function ResultScreen() {
   const { puzzles, t, theme, language } = useApp();
   const colors = mobileThemes[theme];
   const { showAlert } = usePiecefulAlert();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const puzzle = puzzles.find((item) => item.id === id);
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -39,6 +48,12 @@ export default function ResultScreen() {
       </SafeAreaView>
     );
   }
+
+  const imageAspect = puzzle.configuration.columns / puzzle.configuration.rows;
+  const resultMaxWidth = Math.min(600, viewportWidth - 40);
+  const resultMaxHeight = Math.min(420, viewportHeight * 0.46);
+  const resultImageWidth = Math.min(resultMaxWidth, resultMaxHeight * imageAspect);
+  const resultImageHeight = resultImageWidth / imageAspect;
 
   const prepareTimelapse = async () => {
     if (!puzzle.session.completedAt && !puzzle.session.pieces.every((piece) => piece.isPlaced)) {
@@ -113,16 +128,24 @@ export default function ResultScreen() {
         <Text style={[styles.title, { color: colors.accent }]}>
           {t("Memória\nReconstruída", "Memory\nReconstructed")}
         </Text>
-        <View style={[styles.imageFrame, { borderColor: colors.accent }]}>
-          <Image
-            source={{ uri: puzzle.imageUri }}
+        <View style={styles.imageStage}>
+          <View
             style={[
-              styles.image,
-              { aspectRatio: puzzle.configuration.columns / puzzle.configuration.rows },
+              styles.imageFrame,
+              {
+                borderColor: colors.accent,
+                width: resultImageWidth,
+                height: resultImageHeight,
+              },
             ]}
-            contentFit="cover"
-            transition={220}
-          />
+          >
+            <Image
+              source={{ uri: puzzle.imageUri }}
+              style={styles.image}
+              contentFit="contain"
+              transition={220}
+            />
+          </View>
         </View>
         <View style={styles.stats}>
           <Stat
@@ -142,53 +165,34 @@ export default function ResultScreen() {
           />
           <Stat
             icon="star-outline"
-            value={`+${puzzle.configuration.totalPieces * 3}`}
+            value={`+${getPuzzleXp(puzzle)}`}
             label="XP"
             accent
           />
         </View>
-        <View
-          style={[
-            styles.replay,
-            { backgroundColor: colors.panel, borderColor: `${colors.muted}38` },
-          ]}
-        >
-          <Text style={[styles.kicker, { color: colors.muted }]}>
-            {t("TIMELAPSE DA MONTAGEM", "ASSEMBLY TIMELAPSE")}
-          </Text>
-          <View>
-            <Image
-              source={{ uri: puzzle.imageUri }}
-              style={[
-                styles.videoImage,
-                { aspectRatio: puzzle.configuration.columns / puzzle.configuration.rows },
-              ]}
-              contentFit="cover"
-            />
-            <View style={[styles.play, { backgroundColor: `${colors.background}CC` }]}>
-              {creating ? (
-                <ActivityIndicator color={colors.accent} />
-              ) : (
-                <Ionicons name="videocam" size={24} color={colors.accent} />
-              )}
-            </View>
-          </View>
-          {creating && (
-            <View style={styles.generationStatus}>
-              <View style={[styles.generationTrack, { backgroundColor: `${colors.muted}25` }]}>
-                <View
-                  style={[
-                    styles.generationFill,
-                    { backgroundColor: colors.accent, width: `${progress}%` },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.generationText, { color: colors.muted }]}>
+        {creating ? (
+          <View
+            style={[
+              styles.generationStatus,
+              { backgroundColor: colors.panel, borderColor: `${colors.accent}45` },
+            ]}
+          >
+            <View style={styles.generationHeader}>
+              <ActivityIndicator color={colors.accent} />
+              <Text style={[styles.generationText, { color: colors.text }]}>
                 {t(`Criando vídeo… ${progress}%`, `Creating video… ${progress}%`)}
               </Text>
             </View>
-          )}
-        </View>
+            <View style={[styles.generationTrack, { backgroundColor: `${colors.muted}25` }]}>
+              <View
+                style={[
+                  styles.generationFill,
+                  { backgroundColor: colors.accent, width: `${progress}%` },
+                ]}
+              />
+            </View>
+          </View>
+        ) : null}
         <PrimaryButton icon="add-circle-outline" onPress={() => router.replace("/(tabs)/create")}>
           {t("Criar novo quebra-cabeça", "Create new puzzle")}
         </PrimaryButton>
@@ -281,8 +285,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 12,
     marginVertical: 10,
   },
+  imageStage: { width: "100%", alignItems: "center", justifyContent: "center" },
   imageFrame: { borderRadius: 23, borderWidth: 1.5, overflow: "hidden", padding: 3 },
-  image: { width: "100%", borderRadius: 19 },
+  image: { width: "100%", height: "100%", borderRadius: 19 },
   stats: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   stat: {
     width: "48%",
@@ -295,20 +300,14 @@ const styles = StyleSheet.create({
   },
   statValue: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 23 },
   statLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
-  replay: { borderRadius: 21, borderWidth: 1, padding: 14, gap: 9 },
-  videoImage: { width: "100%", maxHeight: 320, borderRadius: 14 },
-  play: {
-    position: "absolute",
-    alignSelf: "center",
-    top: "42%",
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  generationStatus: { gap: 10, padding: 14, borderRadius: 18, borderWidth: 1 },
+  generationHeader: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 9,
   },
-  generationStatus: { gap: 7, paddingTop: 3 },
   generationTrack: { height: 8, borderRadius: 4, overflow: "hidden" },
   generationFill: { height: "100%", borderRadius: 4 },
-  generationText: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
+  generationText: { fontFamily: "Inter_700Bold", fontSize: 13, textAlign: "center" },
 });

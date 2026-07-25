@@ -8,7 +8,7 @@ private struct TFrame { let at: Double; let changes: [TState] }
 private struct TPiece { let id: String; let row: Int; let column: Int; let shape: [String: Any]; let correct: [String: Any] }
 
 final class PiecefulTimelapseEncoder {
-  private let size = CGSize(width: 720, height: 1280)
+  private var size = CGSize(width: 720, height: 1280)
   private let fps: Int32 = 24
 
   func encode(payload: String, progress: @escaping (Int) -> Void) throws -> String {
@@ -28,8 +28,14 @@ final class PiecefulTimelapseEncoder {
       TFrame(at: double(item["at"]), changes: (item["changes"] as? [[String: Any]] ?? []).compactMap(state))
     }.sorted { $0.at < $1.at }
     let rows = number(root["rows"]), columns = number(root["columns"])
-    let elapsed = max(1, double(root["elapsed"])); let sourceDuration = max(elapsed, frames.last?.at ?? 0)
-    let totalFrames = max(2, Int(ceil(sourceDuration / 60 * Double(fps))))
+    let boardScale = max(1, (1280 / max(rows, columns)) / 16) * 16
+    size = CGSize(width: CGFloat(columns * boardScale), height: CGFloat(rows * boardScale))
+    let logo = (root["logoUri"] as? String).flatMap { loadImage($0) }
+    let elapsed = max(1, double(root["elapsed"])); let sourceStart = frames.first?.at ?? 0
+    let sourceEnd = max(sourceStart + 0.12, frames.last?.at ?? elapsed)
+    let sourceDuration = max(0.12, sourceEnd - sourceStart)
+    let assemblyFrames = max(2, Int(ceil(sourceDuration / 60 * Double(fps))))
+    let totalFrames = assemblyFrames + Int(fps)
     let output = FileManager.default.temporaryDirectory.appendingPathComponent("pieceful-\(Int(Date().timeIntervalSince1970 * 1000)).mp4")
     try? FileManager.default.removeItem(at: output)
     let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
@@ -51,19 +57,20 @@ final class PiecefulTimelapseEncoder {
     var states = Dictionary(uniqueKeysWithValues: initial.map { ($0.id, $0) })
     for frameIndex in 0..<totalFrames {
       while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.004) }
-      let sourceTime = sourceDuration * Double(frameIndex) / Double(totalFrames - 1)
+      let assemblyIndex = min(frameIndex, assemblyFrames - 1)
+      let sourceTime = sourceStart + sourceDuration * Double(assemblyIndex) / Double(assemblyFrames - 1)
       states = Dictionary(uniqueKeysWithValues: initial.map { ($0.id, $0) })
       var applied = -1
       for (index, frame) in frames.enumerated() where frame.at <= sourceTime { for change in frame.changes { states[change.id] = change }; applied = index }
-      if frameIndex < totalFrames - 1, frames.indices.contains(applied + 1) {
+      if frameIndex < assemblyFrames - 1, frames.indices.contains(applied + 1) {
         let next = frames[applied + 1], previousTime = applied >= 0 ? frames[applied].at : 0
         let amount = CGFloat(min(1, max(0, (sourceTime - previousTime) / max(0.001, next.at - previousTime))))
         for after in next.changes { if let before = states[after.id] { states[after.id] = interpolate(before, after, amount) } }
       }
-      if frameIndex == totalFrames - 1 {
+      if frameIndex >= assemblyFrames - 1 {
         for piece in pieces { states[piece.id] = TState(id: piece.id, x: cg(piece.correct["x"]), y: cg(piece.correct["y"]), rotation: cg(piece.correct["rotation"]), placed: true, visible: true) }
       }
-      guard let pool = adaptor.pixelBufferPool, let buffer = makeBuffer(pool: pool, image: render(image: image, pieces: pieces, states: states, rows: rows, columns: columns, language: root["language"] as? String ?? "pt-BR", elapsed: elapsed, progress: CGFloat(frameIndex) / CGFloat(totalFrames - 1))) else { throw videoError("Unable to render a video frame") }
+      guard let pool = adaptor.pixelBufferPool, let buffer = makeBuffer(pool: pool, image: render(image: image, logo: logo, pieces: pieces, states: states, rows: rows, columns: columns)) else { throw videoError("Unable to render a video frame") }
       guard adaptor.append(buffer, withPresentationTime: CMTime(value: Int64(frameIndex), timescale: fps)) else { throw writer.error ?? videoError("Unable to append a video frame") }
       progress(Int(Double(frameIndex + 1) / Double(totalFrames) * 100))
     }
@@ -81,33 +88,29 @@ final class PiecefulTimelapseEncoder {
     return nil
   }
 
-  private func render(image: UIImage, pieces: [TPiece], states: [String: TState], rows: Int, columns: Int, language: String, elapsed: Double, progress: CGFloat) -> UIImage {
+  private func render(image: UIImage, logo: UIImage?, pieces: [TPiece], states: [String: TState], rows: Int, columns: Int) -> UIImage {
     UIGraphicsImageRenderer(size: size).image { context in
       let cg = context.cgContext
-      let colors = [UIColor(red: 0.035, green: 0.067, blue: 0.145, alpha: 1).cgColor, UIColor(red: 0.145, green: 0.094, blue: 0.239, alpha: 1).cgColor] as CFArray
-      cg.drawLinearGradient(CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0,1])!, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
-      drawText("PIECEFUL", at: CGPoint(x: 360, y: 52), size: 22, color: UIColor(red: 0.3, green: 0.84, blue: 0.96, alpha: 1), bold: true)
-      drawText(language == "en" ? "A memory, piece by piece" : "Uma memória, peça por peça", at: CGPoint(x: 360, y: 101), size: 40, color: .white, bold: true)
-      drawText(language == "en" ? "ASSEMBLY TIMELAPSE" : "TIMELAPSE DA MONTAGEM", at: CGPoint(x: 360, y: 145), size: 19, color: UIColor(red: 0.62, green: 0.66, blue: 0.77, alpha: 1))
-      let cell = min(620 / CGFloat(columns), 760 / CGFloat(rows)); let boardW = CGFloat(columns) * cell; let boardH = CGFloat(rows) * cell
-      let ox = (size.width - boardW) / 2, oy = 218 + (760 - boardH) / 2
-      UIColor(red: 0.016, green: 0.04, blue: 0.094, alpha: 0.74).setFill(); UIBezierPath(roundedRect: CGRect(x: ox-14, y: oy-14, width: boardW+28, height: boardH+28), cornerRadius: 22).fill()
+      UIColor(red: 0.016, green: 0.04, blue: 0.094, alpha: 1).setFill()
+      cg.fill(CGRect(origin: .zero, size: size))
+      let cell = min(size.width / CGFloat(columns), size.height / CGFloat(rows)); let boardW = CGFloat(columns) * cell; let boardH = CGFloat(rows) * cell
+      let ox = (size.width - boardW) / 2, oy = (size.height - boardH) / 2
+      let imageScale = max(boardW / image.size.width, boardH / image.size.height)
+      let imageWidth = image.size.width * imageScale, imageHeight = image.size.height * imageScale
+      let imageRect = CGRect(x: ox + (boardW - imageWidth) / 2, y: oy + (boardH - imageHeight) / 2, width: imageWidth, height: imageHeight)
       for piece in pieces.sorted(by: { (states[$0.id]?.placed == true ? 0 : 1) < (states[$1.id]?.placed == true ? 0 : 1) }) {
         guard let s = states[piece.id], s.visible else { continue }
         cg.saveGState(); let px = ox + s.x * cell, py = oy + s.y * cell
         cg.translateBy(x: px + cell/2, y: py + cell/2); cg.rotate(by: s.rotation * .pi / 180); cg.translateBy(x: -(px + cell/2), y: -(py + cell/2))
         let path = piecePath(x: px, y: py, size: cell, shape: piece.shape); path.addClip()
-        image.draw(in: CGRect(x: ox + (s.x - CGFloat(piece.column))*cell, y: oy + (s.y - CGFloat(piece.row))*cell, width: boardW, height: boardH))
+        image.draw(in: imageRect.offsetBy(dx: (s.x - CGFloat(piece.column))*cell, dy: (s.y - CGFloat(piece.row))*cell))
         (s.placed ? UIColor.white.withAlphaComponent(0.25) : UIColor.white.withAlphaComponent(0.75)).setStroke(); path.lineWidth = s.placed ? 1 : 1.7; path.stroke(); cg.restoreGState()
       }
-      let placed = progress >= 1 ? pieces.count : states.values.filter(\.placed).count
-      UIColor(red: 0.027, green: 0.051, blue: 0.122, alpha: 0.82).setFill(); UIBezierPath(roundedRect: CGRect(x: 52,y:1040,width:616,height:132), cornerRadius: 28).fill()
-      drawLeft("\(Int(CGFloat(placed) / CGFloat(max(1,pieces.count)) * 100))% \(language == "en" ? "completed" : "concluído")", x:82,y:1067,size:34,color:.white,bold:true)
-      drawLeft(language == "en" ? "\(placed) of \(pieces.count) pieces" : "\(placed) de \(pieces.count) peças", x:82,y:1111,size:18,color:UIColor(red:0.62,green:0.66,blue:0.77,alpha:1))
-      let seconds = Int(elapsed * Double(progress)); let clock = String(format:"%02d:%02d:%02d", seconds/3600, seconds/60%60, seconds%60)
-      drawRight(clock, x:638,y:1084,size:26,color:UIColor(red:0.3,green:0.84,blue:0.96,alpha:1),bold:true)
-      UIColor.white.withAlphaComponent(0.1).setFill(); UIRectFill(CGRect(x:52,y:1204,width:616,height:10)); UIColor(red:0.3,green:0.84,blue:0.96,alpha:1).setFill(); UIRectFill(CGRect(x:52,y:1204,width:616*progress,height:10))
-      drawText(language == "en" ? "Created with Pieceful" : "Criado com Pieceful", at: CGPoint(x:360,y:1237), size:16,color:UIColor(red:0.85,green:0.87,blue:0.96,alpha:1),bold:true)
+      if let logo {
+        let logoSize = min(size.width, size.height) * 0.085
+        let margin = min(size.width, size.height) * 0.025
+        logo.draw(in: CGRect(x: size.width - margin - logoSize, y: margin, width: logoSize, height: logoSize), blendMode: .normal, alpha: 0.7)
+      }
     }
   }
 

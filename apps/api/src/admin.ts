@@ -35,6 +35,7 @@ interface ImagePack {
   total_bytes: number;
   available_from: string | null;
   minimum_app_version: string | null;
+  reward_level: number | null;
   pack_images: PackImage[];
 }
 
@@ -256,6 +257,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         "sort_order",
         "available_from",
         "minimum_app_version",
+        "reward_level",
       ];
       const values = Object.fromEntries(
         Object.entries(request).filter(([key]) => allowed.includes(key)),

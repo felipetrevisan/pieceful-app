@@ -5,7 +5,15 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { NativePuzzleBoard } from "@/components/native-puzzle-board";
@@ -24,6 +32,8 @@ import { useMonetization } from "@/state/monetization-provider";
 export default function PuzzleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
+    consumeHintCredit,
+    hintCredits,
     incrementPuzzleHints,
     puzzles,
     setDrawerOpen,
@@ -37,6 +47,7 @@ export default function PuzzleScreen() {
   const { showAlert } = usePiecefulAlert();
   const colors = mobileThemes[theme];
   const insets = useSafeAreaInsets();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const puzzle = puzzles.find((item) => item.id === id);
   const [pieces, setPieces] = useState<PuzzlePiece[]>(puzzle?.session.pieces ?? []);
   const [showReference, setShowReference] = useState(false);
@@ -57,9 +68,16 @@ export default function PuzzleScreen() {
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
   const progress = pieces.length ? Math.round((placed / pieces.length) * 100) : 0;
   const completed = pieces.length > 0 && placed === pieces.length;
+  const imageAspect = puzzle
+    ? puzzle.configuration.columns / puzzle.configuration.rows
+    : 1;
+  const referenceMaxWidth = Math.min(532, viewportWidth - 64);
+  const referenceMaxHeight = viewportHeight * 0.58;
+  const referenceImageWidth = Math.min(referenceMaxWidth, referenceMaxHeight * imageAspect);
+  const referenceImageHeight = referenceImageWidth / imageAspect;
 
   useEffect(() => {
-    if (!puzzle?.configuration.timerEnabled || completed) return;
+    if (!puzzle?.id || completed) return;
     const timer = setInterval(() => {
       const next = elapsedTimeRef.current + 1;
       elapsedTimeRef.current = next;
@@ -67,7 +85,7 @@ export default function PuzzleScreen() {
       updatePuzzleElapsedTime(id, next);
     }, 1000);
     return () => clearInterval(timer);
-  }, [completed, id, puzzle?.configuration.timerEnabled, updatePuzzleElapsedTime]);
+  }, [completed, id, puzzle?.id, updatePuzzleElapsedTime]);
 
   function savePieces(next: PuzzlePiece[]) {
     setPieces(next);
@@ -104,6 +122,15 @@ export default function PuzzleScreen() {
       ),
       [
         { text: t("Agora não", "Not now"), style: "cancel" },
+        ...(hintCredits > 0
+          ? [{
+              text: t(`Usar dica grátis (${hintCredits})`, `Use free hint (${hintCredits})`),
+              icon: "bulb" as const,
+              onPress: () => {
+                if (consumeHintCredit()) placeHint();
+              },
+            }]
+          : []),
         {
           text: t("Assistir anúncio", "Watch ad"),
           icon: "play-circle",
@@ -234,6 +261,20 @@ export default function PuzzleScreen() {
             label={t("Ver imagem original", "View original image")}
             onPress={() => setShowReference(true)}
           />
+          {puzzle.configuration.hintsEnabled && progress < 100 ? (
+            <IconButton
+              round
+              icon="bulb-outline"
+              label={
+                premium
+                  ? t("Usar dica", "Use hint")
+                  : hintCredits > 0
+                    ? t(`Usar dica grátis · ${hintCredits}`, `Use free hint · ${hintCredits}`)
+                  : t("Assistir anúncio para ganhar dica", "Watch ad to get a hint")
+              }
+              onPress={useHint}
+            />
+          ) : null}
         </View>
       </View>
 
@@ -267,34 +308,6 @@ export default function PuzzleScreen() {
             updatePuzzleCamera(puzzle.id, { x: panX, y: panY, zoom });
           }}
         />
-        {puzzle.configuration.hintsEnabled && progress < 100 ? (
-          <View style={styles.hintArea}>
-            <Pressable
-              accessibilityHint={
-                premium
-                  ? t("Encaixa uma peça", "Places one piece")
-                  : t("Abre um anúncio recompensado", "Opens a rewarded ad")
-              }
-              accessibilityLabel={
-                premium
-                  ? t("Usar dica", "Use hint")
-                  : t("Assistir anúncio para ganhar dica", "Watch ad to get a hint")
-              }
-              accessibilityRole="button"
-              onPress={useHint}
-              style={({ pressed }) => [
-                styles.hintButton,
-                {
-                  borderColor: colors.accent,
-                  shadowColor: colors.accent,
-                  transform: [{ scale: pressed ? 0.9 : 1 }],
-                },
-              ]}
-            >
-              <Ionicons name="bulb-outline" size={30} color={colors.accent} />
-            </Pressable>
-          </View>
-        ) : null}
       </ScrollView>
 
       <PuzzlePieceDrawer
@@ -359,15 +372,17 @@ export default function PuzzleScreen() {
                 onPress={() => setShowReference(false)}
               />
             </View>
-            <Image
-              source={{ uri: puzzle.imageUri }}
-              style={[
-                styles.referenceImage,
-                { aspectRatio: puzzle.configuration.columns / puzzle.configuration.rows },
-              ]}
-              contentFit="contain"
-              transition={180}
-            />
+            <View style={styles.referenceImageStage}>
+              <Image
+                source={{ uri: puzzle.imageUri }}
+                style={[
+                  styles.referenceImage,
+                  { width: referenceImageWidth, height: referenceImageHeight },
+                ]}
+                contentFit="contain"
+                transition={180}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -396,26 +411,6 @@ const styles = StyleSheet.create({
   },
   timerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   timerText: { fontFamily: "Inter_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] },
-  hintArea: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 18,
-    paddingBottom: 4,
-  },
-  hintButton: {
-    width: 62,
-    height: 62,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-    shadowOpacity: 0.24,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
-  },
   referenceBackdrop: {
     flex: 1,
     alignItems: "center",
@@ -445,5 +440,6 @@ const styles = StyleSheet.create({
   },
   referenceTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 19 },
   referenceSubtitle: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
-  referenceImage: { width: "100%", maxHeight: "70%", borderRadius: 18, overflow: "hidden" },
+  referenceImageStage: { width: "100%", alignItems: "center", justifyContent: "center" },
+  referenceImage: { maxWidth: "100%", borderRadius: 18, overflow: "hidden" },
 });
