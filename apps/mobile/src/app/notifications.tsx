@@ -85,8 +85,12 @@ export default function NotificationsScreen() {
               {t(`Nível ${level}`, `Level ${level}`)}
             </Text>
           </View>
-          <View style={[styles.levelBadge, { backgroundColor: colors.panelAlt }]}>
-            <Text style={[styles.levelNumber, { color: colors.accent }]}>{level}</Text>
+          <View
+            style={[styles.levelBadge, { backgroundColor: colors.panelAlt }]}
+          >
+            <Text style={[styles.levelNumber, { color: colors.accent }]}>
+              {level}
+            </Text>
           </View>
         </View>
         <ProgressBar value={progression.progressPercent} />
@@ -130,33 +134,48 @@ function NotificationCard({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      android_ripple={{ color: `${colors.accent}18` }}
+      style={[
         styles.notification,
         {
-          borderColor: `${colors.accent}42`,
-          borderRadius: Math.max(18, colors.radius),
-          opacity: pressed ? 0.78 : 1,
+          backgroundColor: `${colors.panel}F2`,
+          borderColor: `${colors.accent}55`,
         },
       ]}
     >
       <FrostedBackdrop intensity={72} />
       <View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: `${colors.panel}A8` }]}
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: `${colors.panel}A8` },
+        ]}
       />
       <View style={styles.notificationRow}>
-        <View style={[styles.notificationIcon, { backgroundColor: colors.panelAlt }]}>
+        <View
+          style={[
+            styles.notificationIcon,
+            { backgroundColor: colors.panelAlt },
+          ]}
+        >
           <Ionicons name={icon} size={24} color={colors.accent} />
         </View>
         <View style={styles.notificationCopy}>
-          <Text style={[styles.notificationTitle, { color: colors.text }]}>{title}</Text>
-          <Text style={[styles.notificationDescription, { color: colors.muted }]}>
+          <Text style={[styles.notificationTitle, { color: colors.text }]}>
+            {title}
+          </Text>
+          <Text
+            style={[styles.notificationDescription, { color: colors.muted }]}
+          >
             {description}
           </Text>
           <View
             style={[
               styles.notificationAction,
-              { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}70` },
+              {
+                backgroundColor: `${colors.accent}18`,
+                borderColor: `${colors.accent}70`,
+              },
             ]}
           >
             <Text
@@ -183,19 +202,32 @@ const styles = StyleSheet.create({
   notification: {
     width: "100%",
     borderWidth: 1,
-    padding: 17,
+    borderRadius: 26,
+    minHeight: 132,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 3,
   },
   notificationList: {
     width: "100%",
-    gap: 14,
-    marginBottom: 16,
+    gap: 16,
+    marginBottom: 20,
   },
-  notificationRow: { width: "100%", flexDirection: "row", alignItems: "flex-start", gap: 14 },
+  notificationRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+  },
   notificationIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
+    width: 54,
+    height: 54,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -222,7 +254,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  notificationActionText: { flexShrink: 1, fontFamily: "Inter_700Bold", fontSize: 12 },
+  notificationActionText: {
+    flexShrink: 1,
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
   xpCard: { gap: 10 },
   xpHeader: {
     flexDirection: "row",

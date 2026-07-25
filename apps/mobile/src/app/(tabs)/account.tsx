@@ -9,7 +9,7 @@ import { useSocial } from "@/state/social-provider";
 
 export default function AccountScreen() {
   const { t, theme } = useApp();
-  const { busy, configured, error, profile, session, signIn, signOut } = useSocial();
+  const { busy, configured, devAccess, error, exitDevAccess, profile, session, signIn, signOut } = useSocial();
   const colors = mobileThemes[theme];
 
   return (
@@ -24,7 +24,12 @@ export default function AccountScreen() {
       {!configured ? <View style={[styles.notice, { backgroundColor: `${colors.primary}18`, borderColor: `${colors.primary}45` }]}><Ionicons name="construct-outline" size={21} color={colors.primary} /><Text style={[styles.noticeText, { color: colors.text }]}>{t("Configure as variáveis do Supabase no .env para ativar o login.", "Configure the Supabase variables in .env to enable sign-in.")}</Text></View> : null}
       {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
-      {busy ? <ActivityIndicator color={colors.accent} size="large" /> : session ? (
+      {busy ? <ActivityIndicator color={colors.accent} size="large" /> : devAccess ? (
+        <View style={styles.actions}>
+          <View style={[styles.notice, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}45` }]}><Ionicons name="flask-outline" size={21} color={colors.accent} /><Text style={[styles.noticeText, { color: colors.text }]}>{t("Modo de teste local ativo. Os recursos de nuvem ficam desativados.", "Local test mode is active. Cloud features are disabled.")}</Text></View>
+          <SecondaryButton icon="log-out-outline" onPress={() => void exitDevAccess()}>{t("Sair do modo de teste", "Exit test mode")}</SecondaryButton>
+        </View>
+      ) : session ? (
         <View style={styles.actions}>
           <PrimaryButton icon="person-outline" onPress={() => router.push("/(tabs)/profile" as never)}>{t("Abrir meu perfil", "Open my profile")}</PrimaryButton>
           <SecondaryButton icon="log-out-outline" onPress={() => void signOut()}>{t("Sair desta conta", "Sign out")}</SecondaryButton>

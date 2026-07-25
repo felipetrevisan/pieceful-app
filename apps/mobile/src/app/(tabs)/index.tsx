@@ -45,7 +45,15 @@ export default function HomeScreen() {
           {completed.map((puzzle) => <CompletedCard key={puzzle.id} puzzle={puzzle} />)}
         </ScrollView>
       ) : (
-        <Card style={{ alignItems: "center", gap: 8 }}><Ionicons name="images-outline" size={29} color={colors.accent} /><Text maxFontSizeMultiplier={1.2} style={[styles.cardTitle, { color: colors.text }]}>{t("Nenhum quebra-cabeça concluído ainda", "No completed puzzles yet")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, styles.emptyGalleryCopy, { color: colors.muted }]}>{t("Seus quebra-cabeças concluídos aparecerão aqui.", "Your completed puzzles will appear here.")}</Text></Card>
+        <Card style={styles.emptyGalleryCard}>
+          <Ionicons name="images-outline" size={29} color={colors.accent} />
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={[styles.cardTitle, styles.emptyGalleryTitle, { color: colors.text }]}
+          >
+            {t("Nenhum quebra-cabeça concluído", "No completed puzzles")}
+          </Text>
+        </Card>
       )}
     </Screen>
   );
@@ -116,5 +124,6 @@ const styles = StyleSheet.create({
   completedName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 17, marginHorizontal: 14, marginTop: 11 },
   completedMeta: { fontFamily: "Inter_400Regular", fontSize: 12, marginHorizontal: 14, marginTop: 3 },
   cardTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 17 },
-  emptyGalleryCopy: { alignSelf: "stretch", textAlign: "center" },
+  emptyGalleryCard: { alignItems: "center", justifyContent: "center", gap: 10 },
+  emptyGalleryTitle: { width: "100%", textAlign: "center" },
 });

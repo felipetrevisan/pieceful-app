@@ -13,7 +13,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Platform,
@@ -27,10 +27,14 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { ImagePackLibrary } from "@/components/kid-pack-library";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
@@ -187,6 +191,11 @@ export default function CreateScreen() {
   const [selectedKidPicture, setSelectedKidPicture] = useState<string | null>(null);
   const [installedPacks, setInstalledPacks] = useState<ImagePack[]>([]);
   const [showPackLibrary, setShowPackLibrary] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState({
+    photo: true,
+    difficulty: true,
+    options: true,
+  });
   const [configuration, setConfiguration] = useState<PuzzleConfiguration>({
     rows: 6,
     columns: 8,
@@ -386,29 +395,22 @@ export default function CreateScreen() {
     router.push(`/puzzle/${puzzle.id}`);
   }
 
+  function toggleStep(step: keyof typeof expandedSteps) {
+    setExpandedSteps((current) => ({ ...current, [step]: !current[step] }));
+    if (preferences.haptics) void Haptics.selectionAsync();
+  }
+
   return (
     <Screen>
       <AppHeader title={t("Novo quebra-cabeça", "New Puzzle")} showTitle />
 
-      <Card className="mb-4 gap-4">
-        <View className="flex-row items-center gap-3">
-          <View
-            className="h-10 w-10 items-center justify-center rounded-xl"
-            style={{ backgroundColor: colors.panelAlt }}
-          >
-            <Text className="font-black" style={{ color: colors.accent }}>
-              1
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-lg font-black" style={{ color: colors.text }}>
-              {t("Escolha uma foto", "Choose a photo")}
-            </Text>
-            <MutedText>
-              {t("Ela continua somente no seu aparelho.", "It stays only on your device.")}
-            </MutedText>
-          </View>
-        </View>
+      <CollapsibleStepCard
+        step="1"
+        title={t("Escolha uma foto", "Choose a photo")}
+        subtitle={t("Ela continua somente no seu aparelho.", "It stays only on your device.")}
+        expanded={expandedSteps.photo}
+        onToggle={() => toggleStep("photo")}
+      >
 
         {availableKidPictures.length ? (
           <View style={styles.kidGallery}>
@@ -635,27 +637,15 @@ export default function CreateScreen() {
             </MutedText>
           </Pressable>
         )}
-      </Card>
+      </CollapsibleStepCard>
 
-      <Card className="mb-4 gap-4">
-        <View className="flex-row items-center gap-3">
-          <View
-            className="h-10 w-10 items-center justify-center rounded-xl"
-            style={{ backgroundColor: colors.panelAlt }}
-          >
-            <Text className="font-black" style={{ color: colors.accent }}>
-              2
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-lg font-black" style={{ color: colors.text }}>
-              {t("Escolha a dificuldade", "Choose difficulty")}
-            </Text>
-            <MutedText>
-              {configuration.totalPieces} {t("peças", "pieces")}
-            </MutedText>
-          </View>
-        </View>
+      <CollapsibleStepCard
+        step="2"
+        title={t("Escolha a dificuldade", "Choose difficulty")}
+        subtitle={`${configuration.totalPieces} ${t("peças", "pieces")}`}
+        expanded={expandedSteps.difficulty}
+        onToggle={() => toggleStep("difficulty")}
+      >
         <DifficultySlider
           selectedIndex={Math.max(
             0,
@@ -664,27 +654,15 @@ export default function CreateScreen() {
           orientation={resolvedOrientation}
           onSelect={(index) => selectPreset(presets[index] ?? presets[0])}
         />
-      </Card>
+      </CollapsibleStepCard>
 
-      <Card className="mb-5 gap-1">
-        <View className="mb-3 flex-row items-center gap-3">
-          <View
-            className="h-10 w-10 items-center justify-center rounded-xl"
-            style={{ backgroundColor: colors.panelAlt }}
-          >
-            <Text className="font-black" style={{ color: colors.accent }}>
-              3
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-lg font-black" style={{ color: colors.text }}>
-              {t("Opções da partida", "Game options")}
-            </Text>
-            <MutedText>
-              {t("Tudo pronto e visível de cara.", "Everything ready and visible right away.")}
-            </MutedText>
-          </View>
-        </View>
+      <CollapsibleStepCard
+        step="3"
+        title={t("Opções da partida", "Game options")}
+        subtitle={t("Rotação, dicas, referência e tempo", "Rotation, hints, reference and time")}
+        expanded={expandedSteps.options}
+        onToggle={() => toggleStep("options")}
+      >
         <OptionRow
           icon="sync-outline"
           title={t("Rotação das peças", "Piece rotation")}
@@ -713,7 +691,7 @@ export default function CreateScreen() {
           value={configuration.timerEnabled}
           onChange={() => toggle("timerEnabled")}
         />
-      </Card>
+      </CollapsibleStepCard>
 
       <PrimaryButton icon="play" onPress={startPuzzle} disabled={!imageUri}>
         {t("Criar e começar", "Create and start")}
@@ -727,7 +705,123 @@ export default function CreateScreen() {
   );
 }
 
+function CollapsibleStepCard({
+  children,
+  expanded,
+  onToggle,
+  step,
+  subtitle,
+  title,
+}: {
+  children: ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
+  step: string;
+  subtitle: string;
+  title: string;
+}) {
+  const { preferences, theme } = useApp();
+  const colors = mobileThemes[theme];
+  const chevronProgress = useSharedValue(expanded ? 1 : 0);
+
+  useEffect(() => {
+    chevronProgress.set(
+      preferences.reducedMotion
+        ? expanded
+          ? 1
+          : 0
+        : withTiming(expanded ? 1 : 0, { duration: 220 }),
+    );
+  }, [chevronProgress, expanded, preferences.reducedMotion]);
+
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${chevronProgress.value * 180}deg` }],
+  }));
+
+  return (
+    <Animated.View
+      layout={
+        preferences.reducedMotion
+          ? undefined
+          : LinearTransition.springify().damping(18).stiffness(180)
+      }
+      style={styles.stepCardWrap}
+    >
+      <Card style={styles.collapsibleCard}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={`${title}. ${subtitle}`}
+          android_ripple={{ color: `${colors.accent}18` }}
+          onPress={onToggle}
+          style={styles.stepHeader}
+        >
+          <View style={[styles.stepNumber, { backgroundColor: colors.panelAlt }]}>
+            <Text style={[styles.stepNumberText, { color: colors.accent }]}>{step}</Text>
+          </View>
+          <View style={styles.stepHeadingCopy}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>{title}</Text>
+            <Text numberOfLines={2} style={[styles.stepSubtitle, { color: colors.muted }]}>
+              {subtitle}
+            </Text>
+          </View>
+          <Animated.View
+            style={[
+              styles.stepChevron,
+              { backgroundColor: `${colors.accent}14`, borderColor: `${colors.accent}35` },
+              chevronStyle,
+            ]}
+          >
+            <Ionicons name="chevron-down" size={20} color={colors.accent} />
+          </Animated.View>
+        </Pressable>
+
+        {expanded ? (
+          <Animated.View
+            entering={preferences.reducedMotion ? undefined : FadeIn.duration(220)}
+            exiting={preferences.reducedMotion ? undefined : FadeOut.duration(150)}
+            style={styles.stepContent}
+          >
+            {children}
+          </Animated.View>
+        ) : null}
+      </Card>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
+  stepCardWrap: { width: "100%", marginBottom: 16 },
+  collapsibleCard: { padding: 0 },
+  stepHeader: {
+    minHeight: 78,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    overflow: "hidden",
+  },
+  stepNumber: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepNumberText: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  stepHeadingCopy: { flex: 1, minWidth: 0 },
+  stepTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
+  stepSubtitle: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
+  stepChevron: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepContent: { gap: 14, paddingHorizontal: 18, paddingBottom: 18 },
   kidGallery: { gap: 12 },
   kidHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
   kidTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 19 },

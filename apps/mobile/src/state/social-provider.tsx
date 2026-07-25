@@ -54,6 +54,7 @@ interface SocialState {
   ready: boolean;
   configured: boolean;
   session: Session | null;
+  devAccess: boolean;
   profile: PlayerProfile;
   friends: FriendProfile[];
   friendRequests: FriendRequest[];
@@ -61,6 +62,8 @@ interface SocialState {
   socialBusy: boolean;
   busy: boolean;
   error: string | null;
+  enterDevAccess: () => Promise<void>;
+  exitDevAccess: () => Promise<void>;
   signIn: (provider: "google" | "azure") => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -81,6 +84,7 @@ interface SocialState {
 }
 
 const PROFILE_KEY = "pieceful-mobile-profile-v1";
+const DEV_ACCESS_KEY = "pieceful-mobile-dev-access-v1";
 const NATIVE_AUTH_CALLBACK = "pieceful://auth/callback";
 const OAUTH_TIMEOUT_MS = 90_000;
 const handledOAuthCallbacks = new Map<string, Promise<void>>();
@@ -233,6 +237,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   } = useApp();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
+  const [devAccess, setDevAccess] = useState(false);
+  const [devAccessReady, setDevAccessReady] = useState(!__DEV__);
   const [profile, setProfile] = useState<PlayerProfile>(fallbackProfile);
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
@@ -244,6 +250,25 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const completed = progression.completedPuzzles;
   const placed = progression.placedPieces;
   const xp = progression.totalXp;
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    AsyncStorage.getItem(DEV_ACCESS_KEY)
+      .then((value) => setDevAccess(value === "enabled"))
+      .catch(() => setDevAccess(false))
+      .finally(() => setDevAccessReady(true));
+  }, []);
+
+  const enterDevAccess = useCallback(async () => {
+    if (!__DEV__) return;
+    setDevAccess(true);
+    await AsyncStorage.setItem(DEV_ACCESS_KEY, "enabled");
+  }, []);
+
+  const exitDevAccess = useCallback(async () => {
+    setDevAccess(false);
+    if (__DEV__) await AsyncStorage.removeItem(DEV_ACCESS_KEY);
+  }, []);
 
   const loadRemoteProfile = useCallback(
     async (userId: string) => {
@@ -888,9 +913,10 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SocialState>(
     () => ({
-      ready,
+      ready: ready && devAccessReady,
       configured: isSupabaseConfigured,
       session,
+      devAccess,
       profile: { ...profile, xp },
       friends,
       friendRequests,
@@ -898,6 +924,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       socialBusy,
       busy,
       error,
+      enterDevAccess,
+      exitDevAccess,
       signIn,
       signOut,
       deleteAccount,
@@ -914,7 +942,11 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     [
       busy,
       deleteAccount,
+      devAccess,
+      devAccessReady,
+      enterDevAccess,
       error,
+      exitDevAccess,
       friends,
       friendRequests,
       searchResults,

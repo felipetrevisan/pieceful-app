@@ -9,7 +9,7 @@ import { useSocial } from "@/state/social-provider";
 
 export function AuthGate() {
   const { t } = useApp();
-  const { busy, configured, error, signIn } = useSocial();
+  const { busy, configured, enterDevAccess, error, signIn } = useSocial();
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -67,6 +67,27 @@ export function AuthGate() {
                   />
                 </View>
               )}
+
+              {__DEV__ && !busy ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Entrar no modo de teste", "Enter test mode")}
+                  onPress={() => void enterDevAccess()}
+                  android_ripple={{ color: "rgba(99,237,242,.14)" }}
+                  style={styles.devButton}
+                >
+                  <Ionicons name="flask-outline" size={21} color="#63edf2" />
+                  <View style={styles.devCopy}>
+                    <Text maxFontSizeMultiplier={1.15} style={styles.devLabel}>
+                      {t("Entrar no modo de teste", "Enter test mode")}
+                    </Text>
+                    <Text maxFontSizeMultiplier={1.15} style={styles.devCaption}>
+                      {t("Acesso local sem login", "Local access without sign-in")}
+                    </Text>
+                  </View>
+                  <Ionicons name="arrow-forward" size={19} color="#aeb9d8" />
+                </Pressable>
+              ) : null}
 
               {!configured ? (
                 <Text maxFontSizeMultiplier={1.2} style={styles.configurationError}>
@@ -224,6 +245,22 @@ const styles = StyleSheet.create({
   panel: { width: "100%", backgroundColor: "rgba(7,13,34,.78)" },
   panelContent: { width: "100%", paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16 },
   providerStack: { width: "100%", gap: 13 },
+  devButton: {
+    width: "100%",
+    minHeight: 58,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(99,237,242,.32)",
+    backgroundColor: "rgba(99,237,242,.08)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    marginTop: 14,
+  },
+  devCopy: { flex: 1, gap: 2 },
+  devLabel: { color: "#f5f6ff", fontFamily: "Inter_700Bold", fontSize: 14 },
+  devCaption: { color: "#aeb9d8", fontFamily: "Inter_400Regular", fontSize: 11 },
   providerButton: {
     width: "100%",
     height: 62,

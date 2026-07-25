@@ -28,7 +28,7 @@ void SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { ageGateCompleted, ageGroup, ready, theme } = useApp();
-  const { ready: socialReady, session } = useSocial();
+  const { devAccess, ready: socialReady, session } = useSocial();
   const colors = mobileThemes[theme];
   const [showStartupSplash, setShowStartupSplash] = useState(true);
   const [fontsLoaded] = useFonts({
@@ -45,7 +45,7 @@ function RootNavigator() {
 
   const finishStartup = useCallback(() => setShowStartupSplash(false), []);
   const guestChild = ageGroup === "child";
-  const hasAppAccess = Boolean(session) || guestChild;
+  const hasAppAccess = Boolean(session) || devAccess || guestChild;
 
   return (
     <>
