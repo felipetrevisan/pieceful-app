@@ -26,6 +26,7 @@ interface NativePuzzleBoardProps {
   columns: number;
   pieces: PuzzlePiece[];
   rotationEnabled: boolean;
+  zoomCommand?: PuzzleZoomCommand | null;
   initialZoom: number;
   initialPanX: number;
   initialPanY: number;
@@ -35,6 +36,11 @@ interface NativePuzzleBoardProps {
   onBoardFrameChange?: (frame: ScreenFrame) => void;
   onPiecesChange: (pieces: PuzzlePiece[]) => void;
   onCameraChange: (panX: number, panY: number, zoom: number) => void;
+}
+
+export interface PuzzleZoomCommand {
+  id: number;
+  action: "in" | "out" | "reset";
 }
 
 function piecePath(shape: PuzzlePieceShape, size: number, margin: number) {
@@ -78,6 +84,7 @@ export function NativePuzzleBoard({
   columns,
   pieces,
   rotationEnabled,
+  zoomCommand,
   initialZoom,
   initialPanX,
   initialPanY,
@@ -153,6 +160,56 @@ export function NativePuzzleBoard({
   const activeGroupPieceId = useSharedValue<string | null>(null);
   const groupTranslationX = useSharedValue(0);
   const groupTranslationY = useSharedValue(0);
+  const lastZoomCommandId = useRef(0);
+
+  useEffect(() => {
+    if (!zoomCommand || lastZoomCommandId.current === zoomCommand.id) return;
+    lastZoomCommandId.current = zoomCommand.id;
+
+    const currentScale = scale.get();
+    const nextScale =
+      zoomCommand.action === "reset"
+        ? 1
+        : Math.max(
+            0.8,
+            Math.min(2.4, currentScale + (zoomCommand.action === "in" ? 0.25 : -0.25)),
+          );
+    let nextPanX = panX.get();
+    let nextPanY = panY.get();
+
+    if (nextScale <= 1.01 || zoomCommand.action === "reset") {
+      nextPanX = 0;
+      nextPanY = 0;
+    } else {
+      const horizontalLimit =
+        (boardWidth * (nextScale - 1)) / (2 * nextScale) + cameraEdgePadding / nextScale;
+      const minimumY =
+        -(boardHeight * (nextScale - 1)) / nextScale - cameraEdgePadding / nextScale;
+      const maximumY = cameraEdgePadding / nextScale;
+      nextPanX = Math.max(-horizontalLimit, Math.min(horizontalLimit, nextPanX));
+      nextPanY = Math.max(minimumY, Math.min(maximumY, nextPanY));
+    }
+
+    scale.set(withTiming(nextScale, { duration: 180 }));
+    savedScale.set(nextScale);
+    panX.set(withTiming(nextPanX, { duration: 180 }));
+    panY.set(withTiming(nextPanY, { duration: 180 }));
+    savedPanX.set(nextPanX);
+    savedPanY.set(nextPanY);
+    onCameraChange(nextPanX, nextPanY, nextScale);
+  }, [
+    boardHeight,
+    boardWidth,
+    cameraEdgePadding,
+    onCameraChange,
+    panX,
+    panY,
+    savedPanX,
+    savedPanY,
+    savedScale,
+    scale,
+    zoomCommand,
+  ]);
 
   useEffect(() => {
     const invalidGroups = new Set(

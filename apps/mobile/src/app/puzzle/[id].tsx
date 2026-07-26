@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -16,7 +16,10 @@ import {
 } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { NativePuzzleBoard } from "@/components/native-puzzle-board";
+import {
+  NativePuzzleBoard,
+  type PuzzleZoomCommand,
+} from "@/components/native-puzzle-board";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { IconButton, PrimaryButton } from "@/components/pieceful-ui";
 import {
@@ -59,6 +62,7 @@ export default function PuzzleScreen() {
     x: puzzle?.session.camera.x ?? 0,
     y: puzzle?.session.camera.y ?? 0,
   });
+  const [zoomCommand, setZoomCommand] = useState<PuzzleZoomCommand | null>(null);
   const [elapsedTime, setElapsedTime] = useState(puzzle?.session.elapsedTime ?? 0);
   const elapsedTimeRef = useRef(puzzle?.session.elapsedTime ?? 0);
   const [trayDragPreview, setTrayDragPreview] = useState<TrayDragPreview | null>(null);
@@ -66,6 +70,7 @@ export default function PuzzleScreen() {
   const trayDragY = useSharedValue(-200);
   const scrollOffset = useRef(0);
   const toolbarRef = useRef<View>(null);
+  const zoomCommandId = useRef(0);
 
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
   const progress = pieces.length ? Math.round((placed / pieces.length) * 100) : 0;
@@ -188,6 +193,21 @@ export default function PuzzleScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
   }
 
+  const handleCameraChange = useCallback(
+    (panX: number, panY: number, zoom: number) => {
+      setBoardZoom(zoom);
+      setBoardPan({ x: panX, y: panY });
+      updatePuzzleCamera(id, { x: panX, y: panY, zoom });
+    },
+    [id, updatePuzzleCamera],
+  );
+
+  function controlZoom(action: PuzzleZoomCommand["action"]) {
+    zoomCommandId.current += 1;
+    setZoomCommand({ id: zoomCommandId.current, action });
+    void Haptics.selectionAsync();
+  }
+
   if (!puzzle) {
     return (
       <SafeAreaView
@@ -298,6 +318,7 @@ export default function PuzzleScreen() {
           columns={puzzle.configuration.columns}
           pieces={pieces}
           rotationEnabled={puzzle.configuration.rotationEnabled}
+          zoomCommand={zoomCommand}
           initialZoom={puzzle.session.camera.zoom}
           initialPanX={puzzle.session.camera.x}
           initialPanY={puzzle.session.camera.y}
@@ -306,13 +327,34 @@ export default function PuzzleScreen() {
           storageScreenTarget={storageFrame}
           onBoardFrameChange={setBoardFrame}
           onPiecesChange={savePieces}
-          onCameraChange={(panX, panY, zoom) => {
-            setBoardZoom(zoom);
-            setBoardPan({ x: panX, y: panY });
-            updatePuzzleCamera(puzzle.id, { x: panX, y: panY, zoom });
-          }}
+          onCameraChange={handleCameraChange}
         />
       </ScrollView>
+
+      <View style={styles.zoomControls}>
+        <IconButton
+          round
+          disabled={boardZoom <= 0.8}
+          icon="remove"
+          label={t("Diminuir zoom", "Zoom out")}
+          onPress={() => controlZoom("out")}
+          style={boardZoom <= 0.8 ? styles.zoomButtonDisabled : undefined}
+        />
+        <IconButton
+          round
+          icon="scan-outline"
+          label={t("Restaurar zoom", "Reset zoom")}
+          onPress={() => controlZoom("reset")}
+        />
+        <IconButton
+          round
+          disabled={boardZoom >= 2.4}
+          icon="add"
+          label={t("Aumentar zoom", "Zoom in")}
+          onPress={() => controlZoom("in")}
+          style={boardZoom >= 2.4 ? styles.zoomButtonDisabled : undefined}
+        />
+      </View>
 
       <PuzzlePieceDrawer
         imageUri={puzzle.imageUri}
@@ -417,6 +459,16 @@ const styles = StyleSheet.create({
   },
   timerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   timerText: { fontFamily: "Inter_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] },
+  zoomControls: {
+    position: "absolute",
+    right: 16,
+    bottom: 264,
+    zIndex: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  zoomButtonDisabled: { opacity: 0.38 },
   referenceBackdrop: {
     flex: 1,
     alignItems: "center",
