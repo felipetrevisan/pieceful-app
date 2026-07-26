@@ -44,6 +44,8 @@ interface PuzzlePieceDrawerProps {
   columns: number;
   pieces: PuzzlePiece[];
   boardFrame: ScreenFrame | null;
+  headerFrame: ScreenFrame | null;
+  storageFrame: ScreenFrame | null;
   boardZoom: number;
   boardPanX: number;
   boardPanY: number;
@@ -102,6 +104,8 @@ export function PuzzlePieceDrawer({
   columns,
   pieces,
   boardFrame,
+  headerFrame,
+  storageFrame,
   boardZoom,
   boardPanX,
   boardPanY,
@@ -374,6 +378,8 @@ export function PuzzlePieceDrawer({
                         columns={columns}
                         size={pieceSize}
                         boardFrame={boardFrame}
+                        headerFrame={headerFrame}
+                        storageFrame={storageFrame}
                         boardZoom={boardZoom}
                         boardPanX={boardPanX}
                         boardPanY={boardPanY}
@@ -442,6 +448,8 @@ function DrawerPiece({
   columns,
   size,
   boardFrame,
+  headerFrame,
+  storageFrame,
   boardZoom,
   boardPanX,
   boardPanY,
@@ -460,6 +468,8 @@ function DrawerPiece({
   columns: number;
   size: number;
   boardFrame: ScreenFrame | null;
+  headerFrame: ScreenFrame | null;
+  storageFrame: ScreenFrame | null;
   boardZoom: number;
   boardPanX: number;
   boardPanY: number;
@@ -506,29 +516,27 @@ function DrawerPiece({
         event.absoluteY - dragOriginY.get(),
       );
       if (boardFrame && dragDistance >= 24) {
-        const visualWidth = boardFrame.width * boardZoom;
-        const visualHeight = boardFrame.height * boardZoom;
-        const visualX = boardFrame.x - (visualWidth - boardFrame.width) / 2 + boardPanX * boardZoom;
-        const visualY = boardFrame.y + boardPanY * boardZoom;
-        const insideBoard =
-          event.absoluteX >= visualX &&
-          event.absoluteX <= visualX + visualWidth &&
-          event.absoluteY >= visualY &&
-          event.absoluteY <= visualY + visualHeight;
-        if (insideBoard) {
-          const x = Math.max(
-            -0.15,
-            Math.min(columns - 0.85, ((event.absoluteX - visualX) / visualWidth) * columns - 0.5),
-          );
-          const y = Math.max(
-            -0.15,
-            Math.min(rows - 0.85, ((event.absoluteY - visualY) / visualHeight) * rows - 0.5),
-          );
-          runOnJS(onRelease)(selected ? selectedIds : [piece.id], x, y);
+        const insideHeader = headerFrame
+          ? event.absoluteY <= headerFrame.y + headerFrame.height
+          : false;
+        const insideTray = storageFrame
+          ? event.absoluteY >= storageFrame.y
+          : false;
+        if (insideHeader || insideTray) {
           dragging.set(0);
           runOnJS(onDragPreviewChange)(null);
           return;
         }
+        const visualWidth = boardFrame.width * boardZoom;
+        const visualHeight = boardFrame.height * boardZoom;
+        const visualX = boardFrame.x - (visualWidth - boardFrame.width) / 2 + boardPanX * boardZoom;
+        const visualY = boardFrame.y + boardPanY * boardZoom;
+        const x = ((event.absoluteX - visualX) / visualWidth) * columns - 0.5;
+        const y = ((event.absoluteY - visualY) / visualHeight) * rows - 0.5;
+        runOnJS(onRelease)(selected ? selectedIds : [piece.id], x, y);
+        dragging.set(0);
+        runOnJS(onDragPreviewChange)(null);
+        return;
       }
       dragging.set(0);
       runOnJS(onDragPreviewChange)(null);

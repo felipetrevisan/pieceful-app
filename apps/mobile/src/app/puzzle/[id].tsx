@@ -52,6 +52,7 @@ export default function PuzzleScreen() {
   const [pieces, setPieces] = useState<PuzzlePiece[]>(puzzle?.session.pieces ?? []);
   const [showReference, setShowReference] = useState(false);
   const [boardFrame, setBoardFrame] = useState<ScreenFrame | null>(null);
+  const [headerFrame, setHeaderFrame] = useState<ScreenFrame | null>(null);
   const [storageFrame, setStorageFrame] = useState<ScreenFrame | null>(null);
   const [boardZoom, setBoardZoom] = useState(puzzle?.session.camera.zoom ?? 1);
   const [boardPan, setBoardPan] = useState({
@@ -64,6 +65,7 @@ export default function PuzzleScreen() {
   const trayDragX = useSharedValue(-200);
   const trayDragY = useSharedValue(-200);
   const scrollOffset = useRef(0);
+  const toolbarRef = useRef<View>(null);
 
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
   const progress = pieces.length ? Math.round((placed / pieces.length) * 100) : 0;
@@ -158,19 +160,12 @@ export default function PuzzleScreen() {
 
     const gridColumns = Math.ceil(Math.sqrt(released.length));
     const gridRows = Math.ceil(released.length / gridColumns);
-    const horizontalRange = Math.max(0, puzzle.configuration.columns - 0.7);
-    const verticalRange = Math.max(0, puzzle.configuration.rows - 0.7);
-    const horizontalStep =
-      gridColumns > 1 ? Math.min(0.72, horizontalRange / (gridColumns - 1)) : 0;
-    const verticalStep = gridRows > 1 ? Math.min(0.72, verticalRange / (gridRows - 1)) : 0;
+    const horizontalStep = gridColumns > 1 ? 0.72 : 0;
+    const verticalStep = gridRows > 1 ? 0.72 : 0;
     const groupWidth = horizontalStep * (gridColumns - 1);
     const groupHeight = verticalStep * (gridRows - 1);
-    const minimumX = -0.15;
-    const minimumY = -0.15;
-    const maximumX = puzzle.configuration.columns - 0.85;
-    const maximumY = puzzle.configuration.rows - 0.85;
-    const startX = Math.max(minimumX, Math.min(maximumX - groupWidth, x - groupWidth / 2));
-    const startY = Math.max(minimumY, Math.min(maximumY - groupHeight, y - groupHeight / 2));
+    const startX = x - groupWidth / 2;
+    const startY = y - groupHeight / 2;
     const releasedIds = new Set(ids);
 
     savePieces(
@@ -217,6 +212,13 @@ export default function PuzzleScreen() {
       style={{ backgroundColor: colors.background }}
     >
       <View
+        ref={toolbarRef}
+        collapsable={false}
+        onLayout={() => {
+          toolbarRef.current?.measureInWindow((x, y, width, height) => {
+            setHeaderFrame({ x, y, width, height });
+          });
+        }}
         style={[
           styles.toolbar,
           { borderColor: `${colors.accent}35`, backgroundColor: colors.panel },
@@ -295,10 +297,12 @@ export default function PuzzleScreen() {
           rows={puzzle.configuration.rows}
           columns={puzzle.configuration.columns}
           pieces={pieces}
+          rotationEnabled={puzzle.configuration.rotationEnabled}
           initialZoom={puzzle.session.camera.zoom}
           initialPanX={puzzle.session.camera.x}
           initialPanY={puzzle.session.camera.y}
           externalDrawer
+          headerScreenTarget={headerFrame}
           storageScreenTarget={storageFrame}
           onBoardFrameChange={setBoardFrame}
           onPiecesChange={savePieces}
@@ -316,6 +320,8 @@ export default function PuzzleScreen() {
         columns={puzzle.configuration.columns}
         pieces={pieces}
         boardFrame={boardFrame}
+        headerFrame={headerFrame}
+        storageFrame={storageFrame}
         boardZoom={boardZoom}
         boardPanX={boardPan.x}
         boardPanY={boardPan.y}

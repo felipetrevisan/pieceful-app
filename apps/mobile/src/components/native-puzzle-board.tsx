@@ -25,10 +25,12 @@ interface NativePuzzleBoardProps {
   rows: number;
   columns: number;
   pieces: PuzzlePiece[];
+  rotationEnabled: boolean;
   initialZoom: number;
   initialPanX: number;
   initialPanY: number;
   externalDrawer?: boolean;
+  headerScreenTarget?: ScreenFrame | null;
   storageScreenTarget?: ScreenFrame | null;
   onBoardFrameChange?: (frame: ScreenFrame) => void;
   onPiecesChange: (pieces: PuzzlePiece[]) => void;
@@ -75,19 +77,23 @@ export function NativePuzzleBoard({
   rows,
   columns,
   pieces,
+  rotationEnabled,
   initialZoom,
   initialPanX,
   initialPanY,
   externalDrawer = false,
+  headerScreenTarget,
   storageScreenTarget,
   onBoardFrameChange,
   onPiecesChange,
   onCameraChange,
 }: NativePuzzleBoardProps) {
   const { preferences, theme, t } = useApp();
-  const { width } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const colors = mobileThemes[theme];
   const boardWidth = Math.min(352, width - 24);
+  const canvasWidth = externalDrawer ? width - 24 : boardWidth;
+  const boardOffsetX = (canvasWidth - boardWidth) / 2;
   const cell = boardWidth / columns;
   const boardHeight = rows * cell;
   const cameraEdgePadding = Math.max(18, Math.min(34, cell * 0.65));
@@ -119,7 +125,7 @@ export function NativePuzzleBoard({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draggingActivePiece, setDraggingActivePiece] = useState(false);
   const contentHeight = externalDrawer
-    ? boardHeight
+    ? Math.max(boardHeight, height - 356)
     : drawerOpen
     ? drawerBodyTop + drawerBodyHeight
     : drawerTop + drawerHeaderHeight + cell * 0.16;
@@ -161,7 +167,9 @@ export function NativePuzzleBoard({
     );
     let changed = false;
     const normalizedPieces = pieces.map((piece) => {
-      const normalizedRotation = normalizeQuarterTurn(piece.currentPosition.rotation);
+      const normalizedRotation = rotationEnabled
+        ? normalizeQuarterTurn(piece.currentPosition.rotation)
+        : 0;
       const mustReleaseInvalidGroup = Boolean(piece.groupId && invalidGroups.has(piece.groupId));
       if (normalizedRotation === piece.currentPosition.rotation && !mustReleaseInvalidGroup) return piece;
       changed = true;
@@ -172,7 +180,7 @@ export function NativePuzzleBoard({
       };
     });
     if (changed) onPiecesChange(normalizedPieces);
-  }, [onPiecesChange, pieces]);
+  }, [onPiecesChange, pieces, rotationEnabled]);
 
   useEffect(() => {
     if (initialZoom <= 1.01 && (initialPanX !== 0 || initialPanY !== 0)) {
@@ -254,9 +262,11 @@ export function NativePuzzleBoard({
   ) {
     const movingPiece = pieces.find((piece) => piece.id === id);
     if (!movingPiece) return;
-    const effectiveRotation = movingPiece.groupId
-      ? normalizeQuarterTurn(movingPiece.currentPosition.rotation)
-      : normalizeQuarterTurn(rotation);
+    const effectiveRotation = rotationEnabled
+      ? movingPiece.groupId
+        ? normalizeQuarterTurn(movingPiece.currentPosition.rotation)
+        : normalizeQuarterTurn(rotation)
+      : 0;
     const storedSlot = pieces.filter(
       (piece) => piece.id !== id && !piece.isPlaced && piece.trayId !== null,
     ).length;
@@ -393,20 +403,24 @@ export function NativePuzzleBoard({
   return (
     <View style={styles.container}>
       <View
-        ref={boardRef}
-        collapsable={false}
-        onLayout={() => {
-          boardRef.current?.measureInWindow((x, y, measuredWidth) => {
-            onBoardFrameChange?.({ x, y, width: measuredWidth, height: boardHeight });
-          });
-        }}
-        style={{ width: boardWidth, height: contentHeight }}
+        style={{ width: canvasWidth, height: contentHeight, overflow: "visible" }}
       >
+        <View
+          ref={boardRef}
+          collapsable={false}
+          pointerEvents="none"
+          onLayout={() => {
+            boardRef.current?.measureInWindow((x, y, measuredWidth) => {
+              onBoardFrameChange?.({ x, y, width: measuredWidth, height: boardHeight });
+            });
+          }}
+          style={{ position: "absolute", left: boardOffsetX, top: 0, width: boardWidth, height: boardHeight }}
+        />
         <GestureDetector gesture={Gesture.Simultaneous(pinch, boardPan)}>
           <Animated.View
             style={[
               {
-                width: boardWidth,
+                width: canvasWidth,
                 height: contentHeight,
                 transformOrigin: "top center",
               },
@@ -437,7 +451,7 @@ export function NativePuzzleBoard({
             {storedPieces.length === 0 ? <View style={styles.emptyDrawer}><Ionicons name="sparkles-outline" size={28} color={colors.accent} /><Text style={[styles.emptyDrawerText, { color: colors.muted }]}>{t("A caixa está vazia", "The drawer is empty")}</Text></View> : null}
             <Ionicons name="extension-puzzle-outline" size={92} color={`${colors.accent}0c`} style={styles.trayWatermark} />
           </Animated.View> : null}
-          <Svg width={boardWidth} height={boardHeight} style={{ position: "absolute", left: 0, top: 0 }}>
+          <Svg width={boardWidth} height={boardHeight} style={{ position: "absolute", left: boardOffsetX, top: 0 }}>
             <Rect x={1} y={1} width={boardWidth - 2} height={boardHeight - 2} rx={Math.max(5, colors.radius)} fill={colors.panelAlt} stroke={`${colors.accent}70`} strokeWidth={2} />
             {Array.from({ length: columns - 1 }, (_, index) => (
               <Path key={`column-${index}`} d={`M ${(index + 1) * cell} 0 V ${boardHeight}`} stroke={`${colors.accent}18`} strokeWidth={1} />
@@ -484,6 +498,7 @@ export function NativePuzzleBoard({
               imageUri={imageUri}
               boardWidth={boardWidth}
               boardHeight={boardHeight}
+              boardOffsetX={boardOffsetX}
               cell={cell}
               rows={rows}
               columns={columns}
@@ -494,7 +509,9 @@ export function NativePuzzleBoard({
               groupTranslationX={groupTranslationX}
               groupTranslationY={groupTranslationY}
               storageTarget={storageTarget}
+              headerScreenTarget={headerScreenTarget}
               storageScreenTarget={storageScreenTarget}
+              rotationEnabled={rotationEnabled}
               stored={false}
               stroke={piece.isPlaced ? colors.accent : `${colors.text}99`}
               onChange={updatePiece}
@@ -508,6 +525,7 @@ export function NativePuzzleBoard({
               imageUri={imageUri}
               boardWidth={boardWidth}
               boardHeight={boardHeight}
+              boardOffsetX={boardOffsetX}
               cell={cell}
               rows={rows}
               columns={columns}
@@ -518,7 +536,9 @@ export function NativePuzzleBoard({
               groupTranslationX={groupTranslationX}
               groupTranslationY={groupTranslationY}
               storageTarget={storageTarget}
+              headerScreenTarget={headerScreenTarget}
               storageScreenTarget={storageScreenTarget}
+              rotationEnabled={rotationEnabled}
               stored
               stroke={`${colors.text}b8`}
               onChange={updatePiece}
@@ -537,6 +557,7 @@ function DraggablePiece({
   imageUri,
   boardWidth,
   boardHeight,
+  boardOffsetX,
   cell,
   rows,
   columns,
@@ -547,7 +568,9 @@ function DraggablePiece({
   groupTranslationX,
   groupTranslationY,
   storageTarget,
+  headerScreenTarget,
   storageScreenTarget,
+  rotationEnabled,
   stored,
   stroke,
   onChange,
@@ -557,6 +580,7 @@ function DraggablePiece({
   imageUri: string;
   boardWidth: number;
   boardHeight: number;
+  boardOffsetX: number;
   cell: number;
   rows: number;
   columns: number;
@@ -567,7 +591,9 @@ function DraggablePiece({
   groupTranslationX: SharedValue<number>;
   groupTranslationY: SharedValue<number>;
   storageTarget: { x: number; y: number; width: number; height: number };
+  headerScreenTarget?: ScreenFrame | null;
   storageScreenTarget?: ScreenFrame | null;
+  rotationEnabled: boolean;
   stored: boolean;
   stroke: string;
   onChange: (
@@ -684,6 +710,21 @@ function DraggablePiece({
         return;
       }
 
+      const droppedOnHeader = headerScreenTarget
+        ? event.absoluteY <= headerScreenTarget.y + headerScreenTarget.height
+        : false;
+      if (droppedOnHeader) {
+        x.set(withSpring(startX.get()));
+        y.set(withSpring(startY.get()));
+        if (activeGroupPieceId.get() === piece.id) {
+          groupTranslationX.set(0);
+          groupTranslationY.set(0);
+          activeGroupId.set(null);
+          activeGroupPieceId.set(null);
+        }
+        return;
+      }
+
       const worldCenterX = x.get() / cell + 0.5;
       const worldCenterY = y.get() / cell + 0.5;
       const storageHitSlop = 32;
@@ -738,7 +779,7 @@ function DraggablePiece({
     });
 
   const rotate = Gesture.Tap()
-    .enabled(!piece.isPlaced && !stored && piece.groupId === null)
+    .enabled(rotationEnabled && !piece.isPlaced && !stored && piece.groupId === null)
     .numberOfTaps(2)
     .maxDuration(280)
     .onEnd(() => {
@@ -756,7 +797,7 @@ function DraggablePiece({
       activeGroupPieceId.get() !== piece.id,
     );
     return {
-      left: x.get() + (followsActiveGroup ? groupTranslationX.get() : 0),
+      left: boardOffsetX + x.get() + (followsActiveGroup ? groupTranslationX.get() : 0),
       top: y.get() + (followsActiveGroup ? groupTranslationY.get() : 0),
       zIndex: dragging.get() ? 100 : piece.isPlaced ? 1 : 30,
       transform: [{ rotate: `${rotation.get()}deg` }, { scale: stored ? 0.76 : 1 }],
