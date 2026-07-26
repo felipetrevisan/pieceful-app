@@ -449,7 +449,9 @@ export default function SettingsScreen() {
         <Text style={[styles.dangerText, { color: colors.danger }]}>
           {t("Excluir quebra-cabeças deste aparelho", "Delete puzzles from this device")}
         </Text>
-        <Ionicons name="trash-outline" size={22} color={colors.danger} />
+        <View style={styles.dangerIcon}>
+          <Ionicons name="trash-outline" size={22} color={colors.danger} />
+        </View>
       </Pressable>
 
       {session ? (
@@ -465,7 +467,9 @@ export default function SettingsScreen() {
           <Text style={[styles.dangerText, { color: colors.danger }]}>
             {t("Excluir conta e dados da nuvem", "Delete account and cloud data")}
           </Text>
-          <Ionicons name="person-remove-outline" size={22} color={colors.danger} />
+          <View style={styles.dangerIcon}>
+            <Ionicons name="person-remove-outline" size={22} color={colors.danger} />
+          </View>
         </Pressable>
       ) : null}
     </Screen>
@@ -687,8 +691,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
+    gap: 12,
+    overflow: "hidden",
   },
-  dangerText: { fontFamily: "Inter_700Bold", fontSize: 17 },
+  dangerText: { flex: 1, minWidth: 0, fontFamily: "Inter_700Bold", fontSize: 17 },
+  dangerIcon: { width: 28, height: 28, flexShrink: 0, alignItems: "center", justifyContent: "center" },
   dangerDisabled: { opacity: 0.38 },
   premiumCard: { borderWidth: 1, padding: 18, gap: 14, overflow: "hidden" },
   premiumHeader: { flexDirection: "row", alignItems: "center", gap: 13 },

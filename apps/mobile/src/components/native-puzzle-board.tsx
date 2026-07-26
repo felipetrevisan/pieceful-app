@@ -27,6 +27,8 @@ interface NativePuzzleBoardProps {
   pieces: PuzzlePiece[];
   rotationEnabled: boolean;
   zoomCommand?: PuzzleZoomCommand | null;
+  cameraViewportTop: number;
+  cameraViewportBottom: number;
   initialZoom: number;
   initialPanX: number;
   initialPanY: number;
@@ -41,6 +43,35 @@ interface NativePuzzleBoardProps {
 export interface PuzzleZoomCommand {
   id: number;
   action: "in" | "out" | "reset";
+}
+
+function cameraBounds({
+  zoom,
+  boardWidth,
+  boardHeight,
+  viewportWidth,
+  viewportTop,
+  viewportBottom,
+  visibleGrip,
+}: {
+  zoom: number;
+  boardWidth: number;
+  boardHeight: number;
+  viewportWidth: number;
+  viewportTop: number;
+  viewportBottom: number;
+  visibleGrip: number;
+}) {
+  "worklet";
+  const safeZoom = Math.max(0.8, zoom);
+  // The board behaves like a free sheet above a fixed workspace. Every edge can
+  // be brought across the entire useful viewport; only a small grip remains on
+  // screen so the sheet cannot be lost completely.
+  const horizontalLimit =
+    (boardWidth * safeZoom + viewportWidth - visibleGrip * 2) / (2 * safeZoom);
+  const minimumY = (viewportTop + visibleGrip - boardHeight * safeZoom) / safeZoom;
+  const maximumY = (viewportBottom - visibleGrip) / safeZoom;
+  return { horizontalLimit, minimumY, maximumY };
 }
 
 function piecePath(shape: PuzzlePieceShape, size: number, margin: number) {
@@ -85,6 +116,8 @@ export function NativePuzzleBoard({
   pieces,
   rotationEnabled,
   zoomCommand,
+  cameraViewportTop,
+  cameraViewportBottom,
   initialZoom,
   initialPanX,
   initialPanY,
@@ -103,7 +136,7 @@ export function NativePuzzleBoard({
   const boardOffsetX = (canvasWidth - boardWidth) / 2;
   const cell = boardWidth / columns;
   const boardHeight = rows * cell;
-  const cameraEdgePadding = Math.max(18, Math.min(34, cell * 0.65));
+  const cameraVisibleGrip = Math.max(36, Math.min(48, width * 0.11));
   const storedPieces = pieces.filter((piece) => !piece.isPlaced && piece.trayId !== null);
   const drawerColumns = Math.max(3, Math.min(columns, Math.floor(columns * 0.75)));
   const drawerColumnStep = columns / drawerColumns;
@@ -146,8 +179,8 @@ export function NativePuzzleBoard({
     height: storageDockSize / cell,
   };
   const migratedLegacyTray = useRef(false);
-  const normalizedInitialPanX = initialZoom > 1.01 ? initialPanX : 0;
-  const normalizedInitialPanY = initialZoom > 1.01 ? initialPanY : 0;
+  const normalizedInitialPanX = initialPanX;
+  const normalizedInitialPanY = initialPanY;
   const boardRef = useRef<View>(null);
   const scale = useSharedValue(initialZoom);
   const savedScale = useSharedValue(initialZoom);
@@ -177,17 +210,21 @@ export function NativePuzzleBoard({
     let nextPanX = panX.get();
     let nextPanY = panY.get();
 
-    if (nextScale <= 1.01 || zoomCommand.action === "reset") {
+    if (zoomCommand.action === "reset") {
       nextPanX = 0;
       nextPanY = 0;
     } else {
-      const horizontalLimit =
-        (boardWidth * (nextScale - 1)) / (2 * nextScale) + cameraEdgePadding / nextScale;
-      const minimumY =
-        -(boardHeight * (nextScale - 1)) / nextScale - cameraEdgePadding / nextScale;
-      const maximumY = cameraEdgePadding / nextScale;
-      nextPanX = Math.max(-horizontalLimit, Math.min(horizontalLimit, nextPanX));
-      nextPanY = Math.max(minimumY, Math.min(maximumY, nextPanY));
+      const bounds = cameraBounds({
+        zoom: nextScale,
+        boardWidth,
+        boardHeight,
+        viewportWidth: canvasWidth,
+        viewportTop: cameraViewportTop,
+        viewportBottom: cameraViewportBottom,
+        visibleGrip: cameraVisibleGrip,
+      });
+      nextPanX = Math.max(-bounds.horizontalLimit, Math.min(bounds.horizontalLimit, nextPanX));
+      nextPanY = Math.max(bounds.minimumY, Math.min(bounds.maximumY, nextPanY));
     }
 
     scale.set(withTiming(nextScale, { duration: 180 }));
@@ -200,7 +237,10 @@ export function NativePuzzleBoard({
   }, [
     boardHeight,
     boardWidth,
-    cameraEdgePadding,
+    cameraVisibleGrip,
+    cameraViewportBottom,
+    cameraViewportTop,
+    canvasWidth,
     onCameraChange,
     panX,
     panY,
@@ -239,34 +279,26 @@ export function NativePuzzleBoard({
     if (changed) onPiecesChange(normalizedPieces);
   }, [onPiecesChange, pieces, rotationEnabled]);
 
-  useEffect(() => {
-    if (initialZoom <= 1.01 && (initialPanX !== 0 || initialPanY !== 0)) {
-      onCameraChange(0, 0, initialZoom);
-    }
-  }, [initialPanX, initialPanY, initialZoom, onCameraChange]);
-
   const pinch = Gesture.Pinch()
     .onUpdate((event) => {
       scale.set(Math.max(0.8, Math.min(2.4, savedScale.get() * event.scale)));
     })
     .onEnd(() => {
       savedScale.set(scale.get());
-      if (scale.get() <= 1.01) {
-        panX.set(0);
-        panY.set(0);
-        savedPanX.set(0);
-        savedPanY.set(0);
-        runOnJS(onCameraChange)(0, 0, scale.get());
-      } else {
-        const horizontalLimit = (boardWidth * (scale.get() - 1)) / (2 * scale.get()) + cameraEdgePadding / scale.get();
-        const minimumY = -(boardHeight * (scale.get() - 1)) / scale.get() - cameraEdgePadding / scale.get();
-        const maximumY = cameraEdgePadding / scale.get();
-        panX.set(Math.max(-horizontalLimit, Math.min(horizontalLimit, panX.get())));
-        panY.set(Math.max(minimumY, Math.min(maximumY, panY.get())));
-        savedPanX.set(panX.get());
-        savedPanY.set(panY.get());
-        runOnJS(onCameraChange)(panX.get(), panY.get(), scale.get());
-      }
+      const bounds = cameraBounds({
+        zoom: scale.get(),
+        boardWidth,
+        boardHeight,
+        viewportWidth: canvasWidth,
+        viewportTop: cameraViewportTop,
+        viewportBottom: cameraViewportBottom,
+        visibleGrip: cameraVisibleGrip,
+      });
+      panX.set(Math.max(-bounds.horizontalLimit, Math.min(bounds.horizontalLimit, panX.get())));
+      panY.set(Math.max(bounds.minimumY, Math.min(bounds.maximumY, panY.get())));
+      savedPanX.set(panX.get());
+      savedPanY.set(panY.get());
+      runOnJS(onCameraChange)(panX.get(), panY.get(), scale.get());
     });
   const boardPan = Gesture.Pan()
     .enabled(true)
@@ -278,12 +310,28 @@ export function NativePuzzleBoard({
       savedPanY.set(panY.get());
     })
     .onUpdate((event) => {
-      if (scale.get() <= 1.01 || pieceDragActive.get()) return;
-      const horizontalLimit = (boardWidth * (scale.get() - 1)) / (2 * scale.get()) + cameraEdgePadding / scale.get();
-      const minimumY = -(boardHeight * (scale.get() - 1)) / scale.get() - cameraEdgePadding / scale.get();
-      const maximumY = cameraEdgePadding / scale.get();
-      panX.set(Math.max(-horizontalLimit, Math.min(horizontalLimit, savedPanX.get() + event.translationX / scale.get())));
-      panY.set(Math.max(minimumY, Math.min(maximumY, savedPanY.get() + event.translationY / scale.get())));
+      if (pieceDragActive.get()) return;
+      const bounds = cameraBounds({
+        zoom: scale.get(),
+        boardWidth,
+        boardHeight,
+        viewportWidth: canvasWidth,
+        viewportTop: cameraViewportTop,
+        viewportBottom: cameraViewportBottom,
+        visibleGrip: cameraVisibleGrip,
+      });
+      panX.set(
+        Math.max(
+          -bounds.horizontalLimit,
+          Math.min(bounds.horizontalLimit, savedPanX.get() + event.translationX / scale.get()),
+        ),
+      );
+      panY.set(
+        Math.max(
+          bounds.minimumY,
+          Math.min(bounds.maximumY, savedPanY.get() + event.translationY / scale.get()),
+        ),
+      );
     })
     .onEnd(() => {
       savedPanX.set(panX.get());

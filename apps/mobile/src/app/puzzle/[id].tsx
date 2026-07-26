@@ -82,6 +82,13 @@ export default function PuzzleScreen() {
   const referenceMaxHeight = viewportHeight * 0.58;
   const referenceImageWidth = Math.min(referenceMaxWidth, referenceMaxHeight * imageAspect);
   const referenceImageHeight = referenceImageWidth / imageAspect;
+  const cameraViewportTop =
+    boardFrame && headerFrame
+      ? Math.max(0, headerFrame.y + headerFrame.height + 10 - boardFrame.y)
+      : 0;
+  const cameraViewportBottom = boardFrame && storageFrame
+    ? Math.max(cameraViewportTop + 120, storageFrame.y - 10 - boardFrame.y)
+    : Math.max(cameraViewportTop + 120, viewportHeight - 356);
 
   useEffect(() => {
     if (!puzzle?.id || completed) return;
@@ -302,6 +309,7 @@ export default function PuzzleScreen() {
 
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 268, paddingTop: 12 }}
+        scrollEnabled={false}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={(event) => {
@@ -319,6 +327,8 @@ export default function PuzzleScreen() {
           pieces={pieces}
           rotationEnabled={puzzle.configuration.rotationEnabled}
           zoomCommand={zoomCommand}
+          cameraViewportTop={cameraViewportTop}
+          cameraViewportBottom={cameraViewportBottom}
           initialZoom={puzzle.session.camera.zoom}
           initialPanX={puzzle.session.camera.x}
           initialPanY={puzzle.session.camera.y}
