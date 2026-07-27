@@ -2,7 +2,7 @@ import { neighborSnapOffset, normalizeQuarterTurn, type PuzzlePiece, type Puzzle
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -18,13 +18,20 @@ import Animated, {
 import Svg, { ClipPath, Defs, Image as SvgImage, Path, Rect } from "react-native-svg";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import type { ScreenFrame } from "@/components/puzzle-piece-drawer";
-import { useApp } from "@/state/app-provider";
+import type {
+  AppLanguage,
+  MobilePreferences,
+  MobileTheme,
+} from "@/state/app-provider";
 
 interface NativePuzzleBoardProps {
   imageUri: string;
   rows: number;
   columns: number;
   pieces: PuzzlePiece[];
+  language: AppLanguage;
+  preferences: MobilePreferences;
+  theme: MobileTheme;
   rotationEnabled: boolean;
   zoomCommand?: PuzzleZoomCommand | null;
   cameraViewportTop: number;
@@ -109,11 +116,14 @@ function drawerOrder(id: string) {
   return Math.imul(hash, 2246822507) >>> 0;
 }
 
-export function NativePuzzleBoard({
+export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   imageUri,
   rows,
   columns,
   pieces,
+  language,
+  preferences,
+  theme,
   rotationEnabled,
   zoomCommand,
   cameraViewportTop,
@@ -128,7 +138,8 @@ export function NativePuzzleBoard({
   onPiecesChange,
   onCameraChange,
 }: NativePuzzleBoardProps) {
-  const { preferences, theme, t } = useApp();
+  const t = (portuguese: string, english: string) =>
+    language === "en" ? english : portuguese;
   const { height, width } = useWindowDimensions();
   const colors = mobileThemes[theme];
   const boardWidth = Math.min(352, width - 24);
@@ -137,7 +148,10 @@ export function NativePuzzleBoard({
   const cell = boardWidth / columns;
   const boardHeight = rows * cell;
   const cameraVisibleGrip = Math.max(36, Math.min(48, width * 0.11));
-  const storedPieces = pieces.filter((piece) => !piece.isPlaced && piece.trayId !== null);
+  const storedPieces = useMemo(
+    () => pieces.filter((piece) => !piece.isPlaced && piece.trayId !== null),
+    [pieces],
+  );
   const drawerColumns = Math.max(3, Math.min(columns, Math.floor(columns * 0.75)));
   const drawerColumnStep = columns / drawerColumns;
   const displayedStoredPieces = useMemo(
@@ -156,7 +170,10 @@ export function NativePuzzleBoard({
         })),
     [drawerColumnStep, drawerColumns, rows, storedPieces],
   );
-  const activePieces = pieces.filter((piece) => piece.isPlaced || piece.trayId === null);
+  const activePieces = useMemo(
+    () => pieces.filter((piece) => piece.isPlaced || piece.trayId === null),
+    [pieces],
+  );
   const drawerRows = Math.ceil(storedPieces.length / drawerColumns);
   const drawerTop = boardHeight + Math.max(16, cell * 0.36);
   const drawerHeaderHeight = Math.max(62, cell * 1.02);
@@ -172,13 +189,15 @@ export function NativePuzzleBoard({
   const storageDockSize = Math.max(42, Math.min(54, cell * 0.82));
   const storageDockLeft = boardWidth - storageDockSize - 42;
   const storageDockTop = drawerTop + (drawerHeaderHeight - storageDockSize) / 2;
-  const storageTarget = {
+  const storageTarget = useMemo(() => ({
     x: storageDockLeft / cell,
     y: storageDockTop / cell,
     width: storageDockSize / cell,
     height: storageDockSize / cell,
-  };
+  }), [cell, storageDockLeft, storageDockSize, storageDockTop]);
   const migratedLegacyTray = useRef(false);
+  const piecesRef = useRef(pieces);
+  piecesRef.current = pieces;
   const normalizedInitialPanX = initialPanX;
   const normalizedInitialPanY = initialPanY;
   const boardRef = useRef<View>(null);
@@ -359,26 +378,27 @@ export function NativePuzzleBoard({
       if (success) runOnJS(toggleDrawer)();
     });
 
-  function updatePiece(
+  const updatePiece = useCallback((
     id: string,
     x: number,
     y: number,
     rotation: number,
     isPlaced: boolean,
     destination: "board" | "drawer",
-  ) {
-    const movingPiece = pieces.find((piece) => piece.id === id);
+  ) => {
+    const currentPieces = piecesRef.current;
+    const movingPiece = currentPieces.find((piece) => piece.id === id);
     if (!movingPiece) return;
     const effectiveRotation = rotationEnabled
       ? movingPiece.groupId
         ? normalizeQuarterTurn(movingPiece.currentPosition.rotation)
         : normalizeQuarterTurn(rotation)
       : 0;
-    const storedSlot = pieces.filter(
+    const storedSlot = currentPieces.filter(
       (piece) => piece.id !== id && !piece.isPlaced && piece.trayId !== null,
     ).length;
     if (destination === "drawer") {
-      const next = pieces.map((piece) =>
+      const next = currentPieces.map((piece) =>
         piece.id === id
           ? {
               ...piece,
@@ -400,12 +420,12 @@ export function NativePuzzleBoard({
 
     const memberIds = new Set(
       movingPiece.groupId && movingPiece.groupId !== "tabuleiro"
-        ? pieces.filter((piece) => piece.groupId === movingPiece.groupId).map((piece) => piece.id)
+        ? currentPieces.filter((piece) => piece.groupId === movingPiece.groupId).map((piece) => piece.id)
         : [id],
     );
     const deltaX = x - movingPiece.currentPosition.x;
     const deltaY = y - movingPiece.currentPosition.y;
-    let next = pieces.map((piece) =>
+    let next = currentPieces.map((piece) =>
       memberIds.has(piece.id)
         ? {
             ...piece,
@@ -439,7 +459,11 @@ export function NativePuzzleBoard({
         for (const stationary of next) {
           if (memberIds.has(stationary.id) || stationary.trayId !== null) continue;
           if (normalizeQuarterTurn(stationary.currentPosition.rotation) !== 0) continue;
-          const offset = neighborSnapOffset(moving, stationary, 0.3);
+          const neighborTolerance = Math.min(
+            0.68,
+            Math.max(0.38, 10 / Math.max(1, cell)),
+          );
+          const offset = neighborSnapOffset(moving, stationary, neighborTolerance);
           if (offset) {
             match = { offsetX: offset.x, offsetY: offset.y, stationary };
             break;
@@ -478,10 +502,27 @@ export function NativePuzzleBoard({
       }
     }
 
+    // Loose pieces and movable groups that were just touched stay above other
+    // loose pieces. Placed pieces keep their lower board layer.
+    const resolvedMovingPiece = next.find((piece) => piece.id === id);
+    if (resolvedMovingPiece && !resolvedMovingPiece.isPlaced) {
+      const foregroundIds = new Set(
+        resolvedMovingPiece.groupId && resolvedMovingPiece.groupId !== "tabuleiro"
+          ? next
+              .filter((piece) => piece.groupId === resolvedMovingPiece.groupId)
+              .map((piece) => piece.id)
+          : memberIds,
+      );
+      next = [
+        ...next.filter((piece) => !foregroundIds.has(piece.id)),
+        ...next.filter((piece) => foregroundIds.has(piece.id)),
+      ];
+    }
+
     onPiecesChange(next);
     if (connected && preferences.haptics)
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }
+  }, [cell, columns, onPiecesChange, preferences.haptics, rotationEnabled, rows]);
 
   useEffect(() => {
     if (migratedLegacyTray.current || pieces.length === 0) return;
@@ -657,9 +698,9 @@ export function NativePuzzleBoard({
       </View>
     </View>
   );
-}
+});
 
-function DraggablePiece({
+const DraggablePiece = memo(function DraggablePiece({
   piece,
   imageUri,
   boardWidth,
@@ -723,10 +764,11 @@ function DraggablePiece({
   const dragging = useSharedValue(false);
   const path = useMemo(() => piecePath(piece.shape, cell, margin), [cell, margin, piece.shape]);
   const clipId = `clip-${piece.id}`;
+  const snapRadius = Math.max(cell * 0.52, 10);
 
   useEffect(() => {
     const belongsToMovableGroup = Boolean(piece.groupId && piece.groupId !== "tabuleiro");
-    if (belongsToMovableGroup) {
+    if (belongsToMovableGroup || piece.isPlaced) {
       // Connected pieces must update as one rigid object. A spring per piece
       // creates a visible "tail" where the other members arrive afterwards.
       x.set(piece.currentPosition.x * cell);
@@ -742,7 +784,7 @@ function DraggablePiece({
       activeGroupPieceId.set(null);
     }
     rotation.set(withTiming(normalizeQuarterTurn(piece.currentPosition.rotation), { duration: 180 }));
-  }, [activeGroupId, activeGroupPieceId, cell, groupTranslationX, groupTranslationY, piece.currentPosition.rotation, piece.currentPosition.x, piece.currentPosition.y, piece.groupId, piece.id, rotation, x, y]);
+  }, [activeGroupId, activeGroupPieceId, cell, groupTranslationX, groupTranslationY, piece.currentPosition.rotation, piece.currentPosition.x, piece.currentPosition.y, piece.groupId, piece.id, piece.isPlaced, rotation, x, y]);
 
   const notify = (
     nextX: number,
@@ -757,7 +799,7 @@ function DraggablePiece({
     }
     const targetX = piece.correctPosition.x * cell;
     const targetY = piece.correctPosition.y * cell;
-    const closeEnough = Math.hypot(nextX - targetX, nextY - targetY) <= cell * 0.38;
+    const closeEnough = Math.hypot(nextX - targetX, nextY - targetY) <= snapRadius;
     onChange(
       piece.id,
       nextX / cell,
@@ -856,15 +898,10 @@ function DraggablePiece({
       const targetY = piece.correctPosition.y * cell;
       const currentQuarterTurn = Math.round(rotation.get() / 90) * 90;
       const normalized = ((currentQuarterTurn % 360) + 360) % 360;
-      const snaps = Math.hypot(x.get() - targetX, y.get() - targetY) <= cell * 0.38 && normalized === 0;
+      const snaps = Math.hypot(x.get() - targetX, y.get() - targetY) <= snapRadius && normalized === 0;
       if (snaps) {
-        if (piece.groupId && piece.groupId !== "tabuleiro") {
-          x.set(targetX);
-          y.set(targetY);
-        } else {
-          x.set(withSpring(targetX));
-          y.set(withSpring(targetY));
-        }
+        x.set(targetX);
+        y.set(targetY);
       }
       runOnJS(notify)(
         snaps ? targetX : x.get(),
@@ -940,7 +977,7 @@ function DraggablePiece({
       </Animated.View>
     </GestureDetector>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { alignItems: "center" },

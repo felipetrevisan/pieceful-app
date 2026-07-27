@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { PuzzlePiece, PuzzlePieceShape } from "@puzzled/puzzle-engine";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Platform,
@@ -23,7 +22,11 @@ import Animated, {
 import Svg, { ClipPath, Defs, Path, Image as SvgImage } from "react-native-svg";
 import { FrostedBackdrop } from "@/components/frosted-surface";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
-import { useApp } from "@/state/app-provider";
+import type {
+  AppLanguage,
+  MobilePreferences,
+  MobileTheme,
+} from "@/state/app-provider";
 
 export interface ScreenFrame {
   x: number;
@@ -43,6 +46,9 @@ interface PuzzlePieceDrawerProps {
   rows: number;
   columns: number;
   pieces: PuzzlePiece[];
+  language: AppLanguage;
+  preferences: MobilePreferences;
+  theme: MobileTheme;
   boardFrame: ScreenFrame | null;
   headerFrame: ScreenFrame | null;
   storageFrame: ScreenFrame | null;
@@ -98,11 +104,14 @@ function flatEdgeCount(piece: PuzzlePiece) {
   ).length;
 }
 
-export function PuzzlePieceDrawer({
+export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
   imageUri,
   rows,
   columns,
   pieces,
+  language,
+  preferences,
+  theme,
   boardFrame,
   headerFrame,
   storageFrame,
@@ -116,7 +125,8 @@ export function PuzzlePieceDrawer({
   onStorageFrameChange,
 }: PuzzlePieceDrawerProps) {
   const { width } = useWindowDimensions();
-  const { preferences, t, theme } = useApp();
+  const t = (portuguese: string, english: string) =>
+    language === "en" ? english : portuguese;
   const colors = mobileThemes[theme];
   const storedPieces = useMemo(
     () =>
@@ -220,14 +230,18 @@ export function PuzzlePieceDrawer({
       ]}
     >
       {Platform.OS === "android" ? (
-        <BlurView
-          blurMethod="dimezisBlurViewSdk31Plus"
-          blurReductionFactor={2}
-          intensity={88}
+        <View
           pointerEvents="none"
-          tint={isLightMobileTheme(theme) ? "light" : "dark"}
-          style={StyleSheet.absoluteFill}
-        />
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: `${colors.panel}${isLightMobileTheme(theme) ? "f5" : "f2"}` },
+          ]}
+        >
+          <LinearGradient
+            colors={[`${colors.accent}1a`, "transparent", `${colors.primary}20`]}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
       ) : (
         <FrostedBackdrop intensity={88} />
       )}
@@ -439,7 +453,7 @@ export function PuzzlePieceDrawer({
       )}
     </View>
   );
-}
+});
 
 function DrawerPiece({
   piece,

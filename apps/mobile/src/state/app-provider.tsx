@@ -88,7 +88,7 @@ interface AppState {
   equipReward: (kind: "avatar" | "frame", rewardId: string | null) => boolean;
   updatePreference: (key: keyof MobilePreferences, value: boolean) => void;
   createPuzzle: (input: CreatePuzzleInput) => MobilePuzzle;
-  updatePuzzlePieces: (id: string, pieces: PuzzlePiece[]) => void;
+  updatePuzzlePieces: (id: string, pieces: PuzzlePiece[], elapsedTime?: number) => void;
   updatePuzzleCamera: (id: string, camera: Camera) => void;
   updatePuzzleElapsedTime: (id: string, elapsedTime: number) => void;
   incrementPuzzleHints: (id: string) => void;
@@ -389,7 +389,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return puzzle;
   }, []);
 
-  const updatePuzzlePieces = useCallback((id: string, pieces: PuzzlePiece[]) => {
+  const updatePuzzlePieces = useCallback((id: string, pieces: PuzzlePiece[], elapsedTime?: number) => {
     setPuzzles((current) =>
       current.map((puzzle) => {
         if (puzzle.id !== id) return puzzle;
@@ -405,12 +405,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           session: {
             ...puzzle.session,
             pieces,
+            elapsedTime: elapsedTime ?? puzzle.session.elapsedTime,
             completedAt: completed ? new Date().toISOString() : null,
             timelapse: {
               ...currentTimelapse,
               frames: appendTimelapseFrame(
                 currentTimelapse.frames,
-                puzzle.session.elapsedTime,
+                elapsedTime ?? puzzle.session.elapsedTime,
                 changes,
               ),
             },

@@ -10,6 +10,7 @@ import { Asset } from "expo-asset";
 import { Directory, File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -281,9 +282,25 @@ export default function CreateScreen() {
       if (Platform.OS !== "web") {
         const directory = new Directory(Paths.document, "puzzle-images");
         directory.create({ idempotent: true, intermediates: true });
-        const extension = asset.fileName?.split(".").pop()?.toLowerCase() || "jpg";
-        const destination = new File(directory, `puzzle-${Date.now()}.${extension}`);
-        await new File(asset.uri).copy(destination, { overwrite: true });
+        const longestSide = Math.max(asset.width, asset.height);
+        const resizeScale = Math.min(1, 2048 / Math.max(1, longestSide));
+        const optimized = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          resizeScale < 1
+            ? [{
+                resize: {
+                  width: Math.max(1, Math.round(asset.width * resizeScale)),
+                  height: Math.max(1, Math.round(asset.height * resizeScale)),
+                },
+              }]
+            : [],
+          {
+            compress: 0.88,
+            format: ImageManipulator.SaveFormat.JPEG,
+          },
+        );
+        const destination = new File(directory, `puzzle-${Date.now()}.jpg`);
+        await new File(optimized.uri).copy(destination, { overwrite: true });
         permanentUri = destination.uri;
       }
       setImageUri(permanentUri);

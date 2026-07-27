@@ -6,6 +6,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState as NativeAppState,
   Modal,
   Pressable,
   ScrollView,
@@ -62,6 +63,8 @@ export default function PuzzleScreen() {
     hintCredits,
     incrementPuzzleHints,
     puzzles,
+    language,
+    preferences,
     setDrawerOpen,
     t,
     theme,
@@ -119,18 +122,29 @@ export default function PuzzleScreen() {
       const next = elapsedTimeRef.current + 1;
       elapsedTimeRef.current = next;
       setElapsedTime(next);
-      updatePuzzleElapsedTime(id, next);
+      if (next % 30 === 0) updatePuzzleElapsedTime(id, next);
     }, 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      updatePuzzleElapsedTime(id, elapsedTimeRef.current);
+    };
   }, [completed, id, puzzle?.id, updatePuzzleElapsedTime]);
 
-  function savePieces(next: PuzzlePiece[]) {
+  useEffect(() => {
+    if (!puzzle?.id || completed) return;
+    const subscription = NativeAppState.addEventListener("change", (state) => {
+      if (state !== "active") updatePuzzleElapsedTime(id, elapsedTimeRef.current);
+    });
+    return () => subscription.remove();
+  }, [completed, id, puzzle?.id, updatePuzzleElapsedTime]);
+
+  const savePieces = useCallback((next: PuzzlePiece[]) => {
     setPieces(next);
-    updatePuzzlePieces(id, next);
+    updatePuzzlePieces(id, next, elapsedTimeRef.current);
     if (next.length > 0 && next.every((piece) => piece.isPlaced)) {
       setTimeout(() => router.replace(`/result/${id}` as never), 500);
     }
-  }
+  }, [id, updatePuzzlePieces]);
 
   function placeHint() {
     const candidate = pieces.find((piece) => !piece.isPlaced);
@@ -188,8 +202,7 @@ export default function PuzzleScreen() {
     );
   }
 
-  function releasePieces(ids: string[], x: number, y: number, anchorId: string) {
-    if (!puzzle) return;
+  const releasePieces = useCallback((ids: string[], x: number, y: number, anchorId: string) => {
     const released = pieces.filter((piece) => ids.includes(piece.id));
     if (!released.length) return;
 
@@ -219,7 +232,7 @@ export default function PuzzleScreen() {
       }),
     );
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-  }
+  }, [pieces, savePieces]);
 
   const handleCameraChange = useCallback(
     (panX: number, panY: number, zoom: number) => {
@@ -346,6 +359,9 @@ export default function PuzzleScreen() {
           rows={puzzle.configuration.rows}
           columns={puzzle.configuration.columns}
           pieces={pieces}
+          language={language}
+          preferences={preferences}
+          theme={theme}
           rotationEnabled={puzzle.configuration.rotationEnabled}
           zoomCommand={zoomCommand}
           cameraViewportTop={cameraViewportTop}
@@ -392,6 +408,9 @@ export default function PuzzleScreen() {
         rows={puzzle.configuration.rows}
         columns={puzzle.configuration.columns}
         pieces={pieces}
+        language={language}
+        preferences={preferences}
+        theme={theme}
         boardFrame={boardFrame}
         headerFrame={headerFrame}
         storageFrame={storageFrame}
