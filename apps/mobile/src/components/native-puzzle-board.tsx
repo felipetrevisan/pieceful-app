@@ -340,9 +340,11 @@ export function NativePuzzleBoard({
     });
   const zoomStyle = useAnimatedStyle(() => ({
     transform: [
+      // Camera pan is stored in board coordinates. Scaling first keeps the
+      // rendered transform aligned with tray-to-board coordinate conversion.
+      { scale: scale.get() },
       { translateX: panX.get() },
       { translateY: panY.get() },
-      { scale: scale.get() },
     ],
   }));
 

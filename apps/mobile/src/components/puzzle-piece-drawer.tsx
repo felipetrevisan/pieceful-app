@@ -52,7 +52,7 @@ interface PuzzlePieceDrawerProps {
   dragScreenX: SharedValue<number>;
   dragScreenY: SharedValue<number>;
   onDragPreviewChange: (preview: TrayDragPreview | null) => void;
-  onReleasePieces: (ids: string[], x: number, y: number) => void;
+  onReleasePieces: (ids: string[], x: number, y: number, anchorId: string) => void;
   onStorageFrameChange: (frame: ScreenFrame | null) => void;
 }
 
@@ -169,8 +169,8 @@ export function PuzzlePieceDrawer({
     if (preferences.haptics) void Haptics.selectionAsync();
   }
 
-  function releaseSelected(ids: string[], x: number, y: number) {
-    onReleasePieces(ids, x, y);
+  function releaseSelected(ids: string[], x: number, y: number, anchorId: string) {
+    onReleasePieces(ids, x, y, anchorId);
     setSelectedIds((current) => current.filter((id) => !ids.includes(id)));
   }
 
@@ -479,7 +479,7 @@ function DrawerPiece({
   selectedIds: string[];
   onDragPreviewChange: (preview: TrayDragPreview | null) => void;
   onToggleSelected: (id: string) => void;
-  onRelease: (ids: string[], x: number, y: number) => void;
+  onRelease: (ids: string[], x: number, y: number, anchorId: string) => void;
   scrollGesture: GestureType;
 }) {
   const margin = size * 0.24;
@@ -533,7 +533,7 @@ function DrawerPiece({
         const visualY = boardFrame.y + boardPanY * boardZoom;
         const x = ((event.absoluteX - visualX) / visualWidth) * columns - 0.5;
         const y = ((event.absoluteY - visualY) / visualHeight) * rows - 0.5;
-        runOnJS(onRelease)(selected ? selectedIds : [piece.id], x, y);
+        runOnJS(onRelease)(selected ? selectedIds : [piece.id], x, y, piece.id);
         dragging.set(0);
         runOnJS(onDragPreviewChange)(null);
         return;
@@ -614,6 +614,9 @@ export function PuzzlePieceDragOverlay({
   imageUri,
   rows,
   columns,
+  boardFrame,
+  storageFrame,
+  boardZoom,
   screenX,
   screenY,
   screenOffsetY,
@@ -623,6 +626,9 @@ export function PuzzlePieceDragOverlay({
   imageUri: string;
   rows: number;
   columns: number;
+  boardFrame: ScreenFrame | null;
+  storageFrame: ScreenFrame | null;
+  boardZoom: number;
   screenX: SharedValue<number>;
   screenY: SharedValue<number>;
   screenOffsetY: number;
@@ -635,13 +641,22 @@ export function PuzzlePieceDragOverlay({
     () => (preview ? piecePath(preview.piece.shape, size, margin) : ""),
     [margin, preview, size],
   );
-  const overlayStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: screenX.get() - extent / 2 },
-      { translateY: screenY.get() - screenOffsetY - extent / 2 },
-      { scale: 1.16 },
-    ],
-  }));
+  const boardPieceScale = boardFrame
+    ? Math.max(0.32, Math.min(1.8, (boardFrame.width / columns / size) * boardZoom))
+    : 1;
+  const trayBoundaryY = storageFrame?.y ?? Number.POSITIVE_INFINITY;
+  const overlayStyle = useAnimatedStyle(() => {
+    const distanceFromTray = trayBoundaryY - screenY.get();
+    const boardTransition = Math.max(0, Math.min(1, distanceFromTray / 72));
+    const previewScale = 1.16 + (boardPieceScale - 1.16) * boardTransition;
+    return {
+      transform: [
+        { translateX: screenX.get() - extent / 2 },
+        { translateY: screenY.get() - screenOffsetY - extent / 2 },
+        { scale: previewScale },
+      ],
+    };
+  });
 
   if (!preview) return null;
   const clipId = `tray-drag-${preview.piece.id}`;

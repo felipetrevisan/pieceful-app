@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { useMemo, useState } from "react";
+import type { PurchasesPackage } from "react-native-purchases";
 import {
   Pressable,
   ScrollView,
@@ -47,6 +49,33 @@ export default function SettingsScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const helpRowWidth = Math.max(0, screenWidth - 40);
   const helpCardWidth = Math.max(0, (helpRowWidth - 12) / 2);
+  const premiumPlans = useMemo(() => {
+    if (!offering) return [];
+    const preferred = [offering.monthly, offering.annual].filter(
+      (item): item is PurchasesPackage => Boolean(item),
+    );
+    return preferred.length > 0 ? preferred : offering.availablePackages;
+  }, [offering]);
+  const [selectedPremiumPackageId, setSelectedPremiumPackageId] = useState<string | null>(null);
+  const selectedPremiumPackage =
+    premiumPlans.find((item) => item.identifier === selectedPremiumPackageId) ??
+    offering?.annual ??
+    premiumPlans[0] ??
+    null;
+  const monthlyPackage = offering?.monthly ?? null;
+  const annualPackage = offering?.annual ?? null;
+  const annualSavings =
+    monthlyPackage &&
+    annualPackage &&
+    monthlyPackage.product.currencyCode === annualPackage.product.currencyCode &&
+    monthlyPackage.product.price > 0
+      ? Math.max(
+          0,
+          Math.round(
+            (1 - annualPackage.product.price / (monthlyPackage.product.price * 12)) * 100,
+          ),
+        )
+      : 0;
 
   function languageChange(next: AppLanguage) {
     setLanguage(next);
@@ -68,9 +97,15 @@ export default function SettingsScreen() {
     if (preferences.haptics) void Haptics.selectionAsync();
   }
 
+  function selectPremiumPlan(packageIdentifier: string) {
+    setSelectedPremiumPackageId(packageIdentifier);
+    if (preferences.haptics) void Haptics.selectionAsync();
+  }
+
   function startPremiumPurchase() {
+    if (!selectedPremiumPackage) return;
     if (ageGroup !== "child") {
-      void purchasePremium();
+      void purchasePremium(selectedPremiumPackage.identifier);
       return;
     }
     showAlert(
@@ -81,7 +116,10 @@ export default function SettingsScreen() {
       ),
       [
         { text: t("Cancelar", "Cancel"), style: "cancel" },
-        { text: t("Sou responsável", "I'm the guardian"), onPress: () => void purchasePremium() },
+        {
+          text: t("Sou responsável", "I'm the guardian"),
+          onPress: () => void purchasePremium(selectedPremiumPackage.identifier),
+        },
       ],
     );
   }
@@ -126,8 +164,6 @@ export default function SettingsScreen() {
           ["candy", "jungle", "rainbow", "ocean", "castle", "storybook", "space"].includes(item.id),
         )
       : mobileThemeCatalog;
-  const premiumPackage = offering?.availablePackages[0];
-
   return (
     <Screen>
       <AppHeader title={t("Configurações", "Settings")} showTitle back />
@@ -276,15 +312,30 @@ export default function SettingsScreen() {
                 <Benefit text={t("Dicas sem assistir vídeos", "Hints without watching videos")} />
                 <Benefit text={t("Temas e recursos premium", "Premium themes and features")} />
               </View>
+              {premiumPlans.length > 0 ? (
+                <View style={styles.planGrid}>
+                  {premiumPlans.map((item) => (
+                    <PremiumPlanOption
+                      key={item.identifier}
+                      plan={item}
+                      selected={item.identifier === selectedPremiumPackage?.identifier}
+                      savings={item.packageType === "ANNUAL" ? annualSavings : 0}
+                      colors={colors}
+                      t={t}
+                      onPress={() => selectPremiumPlan(item.identifier)}
+                    />
+                  ))}
+                </View>
+              ) : null}
               <PrimaryButton
                 icon="diamond-outline"
-                disabled={!purchaseAvailable}
+                disabled={!purchaseAvailable || !selectedPremiumPackage}
                 onPress={startPremiumPurchase}
               >
                 {purchaseAvailable
                   ? t(
-                      `Assinar por ${premiumPackage?.product.priceString ?? ""}`,
-                      `Subscribe for ${premiumPackage?.product.priceString ?? ""}`,
+                      `Continuar com o plano ${selectedPremiumPackage?.packageType === "ANNUAL" ? "anual" : "mensal"}`,
+                      `Continue with the ${selectedPremiumPackage?.packageType === "ANNUAL" ? "annual" : "monthly"} plan`,
                     )
                   : t("Configure o plano na Play Store", "Configure the plan in Play Store")}
               </PrimaryButton>
@@ -484,6 +535,83 @@ function Benefit({ text }: { text: string }) {
       <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
       <Text style={[styles.benefitText, { color: colors.text }]}>{text}</Text>
     </View>
+  );
+}
+
+function PremiumPlanOption({
+  plan,
+  selected,
+  savings,
+  colors,
+  t,
+  onPress,
+}: {
+  plan: PurchasesPackage;
+  selected: boolean;
+  savings: number;
+  colors: (typeof mobileThemes)[keyof typeof mobileThemes];
+  t: (portuguese: string, english: string) => string;
+  onPress: () => void;
+}) {
+  const annual = plan.packageType === "ANNUAL";
+  const monthly = plan.packageType === "MONTHLY";
+  const title = annual
+    ? t("Anual", "Annual")
+    : monthly
+      ? t("Mensal", "Monthly")
+      : plan.product.title;
+  const cadence = annual
+    ? t("cobrado uma vez por ano", "billed once per year")
+    : monthly
+      ? t("cobrado todos os meses", "billed every month")
+      : t("plano Premium", "Premium plan");
+  const monthlyEquivalent = annual ? plan.product.pricePerMonthString : null;
+
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.planOption,
+        {
+          backgroundColor: selected ? `${colors.accent}1f` : `${colors.panelAlt}c8`,
+          borderColor: selected ? colors.accent : `${colors.muted}38`,
+          borderRadius: Math.max(18, colors.radius),
+        },
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      {annual ? (
+        <View style={[styles.planBadge, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.planBadgeText, { color: colors.background }]}>
+            {savings > 0
+              ? t(`ECONOMIZE ${savings}%`, `SAVE ${savings}%`)
+              : t("MELHOR VALOR", "BEST VALUE")}
+          </Text>
+        </View>
+      ) : null}
+      <View style={styles.planTopRow}>
+        <Text style={[styles.planTitle, { color: colors.text }]}>{title}</Text>
+        <View
+          style={[
+            styles.planRadio,
+            { borderColor: selected ? colors.accent : colors.muted },
+          ]}
+        >
+          {selected ? <View style={[styles.planRadioDot, { backgroundColor: colors.accent }]} /> : null}
+        </View>
+      </View>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.planPrice, { color: colors.text }]}>
+        {plan.product.priceString}
+      </Text>
+      <Text style={[styles.planCadence, { color: colors.muted }]}>{cadence}</Text>
+      {monthlyEquivalent ? (
+        <Text style={[styles.planEquivalent, { color: colors.accent }]}>
+          {t(`${monthlyEquivalent} por mês`, `${monthlyEquivalent} per month`)}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -711,6 +839,39 @@ const styles = StyleSheet.create({
   benefits: { gap: 9 },
   benefit: { flexDirection: "row", alignItems: "center", gap: 9 },
   benefitText: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  planGrid: { width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  planOption: {
+    flex: 1,
+    minWidth: "45%",
+    minHeight: 148,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingTop: 17,
+    paddingBottom: 14,
+    overflow: "hidden",
+  },
+  planBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  planBadgeText: { fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: 0.7 },
+  planTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  planTitle: { flex: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 17 },
+  planRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  planRadioDot: { width: 10, height: 10, borderRadius: 5 },
+  planPrice: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 22, marginTop: 10 },
+  planCadence: { fontFamily: "Inter_600SemiBold", fontSize: 9, lineHeight: 13, marginTop: 2 },
+  planEquivalent: { fontFamily: "Inter_700Bold", fontSize: 10, marginTop: 7 },
   parentNote: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,

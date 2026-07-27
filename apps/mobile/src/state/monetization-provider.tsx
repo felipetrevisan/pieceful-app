@@ -26,7 +26,7 @@ interface MonetizationState {
   ownedProductIds: string[];
   error: string | null;
   showRewardedHint: () => Promise<boolean>;
-  purchasePremium: () => Promise<boolean>;
+  purchasePremium: (packageIdentifier?: string) => Promise<boolean>;
   loadPackProducts: (productIds: string[]) => Promise<void>;
   purchasePack: (productId: string) => Promise<boolean>;
   restorePurchases: () => Promise<boolean>;
@@ -141,8 +141,10 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     });
   }, [adsAvailable, premium]);
 
-  const purchasePremium = useCallback(async () => {
-    const selected = offering?.availablePackages[0];
+  const purchasePremium = useCallback(async (packageIdentifier?: string) => {
+    const selected = packageIdentifier
+      ? offering?.availablePackages.find((item) => item.identifier === packageIdentifier)
+      : offering?.annual ?? offering?.monthly ?? offering?.availablePackages[0];
     if (!selected || !revenueCatKey) return false;
     try {
       const { default: Purchases } = await import("react-native-purchases");

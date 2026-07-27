@@ -32,6 +32,29 @@ import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 import { useMonetization } from "@/state/monetization-provider";
 
+function releaseOffsets(count: number) {
+  const offsets = [{ x: 0, y: 0 }];
+  const step = 0.76;
+  let ring = 1;
+  while (offsets.length < count) {
+    const ringOffsets: { x: number; y: number }[] = [];
+    for (let gridY = -ring; gridY <= ring; gridY += 1) {
+      for (let gridX = -ring; gridX <= ring; gridX += 1) {
+        if (Math.max(Math.abs(gridX), Math.abs(gridY)) !== ring) continue;
+        ringOffsets.push({ x: gridX * step, y: gridY * step });
+      }
+    }
+    ringOffsets.sort(
+      (left, right) =>
+        Math.hypot(left.x, left.y) - Math.hypot(right.x, right.y) ||
+        Math.atan2(left.y, left.x) - Math.atan2(right.y, right.x),
+    );
+    offsets.push(...ringOffsets);
+    ring += 1;
+  }
+  return offsets.slice(0, count);
+}
+
 export default function PuzzleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
@@ -165,33 +188,31 @@ export default function PuzzleScreen() {
     );
   }
 
-  function releasePieces(ids: string[], x: number, y: number) {
+  function releasePieces(ids: string[], x: number, y: number, anchorId: string) {
     if (!puzzle) return;
     const released = pieces.filter((piece) => ids.includes(piece.id));
     if (!released.length) return;
 
-    const gridColumns = Math.ceil(Math.sqrt(released.length));
-    const gridRows = Math.ceil(released.length / gridColumns);
-    const horizontalStep = gridColumns > 1 ? 0.72 : 0;
-    const verticalStep = gridRows > 1 ? 0.72 : 0;
-    const groupWidth = horizontalStep * (gridColumns - 1);
-    const groupHeight = verticalStep * (gridRows - 1);
-    const startX = x - groupWidth / 2;
-    const startY = y - groupHeight / 2;
+    const orderedReleased = [
+      ...released.filter((piece) => piece.id === anchorId),
+      ...released.filter((piece) => piece.id !== anchorId),
+    ];
+    const offsets = releaseOffsets(orderedReleased.length);
     const releasedIds = new Set(ids);
 
     savePieces(
       pieces.map((piece) => {
         if (!releasedIds.has(piece.id)) return piece;
-        const index = released.findIndex((candidate) => candidate.id === piece.id);
+        const index = orderedReleased.findIndex((candidate) => candidate.id === piece.id);
+        const offset = offsets[index] ?? { x: 0, y: 0 };
         return {
           ...piece,
           isPlaced: false,
           trayId: null,
           groupId: null,
           currentPosition: {
-            x: startX + (index % gridColumns) * horizontalStep,
-            y: startY + Math.floor(index / gridColumns) * verticalStep,
+            x: x + offset.x,
+            y: y + offset.y,
             rotation: piece.currentPosition.rotation,
           },
         };
@@ -389,6 +410,9 @@ export default function PuzzleScreen() {
         imageUri={puzzle.imageUri}
         rows={puzzle.configuration.rows}
         columns={puzzle.configuration.columns}
+        boardFrame={boardFrame}
+        storageFrame={storageFrame}
+        boardZoom={boardZoom}
         screenX={trayDragX}
         screenY={trayDragY}
         screenOffsetY={insets.top}
