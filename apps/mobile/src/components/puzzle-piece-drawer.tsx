@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
   type SharedValue,
@@ -158,11 +158,6 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
     }
     return next.length ? next : [[]];
   }, [filteredPieces, pageSize]);
-  // Let the native scroll view own horizontal swipes so the tray follows the
-  // finger continuously. Piece gestures stay simultaneous with it and only
-  // take over after their long-press activation delay.
-  const trayScrollGesture = Gesture.Native();
-
   function finishTrayScroll(offsetX: number) {
     const nextIndex = Math.max(
       0,
@@ -343,11 +338,11 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
           </View>
           {filteredPieces.length ? (
             <>
-            <GestureDetector gesture={trayScrollGesture}>
+            <View style={styles.pieceList}>
             <FlatList
               ref={listRef}
               key={`tray-pages-${trayColumns}`}
-              style={[styles.pageScroller, styles.pieceList]}
+              style={styles.pageScroller}
               data={pages}
               horizontal
               scrollEnabled={pages.length > 1}
@@ -401,14 +396,13 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
                         onDragPreviewChange={onDragPreviewChange}
                         onToggleSelected={toggleSelected}
                         onRelease={releaseSelected}
-                        scrollGesture={trayScrollGesture}
                       />
                     </View>
                   ))}
                 </View>
               )}
             />
-            </GestureDetector>
+            </View>
             <View style={styles.pagination}>
               {visibleDots.map((index) => (
                 <View
@@ -470,7 +464,6 @@ function DrawerPiece({
   onDragPreviewChange,
   onToggleSelected,
   onRelease,
-  scrollGesture,
 }: {
   piece: PuzzlePiece;
   imageUri: string;
@@ -490,7 +483,6 @@ function DrawerPiece({
   onDragPreviewChange: (preview: TrayDragPreview | null) => void;
   onToggleSelected: (id: string) => void;
   onRelease: (ids: string[], x: number, y: number, anchorId: string) => void;
-  scrollGesture: GestureType;
 }) {
   const margin = size * 0.24;
   const extent = size + margin * 2;
@@ -501,7 +493,6 @@ function DrawerPiece({
   const clipId = `drawer-clip-${piece.id}`;
 
   const pan = Gesture.Pan()
-    .simultaneousWithExternalGesture(scrollGesture)
     .activateAfterLongPress(320)
     .minDistance(8)
     .onStart((event) => {
@@ -552,7 +543,6 @@ function DrawerPiece({
       runOnJS(onDragPreviewChange)(null);
     });
   const tap = Gesture.Tap()
-    .simultaneousWithExternalGesture(scrollGesture)
     .maxDuration(260)
     .onEnd((_event, success) => {
       if (success) runOnJS(onToggleSelected)(piece.id);
