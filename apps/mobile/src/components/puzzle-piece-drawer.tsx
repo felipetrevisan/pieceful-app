@@ -158,18 +158,22 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
     }
     return next.length ? next : [[]];
   }, [filteredPieces, pageSize]);
-  const trayScrollGesture = Gesture.Pan()
-    .activeOffsetX([-18, 18])
-    .failOffsetY([-16, 16])
-    .onEnd((event) => {
-      if (Math.abs(event.translationX) < 34) return;
-      runOnJS(moveTrayPage)(event.translationX < 0 ? 1 : -1);
-    });
-  function moveTrayPage(direction: number) {
-    setPageIndex((current) =>
-      Math.max(0, Math.min(pages.length - 1, current + direction)),
+  // Let the native scroll view own horizontal swipes so the tray follows the
+  // finger continuously. Piece gestures stay simultaneous with it and only
+  // take over after their long-press activation delay.
+  const trayScrollGesture = Gesture.Native();
+
+  function finishTrayScroll(offsetX: number) {
+    const nextIndex = Math.max(
+      0,
+      Math.min(pages.length - 1, Math.round(offsetX / pageWidth)),
     );
-    if (preferences.haptics) void Haptics.selectionAsync();
+    setPageIndex((current) => {
+      if (current !== nextIndex && preferences.haptics) {
+        void Haptics.selectionAsync();
+      }
+      return nextIndex;
+    });
   }
 
   function toggleSelected(id: string) {
@@ -340,17 +344,18 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
           {filteredPieces.length ? (
             <>
             <GestureDetector gesture={trayScrollGesture}>
-            <View
-              style={styles.pieceList}
-            >
             <FlatList
               ref={listRef}
               key={`tray-pages-${trayColumns}`}
-              style={styles.pageScroller}
+              style={[styles.pageScroller, styles.pieceList]}
               data={pages}
               horizontal
-              scrollEnabled={false}
+              scrollEnabled={pages.length > 1}
               pagingEnabled
+              bounces={false}
+              directionalLockEnabled
+              nestedScrollEnabled
+              overScrollMode="never"
               decelerationRate="fast"
               snapToInterval={pageWidth}
               disableIntervalMomentum
@@ -360,15 +365,7 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
               maxToRenderPerBatch={2}
               windowSize={3}
               onMomentumScrollEnd={(event) => {
-                setPageIndex(
-                  Math.max(
-                    0,
-                    Math.min(
-                      pages.length - 1,
-                      Math.round(event.nativeEvent.contentOffset.x / pageWidth),
-                    ),
-                  ),
-                );
+                finishTrayScroll(event.nativeEvent.contentOffset.x);
               }}
               getItemLayout={(_data, index) => ({
                 length: pageWidth,
@@ -411,7 +408,6 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
                 </View>
               )}
             />
-            </View>
             </GestureDetector>
             <View style={styles.pagination}>
               {visibleDots.map((index) => (
