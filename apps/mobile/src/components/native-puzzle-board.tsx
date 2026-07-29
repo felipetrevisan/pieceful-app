@@ -43,6 +43,7 @@ interface NativePuzzleBoardProps {
   headerScreenTarget?: ScreenFrame | null;
   storageScreenTarget?: ScreenFrame | null;
   onBoardFrameChange?: (frame: ScreenFrame) => void;
+  onPieceStored?: () => void;
   onPiecesChange: (pieces: PuzzlePiece[]) => void;
   onCameraChange: (panX: number, panY: number, zoom: number) => void;
 }
@@ -135,6 +136,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   headerScreenTarget,
   storageScreenTarget,
   onBoardFrameChange,
+  onPieceStored,
   onPiecesChange,
   onCameraChange,
 }: NativePuzzleBoardProps) {
@@ -414,6 +416,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
           : piece,
       );
       onPiecesChange(next);
+      onPieceStored?.();
       if (preferences.haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       return;
     }
@@ -522,7 +525,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
     onPiecesChange(next);
     if (connected && preferences.haptics)
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [cell, columns, onPiecesChange, preferences.haptics, rotationEnabled, rows]);
+  }, [cell, columns, onPieceStored, onPiecesChange, preferences.haptics, rotationEnabled, rows]);
 
   useEffect(() => {
     if (migratedLegacyTray.current || pieces.length === 0) return;
@@ -876,12 +879,11 @@ const DraggablePiece = memo(function DraggablePiece({
 
       const worldCenterX = x.get() / cell + 0.5;
       const worldCenterY = y.get() / cell + 0.5;
-      const storageHitSlop = 32;
       const droppedOnScreenStorage = storageScreenTarget
-        ? event.absoluteX >= storageScreenTarget.x - storageHitSlop &&
-          event.absoluteX <= storageScreenTarget.x + storageScreenTarget.width + storageHitSlop &&
-          event.absoluteY >= storageScreenTarget.y - storageHitSlop &&
-          event.absoluteY <= storageScreenTarget.y + storageScreenTarget.height + storageHitSlop
+        ? event.absoluteX >= storageScreenTarget.x &&
+          event.absoluteX <= storageScreenTarget.x + storageScreenTarget.width &&
+          event.absoluteY >= storageScreenTarget.y &&
+          event.absoluteY <= storageScreenTarget.y + storageScreenTarget.height
         : false;
       const droppedOnStorage = droppedOnScreenStorage ||
         (!storageScreenTarget &&

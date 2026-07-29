@@ -15,7 +15,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useSharedValue } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutDown, useSharedValue } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   NativePuzzleBoard,
@@ -92,13 +92,19 @@ export default function PuzzleScreen() {
   const [elapsedTime, setElapsedTime] = useState(puzzle?.session.elapsedTime ?? 0);
   const elapsedTimeRef = useRef(puzzle?.session.elapsedTime ?? 0);
   const [trayDragPreview, setTrayDragPreview] = useState<TrayDragPreview | null>(null);
+  const [pieceStoredNoticeCount, setPieceStoredNoticeCount] = useState(0);
   const trayDragX = useSharedValue(-200);
   const trayDragY = useSharedValue(-200);
   const scrollOffset = useRef(0);
   const toolbarRef = useRef<View>(null);
   const zoomCommandId = useRef(0);
+  const pieceStoredNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
+  const looseBoardPieces = useMemo(
+    () => pieces.filter((piece) => !piece.isPlaced && piece.trayId === null && !piece.groupId),
+    [pieces],
+  );
   const progress = pieces.length ? Math.round((placed / pieces.length) * 100) : 0;
   const completed = pieces.length > 0 && placed === pieces.length;
   const imageAspect = puzzle
@@ -129,6 +135,10 @@ export default function PuzzleScreen() {
       updatePuzzleElapsedTime(id, elapsedTimeRef.current);
     };
   }, [completed, id, puzzle?.id, updatePuzzleElapsedTime]);
+
+  useEffect(() => () => {
+    if (pieceStoredNoticeTimer.current) clearTimeout(pieceStoredNoticeTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!puzzle?.id || completed) return;
@@ -247,6 +257,60 @@ export default function PuzzleScreen() {
     zoomCommandId.current += 1;
     setZoomCommand({ id: zoomCommandId.current, action });
     void Haptics.selectionAsync();
+  }
+
+  const showPieceStoredNotice = useCallback((count = 1) => {
+    if (pieceStoredNoticeTimer.current) clearTimeout(pieceStoredNoticeTimer.current);
+    setPieceStoredNoticeCount(count);
+    pieceStoredNoticeTimer.current = setTimeout(() => {
+      setPieceStoredNoticeCount(0);
+      pieceStoredNoticeTimer.current = null;
+    }, 2200);
+  }, []);
+
+  const storeLoosePieces = useCallback(() => {
+    if (!puzzle || !looseBoardPieces.length) return;
+    const looseIds = new Set(looseBoardPieces.map((piece) => piece.id));
+    let slot = pieces.filter((piece) => !piece.isPlaced && piece.trayId !== null).length;
+    const next = pieces.map((piece) => {
+      if (!looseIds.has(piece.id)) return piece;
+      const nextSlot = slot;
+      slot += 1;
+      return {
+        ...piece,
+        trayId: "drawer",
+        currentPosition: {
+          x: nextSlot % puzzle.configuration.columns,
+          y:
+            puzzle.configuration.rows +
+            1.55 +
+            Math.floor(nextSlot / puzzle.configuration.columns) * 1.18,
+          rotation: piece.currentPosition.rotation,
+        },
+      };
+    });
+    savePieces(next);
+    showPieceStoredNotice(looseBoardPieces.length);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [looseBoardPieces, pieces, puzzle, savePieces, showPieceStoredNotice]);
+
+  function confirmStoreLoosePieces() {
+    if (!looseBoardPieces.length) return;
+    showAlert(
+      t("Guardar peças soltas?", "Store loose pieces?"),
+      t(
+        `${looseBoardPieces.length} peças soltas voltarão para a bandeja. Peças conectadas continuarão no tabuleiro.`,
+        `${looseBoardPieces.length} loose pieces will return to the tray. Connected pieces will stay on the board.`,
+      ),
+      [
+        { text: t("Cancelar", "Cancel"), style: "cancel" },
+        {
+          text: t("Mover para bandeja", "Move to tray"),
+          icon: "file-tray-full-outline",
+          onPress: storeLoosePieces,
+        },
+      ],
+    );
   }
 
   if (!puzzle) {
@@ -373,6 +437,7 @@ export default function PuzzleScreen() {
           headerScreenTarget={headerFrame}
           storageScreenTarget={storageFrame}
           onBoardFrameChange={setBoardFrame}
+          onPieceStored={showPieceStoredNotice}
           onPiecesChange={savePieces}
           onCameraChange={handleCameraChange}
         />
@@ -402,6 +467,44 @@ export default function PuzzleScreen() {
           style={boardZoom >= 2.4 ? styles.zoomButtonDisabled : undefined}
         />
       </View>
+
+      <View style={styles.storeLooseControl}>
+        <IconButton
+          round
+          disabled={!looseBoardPieces.length}
+          icon="file-tray-full-outline"
+          label={t(
+            `Mover ${looseBoardPieces.length} peças soltas para a bandeja`,
+            `Move ${looseBoardPieces.length} loose pieces to the tray`,
+          )}
+          onPress={confirmStoreLoosePieces}
+          style={!looseBoardPieces.length ? styles.zoomButtonDisabled : undefined}
+        />
+      </View>
+
+      {pieceStoredNoticeCount > 0 ? (
+        <Animated.View
+          entering={FadeInDown.duration(220)}
+          exiting={FadeOutDown.duration(180)}
+          pointerEvents="none"
+          style={[
+            styles.pieceStoredNotice,
+            { backgroundColor: colors.panel, borderColor: `${colors.accent}70` },
+          ]}
+        >
+          <View style={[styles.pieceStoredNoticeIcon, { backgroundColor: `${colors.accent}20` }]}>
+            <Ionicons name="file-tray-full-outline" size={20} color={colors.accent} />
+          </View>
+          <Text style={[styles.pieceStoredNoticeText, { color: colors.text }]}>
+            {pieceStoredNoticeCount === 1
+              ? t("Peça enviada para a bandeja", "Piece moved to the tray")
+              : t(
+                  `${pieceStoredNoticeCount} peças enviadas para a bandeja`,
+                  `${pieceStoredNoticeCount} pieces moved to the tray`,
+                )}
+          </Text>
+        </Animated.View>
+      ) : null}
 
       <PuzzlePieceDrawer
         imageUri={puzzle.imageUri}
@@ -522,6 +625,47 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   zoomButtonDisabled: { opacity: 0.38 },
+  storeLooseControl: {
+    position: "absolute",
+    left: 16,
+    bottom: 264,
+    zIndex: 72,
+  },
+  pieceStoredNotice: {
+    position: "absolute",
+    left: 22,
+    right: 22,
+    bottom: 266,
+    zIndex: 90,
+    minHeight: 58,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  pieceStoredNoticeIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pieceStoredNoticeText: {
+    flexShrink: 1,
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    lineHeight: 19,
+    textAlign: "center",
+  },
   referenceBackdrop: {
     flex: 1,
     alignItems: "center",

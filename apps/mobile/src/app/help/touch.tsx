@@ -9,7 +9,7 @@ const gestures = [
   ["sync-outline", "Dois toques", "Toque duas vezes rapidamente em uma peça para girá-la 90 graus.", "Double tap", "Quickly tap a piece twice to rotate it 90 degrees."],
   ["resize-outline", "Pinça para zoom", "Aproxime ou afaste dois dedos para controlar o zoom.", "Pinch to zoom", "Pinch two fingers together or apart to control zoom."],
   ["move-outline", "Mover tabuleiro", "Com o zoom ativo, arraste uma área vazia para explorar o tabuleiro.", "Pan board", "While zoomed in, drag an empty area to explore the board."],
-  ["chevron-up-outline", "Bandeja de peças", "Deslize a bandeja inferior para cima ou para baixo para abrir e fechar.", "Piece tray", "Swipe the bottom tray up or down to open and close it."],
+  ["swap-horizontal-outline", "Bandeja de peças", "Deslize para os lados para ver mais peças. Para guardar uma peça, solte-a exatamente sobre a bandeja.", "Piece tray", "Swipe sideways to see more pieces. To store a piece, drop it directly over the tray."],
 ] as const;
 
 export default function TouchHelpScreen() {

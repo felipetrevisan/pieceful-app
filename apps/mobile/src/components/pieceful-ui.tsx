@@ -95,43 +95,74 @@ export function AppHeader({
 }) {
   const { notificationCount, setDrawerOpen, t, theme } = useApp();
   const colors = mobileThemes[theme];
+  if (back) {
+    return (
+      <View style={styles.backHeader}>
+        <View style={styles.backHeaderActions}>
+          <Pressable
+            accessibilityLabel={t("Voltar para a tela anterior", "Back to previous screen")}
+            accessibilityRole="button"
+            android_ripple={{ color: `${colors.accent}24`, borderless: false }}
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace("/(tabs)" as never);
+            }}
+            style={[
+              styles.visibleBackButton,
+              { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}45` },
+            ]}
+          >
+            <Ionicons name="chevron-back" size={20} color={colors.accent} />
+            <Text style={[styles.visibleBackLabel, { color: colors.text }]}>{t("Voltar", "Back")}</Text>
+          </Pressable>
+          {showNotifications ? (
+            <IconButton
+              badge={notificationCount}
+              round
+              icon={notificationCount ? "notifications" : "notifications-outline"}
+              label={t("Notificações", "Notifications")}
+              onPress={() => router.push("/notifications" as never)}
+            />
+          ) : null}
+        </View>
+        <Text
+          maxFontSizeMultiplier={1.2}
+          numberOfLines={2}
+          style={[styles.backHeaderTitle, { color: colors.text }]}
+        >
+          {title}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.appHeader}>
-      {back ? (
-        <IconButton
-          round
-          icon="chevron-back"
-          label={t("Voltar", "Back")}
-          onPress={() => router.back()}
-        />
-      ) : (
-        <View
-          style={[
-            styles.headerAvatar,
-            { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}70` },
-          ]}
+      <View
+        style={[
+          styles.headerAvatar,
+          { backgroundColor: colors.panelAlt, borderColor: `${colors.accent}70` },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("Abrir menu", "Open menu")}
+          android_ripple={{ color: `${colors.accent}30`, radius: 24 }}
+          hitSlop={8}
+          onPress={() => setDrawerOpen(true)}
+          style={styles.headerAvatarPressable}
         >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("Abrir menu", "Open menu")}
-            android_ripple={{ color: `${colors.accent}30`, radius: 24 }}
-            hitSlop={8}
-            onPress={() => setDrawerOpen(true)}
-            style={styles.headerAvatarPressable}
-          >
-            <LinearGradient
-              colors={[`${colors.accent}28`, `${colors.primary}38`]}
-              style={StyleSheet.absoluteFill}
-            />
-            <Image
-              accessibilityIgnoresInvertColors
-              source={require("../../assets/images/pieceful-logo.png")}
-              style={styles.headerLogo}
-              contentFit="contain"
-            />
-          </Pressable>
-        </View>
-      )}
+          <LinearGradient
+            colors={[`${colors.accent}28`, `${colors.primary}38`]}
+            style={StyleSheet.absoluteFill}
+          />
+          <Image
+            accessibilityIgnoresInvertColors
+            source={require("../../assets/images/pieceful-logo.png")}
+            style={styles.headerLogo}
+            contentFit="contain"
+          />
+        </Pressable>
+      </View>
       <Text
         adjustsFontSizeToFit={showTitle}
         maxFontSizeMultiplier={1.2}
@@ -620,6 +651,32 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 22,
   },
+  backHeader: { width: "100%", marginBottom: 22, gap: 12 },
+  backHeaderActions: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  backHeaderTitle: {
+    width: "100%",
+    fontFamily: "BricolageGrotesque_800ExtraBold",
+    fontSize: 29,
+    lineHeight: 34,
+  },
+  visibleBackButton: {
+    minWidth: 84,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    paddingHorizontal: 9,
+    overflow: "hidden",
+  },
+  visibleBackLabel: { fontFamily: "Inter_700Bold", fontSize: 12 },
   headerAvatar: {
     width: 48,
     height: 48,

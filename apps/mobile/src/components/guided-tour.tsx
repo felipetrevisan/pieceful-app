@@ -23,6 +23,13 @@ const steps = [
     tips: [["image-outline", "Escolha sua foto", "Choose your photo"], ["color-palette-outline", "Use o tema que combina com você", "Pick a theme that feels like you"]],
   },
   {
+    icon: "navigate-circle-outline",
+    eyebrow: ["COMO SE ORIENTAR", "HOW TO GET AROUND"],
+    title: ["Três caminhos simples", "Three simple paths"],
+    description: ["Use a barra inferior para Início, Criar e Coleção. O logo no alto abre o menu completo. Em telas internas, toque em Voltar para retornar.", "Use the bottom bar for Home, Create, and Collection. The logo at the top opens the full menu. On inner screens, tap Back to return."],
+    tips: [["home-outline", "Início mostra o que continuar", "Home shows what to continue"], ["albums-outline", "Coleção guarda tudo que você criou", "Collection stores everything you created"], ["menu-outline", "O menu reúne perfil, amigos, conquistas e ajustes", "The menu contains profile, friends, achievements, and settings"]],
+  },
+  {
     icon: "add-circle-outline",
     eyebrow: ["CRIE EM SEGUNDOS", "CREATE IN SECONDS"],
     title: ["A foto define o formato", "Your photo defines the shape"],
@@ -33,8 +40,8 @@ const steps = [
     icon: "file-tray-full-outline",
     eyebrow: ["BANDEJA DE PEÇAS", "PIECE TRAY"],
     title: ["Leve só as peças que quiser", "Bring out only the pieces you want"],
-    description: ["Deslize a bandeja inferior para cima. Arraste peças para o tabuleiro e leve-as até a caixa para guardá-las novamente.", "Swipe the bottom tray up. Drag pieces onto the board and move them to the box to store them again."],
-    tips: [["hand-left-outline", "Arraste livremente pelo tabuleiro", "Drag freely around the board"], ["magnet-outline", "Peças corretas grudam quando estão próximas", "Correct pieces snap when they are close"]],
+    description: ["A bandeja fica visível na parte inferior. Deslize para os lados para ver mais peças, arraste para o tabuleiro e solte exatamente sobre a bandeja para guardar novamente.", "The tray stays visible at the bottom. Swipe sideways to see more pieces, drag one onto the board, and drop it directly over the tray to store it again."],
+    tips: [["hand-left-outline", "Arraste livremente pelo tabuleiro", "Drag freely around the board"], ["file-tray-full-outline", "Só volta se for solta sobre a bandeja", "It only returns when dropped over the tray"]],
   },
   {
     icon: "hand-right-outline",

@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "app.perazzo.pieceful",
-      "versionCode": 25,
+      "versionCode": 26,
       "intentFilters": [
         {
           "action": "VIEW",

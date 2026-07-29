@@ -93,7 +93,7 @@ export function NavigationDrawer() {
 
   function navigate(path: string) {
     setDrawerOpen(false);
-    router.push(path as never);
+    router.replace(path as never);
   }
 
   function closeDrawer() {

@@ -109,8 +109,13 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     if (premium) return true;
     if (!adsAvailable || Platform.OS !== "android") return false;
     const ads = await import("react-native-google-mobile-ads");
-    const unitId = __DEV__ ? ads.TestIds.REWARDED : process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID;
-    if (!unitId) return false;
+    // Closed/internal Play tests are release builds too, so __DEV__ is false.
+    // Keep the official demo unit as a safe fallback until the production
+    // rewarded unit is configured; this also prevents testers from clicking
+    // real ads and creating invalid traffic.
+    const unitId = __DEV__
+      ? ads.TestIds.REWARDED
+      : process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID || ads.TestIds.REWARDED;
     return new Promise<boolean>((resolve) => {
       const rewarded = ads.RewardedAd.createForAdRequest(unitId, {
         requestNonPersonalizedAdsOnly: true,

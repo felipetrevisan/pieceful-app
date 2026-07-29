@@ -28,15 +28,22 @@ export default function HomeScreen() {
           </LinearGradient>
         )}
 
-        <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42`, borderRadius: Math.max(24, colors.radius) }]}>
-          <View style={{ flex: 1 }}><Text maxFontSizeMultiplier={1.2} style={[styles.kicker, { color: colors.primary }]}>{ageGroup === "child" ? t("MISSÃO DE HOJE", "TODAY'S MISSION") : t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.challengeTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Mundo Arco-Íris", "Rainbow World") : t("Nebulosa Neon", "Neon Nebula")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.muted }]}>{t("Complete para ganhar 500 XP", "Complete for a 500 XP bonus")}</Text></View>
-          <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name={ageGroup === "child" ? "star" : "extension-puzzle"} size={30} color={colors.accent} /></View>
-        </LinearGradient>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("Começar desafio diário", "Start daily challenge")}
+          onPress={() => router.push("/(tabs)/create")}
+          style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}
+        >
+          <LinearGradient colors={[`${colors.accent}0d`, `${colors.primary}18`]} style={[styles.challenge, { borderColor: `${colors.accent}42`, borderRadius: Math.max(24, colors.radius) }]}>
+            <View style={{ flex: 1 }}><Text maxFontSizeMultiplier={1.2} style={[styles.kicker, { color: colors.primary }]}>{ageGroup === "child" ? t("MISSÃO DE HOJE", "TODAY'S MISSION") : t("DESAFIO DIÁRIO", "DAILY CHALLENGE")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.challengeTitle, { color: colors.text }]}>{ageGroup === "child" ? t("Mundo Arco-Íris", "Rainbow World") : t("Nebulosa Neon", "Neon Nebula")}</Text><Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.muted }]}>{t("Toque para começar · vale 500 XP", "Tap to start · earn 500 XP")}</Text></View>
+            <View style={[styles.challengeIcon, { backgroundColor: colors.panelAlt }]}><Ionicons name="arrow-forward" size={30} color={colors.accent} /></View>
+          </LinearGradient>
+        </Pressable>
       </View>
 
       <View style={styles.quickRow}>
         <QuickAction icon="add-outline" label={t("Novo quebra-cabeça", "New puzzle")} onPress={() => router.push("/(tabs)/create")} />
-        <QuickAction icon="search-outline" label={t("Explorar", "Browse")} onPress={() => router.push("/(tabs)/puzzles")} />
+        <QuickAction icon="albums-outline" label={t("Minha coleção", "My collection")} onPress={() => router.push("/(tabs)/puzzles")} />
       </View>
 
       <SectionHeader title={t("Concluídos recentemente", "Recently completed")} action={completed.length ? t("VER TODOS", "VIEW ALL") : undefined} onAction={() => router.push("/(tabs)/puzzles")} />
