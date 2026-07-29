@@ -32,7 +32,10 @@ export type MobileTheme =
   | "storybook"
   | "cyberpunk"
   | "hologram"
-  | "space";
+  | "space"
+  | "sunset"
+  | "enchanted"
+  | "sakura";
 export interface MobilePreferences {
   sound: boolean;
   haptics: boolean;
@@ -226,6 +229,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             "cyberpunk",
             "hologram",
             "space",
+            "sunset",
+            "enchanted",
+            "sakura",
           ].includes(parsed.theme ?? "")
         ) {
           setThemeState(parsed.theme as MobileTheme);

@@ -19,6 +19,7 @@ import Animated, { FadeInDown, FadeOutDown, useSharedValue } from "react-native-
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   NativePuzzleBoard,
+  type PuzzleHintCommand,
   type PuzzleZoomCommand,
 } from "@/components/native-puzzle-board";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
@@ -89,6 +90,7 @@ export default function PuzzleScreen() {
     y: puzzle?.session.camera.y ?? 0,
   });
   const [zoomCommand, setZoomCommand] = useState<PuzzleZoomCommand | null>(null);
+  const [hintCommand, setHintCommand] = useState<PuzzleHintCommand | null>(null);
   const [elapsedTime, setElapsedTime] = useState(puzzle?.session.elapsedTime ?? 0);
   const elapsedTimeRef = useRef(puzzle?.session.elapsedTime ?? 0);
   const [trayDragPreview, setTrayDragPreview] = useState<TrayDragPreview | null>(null);
@@ -98,6 +100,7 @@ export default function PuzzleScreen() {
   const scrollOffset = useRef(0);
   const toolbarRef = useRef<View>(null);
   const zoomCommandId = useRef(0);
+  const hintCommandId = useRef(0);
   const pieceStoredNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
@@ -157,18 +160,55 @@ export default function PuzzleScreen() {
   }, [id, updatePuzzlePieces]);
 
   function placeHint() {
-    const candidate = pieces.find((piece) => !piece.isPlaced);
+    if (hintCommand || !puzzle) return;
+    const candidate =
+      pieces.find((piece) => !piece.isPlaced && piece.groupId === null) ??
+      pieces.find((piece) => !piece.isPlaced);
     if (!candidate) return;
     incrementPuzzleHints(id);
-    savePieces(
-      pieces.map((piece) =>
-        piece.id === candidate.id
-          ? { ...piece, isPlaced: true, currentPosition: { ...piece.correctPosition } }
-          : piece,
-      ),
-    );
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const startOffsetX = candidate.correctPosition.x < puzzle.configuration.columns / 2 ? 2.1 : -2.1;
+    const startOffsetY = candidate.correctPosition.y < puzzle.configuration.rows / 2 ? 1.4 : -1.4;
+    const startX = candidate.trayId === null
+      ? candidate.currentPosition.x
+      : Math.max(-0.15, Math.min(puzzle.configuration.columns - 0.85, candidate.correctPosition.x + startOffsetX));
+    const startY = candidate.trayId === null
+      ? candidate.currentPosition.y
+      : Math.max(-0.15, Math.min(puzzle.configuration.rows - 0.85, candidate.correctPosition.y + startOffsetY));
+    const prepared = pieces.map((piece) => {
+      if (piece.id === candidate.id)
+        return {
+          ...piece,
+          isPlaced: false,
+          groupId: null,
+          trayId: null,
+          currentPosition: { x: startX, y: startY, rotation: 0 },
+        };
+      if (candidate.groupId && piece.groupId === candidate.groupId)
+        return { ...piece, groupId: null };
+      return piece;
+    });
+    setPieces(prepared);
+    hintCommandId.current += 1;
+    setHintCommand({ id: hintCommandId.current, pieceId: candidate.id });
   }
+
+  const completeHintAnimation = useCallback((pieceId: string) => {
+    const next = pieces.map((piece) =>
+      piece.id === pieceId
+        ? {
+            ...piece,
+            isPlaced: true,
+            groupId: "tabuleiro",
+            trayId: null,
+            currentPosition: { ...piece.correctPosition },
+          }
+        : piece,
+    );
+    setHintCommand(null);
+    savePieces(next);
+    if (preferences.haptics)
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [pieces, preferences.haptics, savePieces]);
 
   function useHint() {
     if (premium) {
@@ -428,6 +468,7 @@ export default function PuzzleScreen() {
           theme={theme}
           rotationEnabled={puzzle.configuration.rotationEnabled}
           zoomCommand={zoomCommand}
+          hintCommand={hintCommand}
           cameraViewportTop={cameraViewportTop}
           cameraViewportBottom={cameraViewportBottom}
           initialZoom={puzzle.session.camera.zoom}
@@ -440,6 +481,7 @@ export default function PuzzleScreen() {
           onPieceStored={showPieceStoredNotice}
           onPiecesChange={savePieces}
           onCameraChange={handleCameraChange}
+          onHintAnimationComplete={completeHintAnimation}
         />
       </ScrollView>
 
@@ -502,6 +544,23 @@ export default function PuzzleScreen() {
                   `${pieceStoredNoticeCount} peças enviadas para a bandeja`,
                   `${pieceStoredNoticeCount} pieces moved to the tray`,
                 )}
+          </Text>
+        </Animated.View>
+      ) : null}
+
+      {hintCommand ? (
+        <Animated.View
+          entering={FadeInDown.duration(220)}
+          exiting={FadeOutDown.duration(180)}
+          pointerEvents="none"
+          style={[
+            styles.hintFollowNotice,
+            { backgroundColor: colors.panel, borderColor: `${colors.primary}80` },
+          ]}
+        >
+          <Ionicons name="locate-outline" size={19} color={colors.primary} />
+          <Text style={[styles.pieceStoredNoticeText, { color: colors.text }]}>
+            {t("Acompanhe a peça até o encaixe", "Follow the piece to its place")}
           </Text>
         </Animated.View>
       ) : null}
@@ -665,6 +724,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
     textAlign: "center",
+  },
+  hintFollowNotice: {
+    position: "absolute",
+    alignSelf: "center",
+    top: 128,
+    zIndex: 90,
+    minHeight: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 10,
   },
   referenceBackdrop: {
     flex: 1,

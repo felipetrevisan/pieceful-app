@@ -11,6 +11,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
   type SharedValue,
@@ -34,6 +35,7 @@ interface NativePuzzleBoardProps {
   theme: MobileTheme;
   rotationEnabled: boolean;
   zoomCommand?: PuzzleZoomCommand | null;
+  hintCommand?: PuzzleHintCommand | null;
   cameraViewportTop: number;
   cameraViewportBottom: number;
   initialZoom: number;
@@ -46,11 +48,17 @@ interface NativePuzzleBoardProps {
   onPieceStored?: () => void;
   onPiecesChange: (pieces: PuzzlePiece[]) => void;
   onCameraChange: (panX: number, panY: number, zoom: number) => void;
+  onHintAnimationComplete?: (pieceId: string) => void;
 }
 
 export interface PuzzleZoomCommand {
   id: number;
   action: "in" | "out" | "reset";
+}
+
+export interface PuzzleHintCommand {
+  id: number;
+  pieceId: string;
 }
 
 function cameraBounds({
@@ -127,6 +135,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   theme,
   rotationEnabled,
   zoomCommand,
+  hintCommand,
   cameraViewportTop,
   cameraViewportBottom,
   initialZoom,
@@ -139,6 +148,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   onPieceStored,
   onPiecesChange,
   onCameraChange,
+  onHintAnimationComplete,
 }: NativePuzzleBoardProps) {
   const t = (portuguese: string, english: string) =>
     language === "en" ? english : portuguese;
@@ -215,6 +225,68 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   const groupTranslationX = useSharedValue(0);
   const groupTranslationY = useSharedValue(0);
   const lastZoomCommandId = useRef(0);
+  const lastHintCommandId = useRef(0);
+
+  useEffect(() => {
+    if (!hintCommand || lastHintCommandId.current === hintCommand.id) return;
+    const target = pieces.find((piece) => piece.id === hintCommand.pieceId);
+    if (!target) return;
+    lastHintCommandId.current = hintCommand.id;
+
+    const startCenterX = boardOffsetX + (target.currentPosition.x + 0.5) * cell;
+    const startCenterY = (target.currentPosition.y + 0.5) * cell;
+    const targetCenterX = boardOffsetX + (target.correctPosition.x + 0.5) * cell;
+    const targetCenterY = (target.correctPosition.y + 0.5) * cell;
+    const viewportCenterY = (cameraViewportTop + cameraViewportBottom) / 2;
+    const overviewZoom = Math.max(
+      1,
+      Math.min(1.32, 1.45 - Math.hypot(startCenterX - targetCenterX, startCenterY - targetCenterY) / Math.max(boardWidth, boardHeight) * 0.35),
+    );
+    const focusZoom = Math.min(2.05, Math.max(1.55, 72 / Math.max(32, cell)));
+    const midpointX = (startCenterX + targetCenterX) / 2;
+    const midpointY = (startCenterY + targetCenterY) / 2;
+    const overviewPanX = canvasWidth / 2 - midpointX;
+    const overviewPanY = viewportCenterY / overviewZoom - midpointY;
+    const focusPanX = canvasWidth / 2 - targetCenterX;
+    const focusPanY = viewportCenterY / focusZoom - targetCenterY;
+
+    scale.set(
+      withTiming(overviewZoom, { duration: 300 }, () => {
+        scale.set(withTiming(focusZoom, { duration: 620 }));
+      }),
+    );
+    panX.set(
+      withTiming(overviewPanX, { duration: 300 }, () => {
+        panX.set(withTiming(focusPanX, { duration: 620 }));
+      }),
+    );
+    panY.set(
+      withTiming(overviewPanY, { duration: 300 }, () => {
+        panY.set(withTiming(focusPanY, { duration: 620 }));
+      }),
+    );
+    savedScale.set(focusZoom);
+    savedPanX.set(focusPanX);
+    savedPanY.set(focusPanY);
+    onCameraChange(focusPanX, focusPanY, focusZoom);
+  }, [
+    boardHeight,
+    boardOffsetX,
+    boardWidth,
+    cameraViewportBottom,
+    cameraViewportTop,
+    canvasWidth,
+    cell,
+    hintCommand,
+    onCameraChange,
+    panX,
+    panY,
+    pieces,
+    savedPanX,
+    savedPanY,
+    savedScale,
+    scale,
+  ]);
 
   useEffect(() => {
     if (!zoomCommand || lastZoomCommandId.current === zoomCommand.id) return;
@@ -301,6 +373,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   }, [onPiecesChange, pieces, rotationEnabled]);
 
   const pinch = Gesture.Pinch()
+    .enabled(!hintCommand)
     .onUpdate((event) => {
       scale.set(Math.max(0.8, Math.min(2.4, savedScale.get() * event.scale)));
     })
@@ -322,7 +395,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
       runOnJS(onCameraChange)(panX.get(), panY.get(), scale.get());
     });
   const boardPan = Gesture.Pan()
-    .enabled(true)
+    .enabled(!hintCommand)
     .maxPointers(1)
     .activeOffsetX([-4, 4])
     .activeOffsetY([-4, 4])
@@ -667,6 +740,8 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
               stroke={piece.isPlaced ? colors.accent : `${colors.text}99`}
               onChange={updatePiece}
               onDragState={setDraggingActivePiece}
+              hintCommand={hintCommand}
+              onHintAnimationComplete={onHintAnimationComplete}
             />
           ))}
           {!externalDrawer && drawerOpen ? displayedStoredPieces.map((piece) => (
@@ -694,6 +769,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
               stroke={`${colors.text}b8`}
               onChange={updatePiece}
               onDragState={setDraggingActivePiece}
+              hintCommand={null}
             />
           )) : null}
           </Animated.View>
@@ -726,6 +802,8 @@ const DraggablePiece = memo(function DraggablePiece({
   stroke,
   onChange,
   onDragState,
+  hintCommand,
+  onHintAnimationComplete,
 }: {
   piece: PuzzlePiece;
   imageUri: string;
@@ -756,6 +834,8 @@ const DraggablePiece = memo(function DraggablePiece({
     destination: "board" | "drawer",
   ) => void;
   onDragState: (active: boolean) => void;
+  hintCommand?: PuzzleHintCommand | null;
+  onHintAnimationComplete?: (pieceId: string) => void;
 }) {
   const margin = cell * 0.24;
   const extent = cell + margin * 2;
@@ -768,6 +848,7 @@ const DraggablePiece = memo(function DraggablePiece({
   const path = useMemo(() => piecePath(piece.shape, cell, margin), [cell, margin, piece.shape]);
   const clipId = `clip-${piece.id}`;
   const snapRadius = Math.max(cell * 0.52, 10);
+  const lastHintCommandId = useRef(0);
 
   useEffect(() => {
     const belongsToMovableGroup = Boolean(piece.groupId && piece.groupId !== "tabuleiro");
@@ -788,6 +869,29 @@ const DraggablePiece = memo(function DraggablePiece({
     }
     rotation.set(withTiming(normalizeQuarterTurn(piece.currentPosition.rotation), { duration: 180 }));
   }, [activeGroupId, activeGroupPieceId, cell, groupTranslationX, groupTranslationY, piece.currentPosition.rotation, piece.currentPosition.x, piece.currentPosition.y, piece.groupId, piece.id, piece.isPlaced, rotation, x, y]);
+
+  useEffect(() => {
+    if (
+      !hintCommand ||
+      hintCommand.pieceId !== piece.id ||
+      lastHintCommandId.current === hintCommand.id
+    )
+      return;
+    lastHintCommandId.current = hintCommand.id;
+    const targetX = piece.correctPosition.x * cell;
+    const targetY = piece.correctPosition.y * cell;
+    rotation.set(withDelay(260, withTiming(0, { duration: 520 })));
+    x.set(withDelay(260, withTiming(targetX, { duration: 980 })));
+    y.set(
+      withDelay(
+        260,
+        withTiming(targetY, { duration: 980 }, (finished) => {
+          if (finished && onHintAnimationComplete)
+            runOnJS(onHintAnimationComplete)(piece.id);
+        }),
+      ),
+    );
+  }, [cell, hintCommand, onHintAnimationComplete, piece.correctPosition.x, piece.correctPosition.y, piece.id, rotation, x, y]);
 
   const notify = (
     nextX: number,
@@ -814,7 +918,7 @@ const DraggablePiece = memo(function DraggablePiece({
   };
 
   const pan = Gesture.Pan()
-    .enabled(!piece.isPlaced)
+    .enabled(!piece.isPlaced && hintCommand?.pieceId !== piece.id)
     .minDistance(2)
     .shouldCancelWhenOutside(false)
     .onStart(() => {
@@ -925,7 +1029,7 @@ const DraggablePiece = memo(function DraggablePiece({
     });
 
   const rotate = Gesture.Tap()
-    .enabled(rotationEnabled && !piece.isPlaced && !stored && piece.groupId === null)
+    .enabled(rotationEnabled && !piece.isPlaced && !stored && piece.groupId === null && hintCommand?.pieceId !== piece.id)
     .numberOfTaps(2)
     .maxDuration(280)
     .onEnd(() => {

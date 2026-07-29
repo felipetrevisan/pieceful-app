@@ -42,6 +42,8 @@ export default function SettingsScreen() {
     purchaseAvailable,
     purchasePremium,
     restorePurchases,
+    unlockRewardedTheme,
+    isRewardedThemeUnlocked,
   } = useMonetization();
   const { busy: accountBusy, deleteAccount, session } = useSocial();
   const colors = mobileThemes[theme];
@@ -83,13 +85,47 @@ export default function SettingsScreen() {
   }
 
   function themeChange(next: MobileTheme) {
-    if (!premium && ["arcade", "castle", "cyberpunk", "hologram", "space"].includes(next)) {
+    const catalogItem = mobileThemeCatalog.find((item) => item.id === next);
+    if (!premium && catalogItem?.access === "premium") {
       showAlert(
         t("Tema Premium", "Premium theme"),
         t(
           "Este estilo faz parte do Pieceful Premium.",
           "This style is included with Pieceful Premium.",
         ),
+      );
+      return;
+    }
+    if (!premium && catalogItem?.access === "rewarded" && !isRewardedThemeUnlocked(next)) {
+      showAlert(
+        t("Experimentar tema por 24 horas", "Try theme for 24 hours"),
+        t(
+          `Assista a um anúncio curto para liberar ${catalogItem.name} durante 24 horas. O Premium mantém todos os temas disponíveis sem anúncios.`,
+          `Watch a short ad to unlock ${catalogItem.name} for 24 hours. Premium keeps every theme available without ads.`,
+        ),
+        [
+          { text: t("Agora não", "Not now"), style: "cancel" },
+          {
+            text: t("Assistir e desbloquear", "Watch and unlock"),
+            icon: "play-circle",
+            onPress: () =>
+              void unlockRewardedTheme(next).then((unlocked) => {
+                if (unlocked) {
+                  setTheme(next);
+                  if (preferences.haptics)
+                    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  return;
+                }
+                showAlert(
+                  t("Anúncio indisponível", "Ad unavailable"),
+                  t(
+                    "Não foi possível carregar o anúncio agora. Tente novamente em instantes.",
+                    "The ad couldn't be loaded right now. Try again in a moment.",
+                  ),
+                );
+              }),
+          },
+        ],
       );
       return;
     }
@@ -161,7 +197,7 @@ export default function SettingsScreen() {
   const visibleThemes =
     ageGroup === "child"
       ? mobileThemeCatalog.filter((item) =>
-          ["candy", "jungle", "rainbow", "ocean", "castle", "storybook", "space"].includes(item.id),
+          ["candy", "jungle", "rainbow", "ocean", "castle", "storybook", "space", "sunset", "enchanted", "sakura"].includes(item.id),
         )
       : mobileThemeCatalog;
   return (
@@ -218,8 +254,11 @@ export default function SettingsScreen() {
           {visibleThemes.map((item) => {
             const preview = mobileThemes[item.id];
             const selected = item.id === theme;
-            const locked =
-              !premium && ["arcade", "castle", "cyberpunk", "hologram", "space"].includes(item.id);
+            const rewardedUnlocked = isRewardedThemeUnlocked(item.id);
+            const locked = !premium && (
+              item.access === "premium" ||
+              (item.access === "rewarded" && !rewardedUnlocked)
+            );
             return (
               <Pressable
                 key={item.id}
@@ -257,6 +296,18 @@ export default function SettingsScreen() {
                   >
                     {t(item.description[0], item.description[1])}
                   </Text>
+                  {item.access === "rewarded" && !premium ? (
+                    <View style={[styles.rewardedBadge, { backgroundColor: `${preview.accent}22` }]}>
+                      <Ionicons
+                        name={rewardedUnlocked ? "time-outline" : "play-circle-outline"}
+                        size={12}
+                        color={preview.accent}
+                      />
+                      <Text style={[styles.rewardedBadgeText, { color: preview.accent }]}>
+                        {rewardedUnlocked ? t("LIBERADO 24H", "24H UNLOCK") : t("ASSISTIR", "WATCH")}
+                      </Text>
+                    </View>
+                  ) : null}
                   {selected ? (
                     <View style={[styles.check, { backgroundColor: colors.accent }]}>
                       <Ionicons name="checkmark" size={15} color={colors.background} />
@@ -761,6 +812,8 @@ const styles = StyleSheet.create({
   },
   themeName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
   themeDescription: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 3 },
+  rewardedBadge: { position: "absolute", top: 14, left: 12, minHeight: 25, borderRadius: 13, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 4 },
+  rewardedBadgeText: { fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: .35 },
   check: {
     position: "absolute",
     top: 14,

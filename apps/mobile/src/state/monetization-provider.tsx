@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createContext,
   type ReactNode,
@@ -10,10 +11,13 @@ import {
 } from "react";
 import { Platform } from "react-native";
 import type { PurchasesOffering, PurchasesStoreProduct } from "react-native-purchases";
-import { useApp } from "@/state/app-provider";
+import { type MobileTheme, useApp } from "@/state/app-provider";
 import { useSocial } from "@/state/social-provider";
 
 const PREMIUM_ENTITLEMENT = "premium";
+const REWARDED_THEME_STORAGE_KEY = "pieceful:rewarded-theme-unlocks-v1";
+const REWARDED_THEME_DURATION = 24 * 60 * 60 * 1000;
+const REWARDED_THEMES: MobileTheme[] = ["sunset", "enchanted", "sakura"];
 let purchasesConfigured = false;
 
 interface MonetizationState {
@@ -26,6 +30,8 @@ interface MonetizationState {
   ownedProductIds: string[];
   error: string | null;
   showRewardedHint: () => Promise<boolean>;
+  unlockRewardedTheme: (theme: MobileTheme) => Promise<boolean>;
+  isRewardedThemeUnlocked: (theme: MobileTheme) => boolean;
   purchasePremium: (packageIdentifier?: string) => Promise<boolean>;
   loadPackProducts: (productIds: string[]) => Promise<void>;
   purchasePack: (productId: string) => Promise<boolean>;
@@ -35,7 +41,7 @@ interface MonetizationState {
 const MonetizationContext = createContext<MonetizationState | null>(null);
 
 export function MonetizationProvider({ children }: { children: ReactNode }) {
-  const { ageGroup } = useApp();
+  const { ageGroup, setTheme, theme } = useApp();
   const { session } = useSocial();
   const [ready, setReady] = useState(false);
   const [premium, setPremium] = useState(false);
@@ -44,7 +50,38 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
   const [packProducts, setPackProducts] = useState<Record<string, PurchasesStoreProduct>>({});
   const [ownedProductIds, setOwnedProductIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [rewardedThemeUnlocks, setRewardedThemeUnlocks] = useState<Partial<Record<MobileTheme, number>>>({});
+  const [themeUnlocksReady, setThemeUnlocksReady] = useState(false);
   const revenueCatKey = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
+
+  useEffect(() => {
+    let active = true;
+    void AsyncStorage.getItem(REWARDED_THEME_STORAGE_KEY).then((stored) => {
+      if (!active) return;
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as Partial<Record<MobileTheme, number>>;
+          setRewardedThemeUnlocks(
+            Object.fromEntries(
+              Object.entries(parsed).filter(([, expiresAt]) => Number(expiresAt) > Date.now()),
+            ) as Partial<Record<MobileTheme, number>>,
+          );
+        } catch {
+          // A malformed local reward must not prevent the app from starting.
+        }
+      }
+      setThemeUnlocksReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !themeUnlocksReady || premium || !REWARDED_THEMES.includes(theme)) return;
+    if ((rewardedThemeUnlocks[theme] ?? 0) > Date.now()) return;
+    setTheme(ageGroup === "child" ? "candy" : "cosmic");
+  }, [ageGroup, premium, ready, rewardedThemeUnlocks, setTheme, theme, themeUnlocksReady]);
 
   useEffect(() => {
     if (!ageGroup) return;
@@ -105,7 +142,7 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     };
   }, [ageGroup, revenueCatKey, session?.user.id]);
 
-  const showRewardedHint = useCallback(async () => {
+  const showRewardedAd = useCallback(async (configuredUnitId?: string) => {
     if (premium) return true;
     if (!adsAvailable || Platform.OS !== "android") return false;
     const ads = await import("react-native-google-mobile-ads");
@@ -115,7 +152,7 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     // real ads and creating invalid traffic.
     const unitId = __DEV__
       ? ads.TestIds.REWARDED
-      : process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID || ads.TestIds.REWARDED;
+      : configuredUnitId || ads.TestIds.REWARDED;
     return new Promise<boolean>((resolve) => {
       const rewarded = ads.RewardedAd.createForAdRequest(unitId, {
         requestNonPersonalizedAdsOnly: true,
@@ -145,6 +182,33 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
       rewarded.load();
     });
   }, [adsAvailable, premium]);
+
+  const showRewardedHint = useCallback(
+    () => showRewardedAd(process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID),
+    [showRewardedAd],
+  );
+
+  const isRewardedThemeUnlocked = useCallback(
+    (nextTheme: MobileTheme) => premium || (rewardedThemeUnlocks[nextTheme] ?? 0) > Date.now(),
+    [premium, rewardedThemeUnlocks],
+  );
+
+  const unlockRewardedTheme = useCallback(async (nextTheme: MobileTheme) => {
+    if (premium) return true;
+    if (!REWARDED_THEMES.includes(nextTheme)) return false;
+    const earned = await showRewardedAd(
+      process.env.EXPO_PUBLIC_ADMOB_REWARDED_THEME_ID ??
+        process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID,
+    );
+    if (!earned) return false;
+    const nextUnlocks = {
+      ...rewardedThemeUnlocks,
+      [nextTheme]: Date.now() + REWARDED_THEME_DURATION,
+    };
+    setRewardedThemeUnlocks(nextUnlocks);
+    await AsyncStorage.setItem(REWARDED_THEME_STORAGE_KEY, JSON.stringify(nextUnlocks));
+    return true;
+  }, [premium, rewardedThemeUnlocks, showRewardedAd]);
 
   const purchasePremium = useCallback(async (packageIdentifier?: string) => {
     const selected = packageIdentifier
@@ -235,6 +299,8 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
       packProducts,
       ownedProductIds,
       showRewardedHint,
+      unlockRewardedTheme,
+      isRewardedThemeUnlocked,
       purchasePremium,
       loadPackProducts,
       purchasePack,
@@ -249,6 +315,8 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
       ready,
       restorePurchases,
       showRewardedHint,
+      unlockRewardedTheme,
+      isRewardedThemeUnlocked,
       packProducts,
       ownedProductIds,
       loadPackProducts,

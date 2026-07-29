@@ -11,7 +11,12 @@ The app code supports a free tier with opt-in rewarded hints and a Premium entit
 
 ```env
 EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy
+# Optional. When empty, rewarded themes reuse the hint unit above.
+EXPO_PUBLIC_ADMOB_REWARDED_THEME_ID=ca-app-pub-xxxxxxxxxxxxxxxx/zzzzzzzzzz
 ```
+
+Rewarded themes stay unlocked on the device for 24 hours. Premium users can
+apply them immediately without watching an ad.
 
 The current implementation requests non-personalized ads for every age range. It also marks the child range as child-directed, treats child and teen ranges as under the age of consent, and limits child ads to the `G` rating.
 
