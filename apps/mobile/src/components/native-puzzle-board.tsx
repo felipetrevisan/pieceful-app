@@ -12,6 +12,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withSequence,
   withSpring,
   withTiming,
   type SharedValue,
@@ -251,19 +252,22 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
     const focusPanY = viewportCenterY / focusZoom - targetCenterY;
 
     scale.set(
-      withTiming(overviewZoom, { duration: 300 }, () => {
-        scale.set(withTiming(focusZoom, { duration: 620 }));
-      }),
+      withSequence(
+        withTiming(overviewZoom, { duration: 300 }),
+        withTiming(focusZoom, { duration: 620 }),
+      ),
     );
     panX.set(
-      withTiming(overviewPanX, { duration: 300 }, () => {
-        panX.set(withTiming(focusPanX, { duration: 620 }));
-      }),
+      withSequence(
+        withTiming(overviewPanX, { duration: 300 }),
+        withTiming(focusPanX, { duration: 620 }),
+      ),
     );
     panY.set(
-      withTiming(overviewPanY, { duration: 300 }, () => {
-        panY.set(withTiming(focusPanY, { duration: 620 }));
-      }),
+      withSequence(
+        withTiming(overviewPanY, { duration: 300 }),
+        withTiming(focusPanY, { duration: 620 }),
+      ),
     );
     savedScale.set(focusZoom);
     savedPanX.set(focusPanX);

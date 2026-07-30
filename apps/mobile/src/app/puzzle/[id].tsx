@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState as NativeAppState,
+  InteractionManager,
   Modal,
   Pressable,
   ScrollView,
@@ -101,7 +102,10 @@ export default function PuzzleScreen() {
   const toolbarRef = useRef<View>(null);
   const zoomCommandId = useRef(0);
   const hintCommandId = useRef(0);
+  const activeHintPieceId = useRef<string | null>(null);
   const pieceStoredNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rewardedHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rewardedHintAppStateSubscription = useRef<ReturnType<typeof NativeAppState.addEventListener> | null>(null);
 
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
   const looseBoardPieces = useMemo(
@@ -141,6 +145,8 @@ export default function PuzzleScreen() {
 
   useEffect(() => () => {
     if (pieceStoredNoticeTimer.current) clearTimeout(pieceStoredNoticeTimer.current);
+    if (rewardedHintTimer.current) clearTimeout(rewardedHintTimer.current);
+    rewardedHintAppStateSubscription.current?.remove();
   }, []);
 
   useEffect(() => {
@@ -159,7 +165,7 @@ export default function PuzzleScreen() {
     }
   }, [id, updatePuzzlePieces]);
 
-  function placeHint() {
+  const placeHint = useCallback(() => {
     if (hintCommand || !puzzle) return;
     const candidate =
       pieces.find((piece) => !piece.isPlaced && piece.groupId === null) ??
@@ -188,11 +194,14 @@ export default function PuzzleScreen() {
       return piece;
     });
     setPieces(prepared);
+    activeHintPieceId.current = candidate.id;
     hintCommandId.current += 1;
     setHintCommand({ id: hintCommandId.current, pieceId: candidate.id });
-  }
+  }, [hintCommand, id, incrementPuzzleHints, pieces, puzzle]);
 
   const completeHintAnimation = useCallback((pieceId: string) => {
+    if (activeHintPieceId.current !== pieceId) return;
+    activeHintPieceId.current = null;
     const next = pieces.map((piece) =>
       piece.id === pieceId
         ? {
@@ -209,6 +218,40 @@ export default function PuzzleScreen() {
     if (preferences.haptics)
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, [pieces, preferences.haptics, savePieces]);
+
+  useEffect(() => {
+    if (!hintCommand) return;
+    const timeout = setTimeout(() => {
+      completeHintAnimation(hintCommand.pieceId);
+    }, 2400);
+    return () => clearTimeout(timeout);
+  }, [completeHintAnimation, hintCommand]);
+
+  const placeRewardedHintWhenActive = useCallback(() => {
+    rewardedHintAppStateSubscription.current?.remove();
+    const beginAfterTransition = () => {
+      rewardedHintAppStateSubscription.current?.remove();
+      rewardedHintAppStateSubscription.current = null;
+      InteractionManager.runAfterInteractions(() => {
+        if (rewardedHintTimer.current) clearTimeout(rewardedHintTimer.current);
+        rewardedHintTimer.current = setTimeout(() => {
+          rewardedHintTimer.current = null;
+          placeHint();
+        }, 350);
+      });
+    };
+
+    if (NativeAppState.currentState === "active") {
+      beginAfterTransition();
+      return;
+    }
+    rewardedHintAppStateSubscription.current = NativeAppState.addEventListener(
+      "change",
+      (state) => {
+        if (state === "active") beginAfterTransition();
+      },
+    );
+  }, [placeHint]);
 
   function useHint() {
     if (premium) {
@@ -237,7 +280,7 @@ export default function PuzzleScreen() {
           icon: "play-circle",
           onPress: () =>
             void showRewardedHint().then((earned) => {
-              if (earned) placeHint();
+              if (earned) placeRewardedHintWhenActive();
               else
                 showAlert(
                   t("Anúncio indisponível", "Ad unavailable"),
