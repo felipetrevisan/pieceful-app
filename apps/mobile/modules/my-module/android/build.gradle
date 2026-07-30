@@ -19,5 +19,6 @@ android {
 
 dependencies {
   implementation "androidx.exifinterface:exifinterface:1.4.1"
+  implementation "androidx.work:work-runtime:2.10.1"
   implementation "com.google.android.gms:play-services-games-v2:21.0.0"
 }

@@ -169,22 +169,28 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   const drawerColumnStep = columns / drawerColumns;
   const displayedStoredPieces = useMemo(
     () =>
-      [...storedPieces]
-        .sort((left, right) => drawerOrder(left.id) - drawerOrder(right.id))
-        .map((piece, index) => ({
-          ...piece,
-          currentPosition: {
-            ...piece.currentPosition,
-            x:
-              (index % drawerColumns) * drawerColumnStep +
-              Math.max(0, (drawerColumnStep - 1) / 2),
-            y: rows + 1.55 + Math.floor(index / drawerColumns) * 1.12,
-          },
-        })),
-    [drawerColumnStep, drawerColumns, rows, storedPieces],
+      externalDrawer
+        ? []
+        : [...storedPieces]
+            .sort((left, right) => drawerOrder(left.id) - drawerOrder(right.id))
+            .map((piece, index) => ({
+              ...piece,
+              currentPosition: {
+                ...piece.currentPosition,
+                x:
+                  (index % drawerColumns) * drawerColumnStep +
+                  Math.max(0, (drawerColumnStep - 1) / 2),
+                y: rows + 1.55 + Math.floor(index / drawerColumns) * 1.12,
+              },
+            })),
+    [drawerColumnStep, drawerColumns, externalDrawer, rows, storedPieces],
   );
-  const activePieces = useMemo(
-    () => pieces.filter((piece) => piece.isPlaced || piece.trayId === null),
+  const placedPieces = useMemo(
+    () => pieces.filter((piece) => piece.isPlaced),
+    [pieces],
+  );
+  const movablePieces = useMemo(
+    () => pieces.filter((piece) => !piece.isPlaced && piece.trayId === null),
     [pieces],
   );
   const drawerRows = Math.ceil(storedPieces.length / drawerColumns);
@@ -689,6 +695,18 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
             ))}
           </Svg>
 
+          {placedPieces.length ? (
+            <PlacedPiecesLayer
+              pieces={placedPieces}
+              imageUri={imageUri}
+              boardWidth={boardWidth}
+              boardHeight={boardHeight}
+              boardOffsetX={boardOffsetX}
+              cell={cell}
+              stroke={colors.accent}
+            />
+          ) : null}
+
           {!externalDrawer ? <GestureDetector gesture={drawerTap}>
             <View
               accessible
@@ -719,7 +737,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
             </View>
           </GestureDetector> : null}
 
-          {activePieces.map((piece) => (
+          {movablePieces.map((piece) => (
             <DraggablePiece
               key={piece.id}
               piece={piece}
@@ -780,6 +798,76 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
         </GestureDetector>
       </View>
     </View>
+  );
+});
+
+const PlacedPiecesLayer = memo(function PlacedPiecesLayer({
+  pieces,
+  imageUri,
+  boardWidth,
+  boardHeight,
+  boardOffsetX,
+  cell,
+  stroke,
+}: {
+  pieces: PuzzlePiece[];
+  imageUri: string;
+  boardWidth: number;
+  boardHeight: number;
+  boardOffsetX: number;
+  cell: number;
+  stroke: string;
+}) {
+  const clipId = "pieceful-placed-pieces";
+  const entries = useMemo(
+    () =>
+      pieces.map((piece) => ({
+        id: piece.id,
+        path: piecePath(piece.shape, cell, 0),
+        x: piece.correctPosition.x * cell,
+        y: piece.correctPosition.y * cell,
+      })),
+    [cell, pieces],
+  );
+  return (
+    <Svg
+      pointerEvents="none"
+      width={boardWidth}
+      height={boardHeight}
+      style={{ position: "absolute", left: boardOffsetX, top: 0, zIndex: 1 }}
+    >
+      <Defs>
+        <ClipPath id={clipId}>
+          {entries.map((entry) => (
+            <Path
+              key={`clip-${entry.id}`}
+              d={entry.path}
+              transform={`translate(${entry.x} ${entry.y})`}
+            />
+          ))}
+        </ClipPath>
+      </Defs>
+      <SvgImage
+        href={{ uri: imageUri }}
+        x={0}
+        y={0}
+        width={boardWidth}
+        height={boardHeight}
+        preserveAspectRatio="xMidYMid slice"
+        clipPath={`url(#${clipId})`}
+      />
+      {entries.map((entry) => (
+        <Path
+          key={`stroke-${entry.id}`}
+          d={entry.path}
+          transform={`translate(${entry.x} ${entry.y})`}
+          fill="transparent"
+          stroke={stroke}
+          strokeOpacity={0.32}
+          strokeWidth={Math.max(0.7, cell * 0.022)}
+        />
+      ))}
+    </Svg>
   );
 });
 

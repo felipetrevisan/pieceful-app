@@ -6,6 +6,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   AppState as NativeAppState,
   InteractionManager,
   Modal,
@@ -93,6 +94,9 @@ export default function PuzzleScreen() {
   const [zoomCommand, setZoomCommand] = useState<PuzzleZoomCommand | null>(null);
   const [hintCommand, setHintCommand] = useState<PuzzleHintCommand | null>(null);
   const [elapsedTime, setElapsedTime] = useState(puzzle?.session.elapsedTime ?? 0);
+  const [workspaceReady, setWorkspaceReady] = useState(
+    (puzzle?.session.pieces.length ?? 0) < 300,
+  );
   const elapsedTimeRef = useRef(puzzle?.session.elapsedTime ?? 0);
   const [trayDragPreview, setTrayDragPreview] = useState<TrayDragPreview | null>(null);
   const [pieceStoredNoticeCount, setPieceStoredNoticeCount] = useState(0);
@@ -106,6 +110,21 @@ export default function PuzzleScreen() {
   const pieceStoredNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardedHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardedHintAppStateSubscription = useRef<ReturnType<typeof NativeAppState.addEventListener> | null>(null);
+  const largeWorkspace = (puzzle?.session.pieces.length ?? 0) >= 300;
+
+  useEffect(() => {
+    if (!largeWorkspace) return;
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setWorkspaceReady(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+      task.cancel();
+    };
+  }, [largeWorkspace, puzzle?.id]);
 
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
   const looseBoardPieces = useMemo(
@@ -501,7 +520,7 @@ export default function PuzzleScreen() {
             setBoardFrame((current) => (current ? { ...current, y: current.y - delta } : current));
         }}
       >
-        <NativePuzzleBoard
+        {workspaceReady ? <NativePuzzleBoard
           imageUri={puzzle.imageUri}
           rows={puzzle.configuration.rows}
           columns={puzzle.configuration.columns}
@@ -525,10 +544,23 @@ export default function PuzzleScreen() {
           onPiecesChange={savePieces}
           onCameraChange={handleCameraChange}
           onHintAnimationComplete={completeHintAnimation}
-        />
+        /> : (
+          <View style={[styles.workspaceLoading, { borderColor: `${colors.accent}45` }]}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={[styles.workspaceLoadingTitle, { color: colors.text }]}>
+              {t("Preparando o tabuleiro", "Preparing the board")}
+            </Text>
+            <Text style={[styles.workspaceLoadingText, { color: colors.muted }]}>
+              {t(
+                `Organizando ${pieces.length} peças para você…`,
+                `Organizing ${pieces.length} pieces for you…`,
+              )}
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
-      <View style={styles.zoomControls}>
+      {workspaceReady ? <View style={styles.zoomControls}>
         <IconButton
           round
           disabled={boardZoom <= 0.8}
@@ -551,9 +583,9 @@ export default function PuzzleScreen() {
           onPress={() => controlZoom("in")}
           style={boardZoom >= 2.4 ? styles.zoomButtonDisabled : undefined}
         />
-      </View>
+      </View> : null}
 
-      <View style={styles.storeLooseControl}>
+      {workspaceReady ? <View style={styles.storeLooseControl}>
         <IconButton
           round
           disabled={!looseBoardPieces.length}
@@ -565,7 +597,7 @@ export default function PuzzleScreen() {
           onPress={confirmStoreLoosePieces}
           style={!looseBoardPieces.length ? styles.zoomButtonDisabled : undefined}
         />
-      </View>
+      </View> : null}
 
       {pieceStoredNoticeCount > 0 ? (
         <Animated.View
@@ -608,7 +640,7 @@ export default function PuzzleScreen() {
         </Animated.View>
       ) : null}
 
-      <PuzzlePieceDrawer
+      {workspaceReady ? <PuzzlePieceDrawer
         imageUri={puzzle.imageUri}
         rows={puzzle.configuration.rows}
         columns={puzzle.configuration.columns}
@@ -627,9 +659,9 @@ export default function PuzzleScreen() {
         onDragPreviewChange={setTrayDragPreview}
         onReleasePieces={releasePieces}
         onStorageFrameChange={setStorageFrame}
-      />
+      /> : null}
 
-      <PuzzlePieceDragOverlay
+      {workspaceReady ? <PuzzlePieceDragOverlay
         preview={trayDragPreview}
         imageUri={puzzle.imageUri}
         rows={puzzle.configuration.rows}
@@ -641,7 +673,7 @@ export default function PuzzleScreen() {
         screenY={trayDragY}
         screenOffsetY={insets.top}
         accent={colors.accent}
-      />
+      /> : null}
 
       <Modal
         visible={showReference}
@@ -717,6 +749,25 @@ const styles = StyleSheet.create({
   },
   timerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   timerText: { fontFamily: "Inter_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] },
+  workspaceLoading: {
+    minHeight: 420,
+    borderWidth: 1,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 28,
+  },
+  workspaceLoadingTitle: {
+    fontFamily: "BricolageGrotesque_700Bold",
+    fontSize: 21,
+    marginTop: 5,
+  },
+  workspaceLoadingText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    textAlign: "center",
+  },
   zoomControls: {
     position: "absolute",
     right: 16,

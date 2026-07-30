@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -16,9 +16,16 @@ import { PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
 import { ThemeParallaxBackground } from "@/components/theme-parallax-background";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { getPuzzleXp } from "@/lib/progression";
-import { createTimelapse, saveTimelapse, shareTimelapse } from "@/lib/native-timelapse";
+import {
+  createTimelapseInBackground,
+  getTimelapseJob,
+  saveTimelapse,
+  shareTimelapse,
+} from "@/lib/native-timelapse";
 import { useApp } from "@/state/app-provider";
-import PiecefulGameServices from "../../../modules/my-module/src/PiecefulGameServicesModule";
+import PiecefulGameServices, {
+  type TimelapseJob,
+} from "../../../modules/my-module/src/PiecefulGameServicesModule";
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
@@ -34,6 +41,8 @@ export default function ResultScreen() {
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [backgroundJob, setBackgroundJob] = useState<TimelapseJob | null>(null);
+  const reportedJobError = useRef<string | null>(null);
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.set(event.contentOffset.y);
@@ -46,6 +55,31 @@ export default function ResultScreen() {
     );
     return () => subscription?.remove();
   }, []);
+
+  useEffect(() => {
+    if (!puzzle?.id) return;
+    let mounted = true;
+    const refresh = async () => {
+      const job = await getTimelapseJob(puzzle.id).catch(() => null);
+      if (!mounted || !job) return;
+      setBackgroundJob(job);
+      setProgress(job.progress);
+      if (job.status === "completed" && job.fileUri) setVideoUri(job.fileUri);
+      if (job.status === "failed" && reportedJobError.current !== job.jobId) {
+        reportedJobError.current = job.jobId;
+        showAlert(
+          t("Não foi possível criar o vídeo", "Couldn't create the video"),
+          job.error ?? t("Tente novamente.", "Try again."),
+        );
+      }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 1200);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, [puzzle?.id, showAlert, t]);
 
   if (!puzzle) {
     return (
@@ -63,7 +97,7 @@ export default function ResultScreen() {
   const resultImageWidth = Math.min(resultMaxWidth, resultMaxHeight * imageAspect);
   const resultImageHeight = resultImageWidth / imageAspect;
 
-  const prepareTimelapse = async () => {
+  const prepareTimelapse = async (action: "save" | "share") => {
     if (!puzzle.session.completedAt && !puzzle.session.pieces.every((piece) => piece.isPlaced)) {
       showAlert(
         t("Quebra-cabeça incompleto", "Incomplete puzzle"),
@@ -76,15 +110,36 @@ export default function ResultScreen() {
     }
     if (videoUri) return videoUri;
     setProgress(0);
-    const uri = await createTimelapse(puzzle, language);
-    setVideoUri(uri);
-    return uri;
+    const result = await createTimelapseInBackground(puzzle, language);
+    if (result.uri) {
+      setVideoUri(result.uri);
+      return result.uri;
+    }
+    setBackgroundJob({
+      jobId: result.jobId ?? puzzle.id,
+      puzzleId: puzzle.id,
+      status: "queued",
+      progress: 0,
+    });
+    showAlert(
+      t("Vídeo sendo criado", "Video creation started"),
+      action === "share"
+        ? t(
+            "Você pode continuar usando o Pieceful ou fechar o app. Avisaremos quando o vídeo estiver salvo; depois, volte aqui para compartilhar.",
+            "You can keep using Pieceful or close the app. We'll notify you when the video is saved; then return here to share it.",
+          )
+        : t(
+            "Você pode continuar usando o Pieceful ou fechar o app. O vídeo será salvo na galeria e enviaremos uma notificação quando terminar.",
+            "You can keep using Pieceful or close the app. The video will be saved to your gallery and we'll notify you when it's ready.",
+          ),
+    );
+    return null;
   };
 
   const runVideoAction = async (action: "save" | "share") => {
     setCreating(true);
     try {
-      const uri = await prepareTimelapse();
+      const uri = await prepareTimelapse(action);
       if (!uri) return;
       if (action === "save") {
         await saveTimelapse(uri, language);
@@ -109,6 +164,9 @@ export default function ResultScreen() {
       setCreating(false);
     }
   };
+
+  const backgroundActive =
+    backgroundJob?.status === "queued" || backgroundJob?.status === "running";
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -165,7 +223,7 @@ export default function ResultScreen() {
           />
           <Stat
             icon="timer-outline"
-            value={formatTime(puzzle.session.elapsedTime)}
+            value={formatTime(puzzle.session.elapsedTime, language)}
             label={t("Tempo", "Time")}
           />
           <Stat
@@ -180,7 +238,7 @@ export default function ResultScreen() {
             accent
           />
         </View>
-        {creating ? (
+        {creating || backgroundActive ? (
           <View
             style={[
               styles.generationStatus,
@@ -190,7 +248,12 @@ export default function ResultScreen() {
             <View style={styles.generationHeader}>
               <ActivityIndicator color={colors.accent} />
               <Text style={[styles.generationText, { color: colors.text }]}>
-                {t(`Criando vídeo… ${progress}%`, `Creating video… ${progress}%`)}
+                {backgroundActive
+                  ? t(
+                      `Criando em segundo plano… ${progress}%`,
+                      `Creating in background… ${progress}%`,
+                    )
+                  : t(`Preparando vídeo… ${progress}%`, `Preparing video… ${progress}%`)}
               </Text>
             </View>
             <View style={[styles.generationTrack, { backgroundColor: `${colors.muted}25` }]}>
@@ -208,18 +271,20 @@ export default function ResultScreen() {
         </PrimaryButton>
         <SecondaryButton
           icon="download-outline"
-          disabled={creating}
+          disabled={creating || backgroundActive}
           onPress={() => void runVideoAction("save")}
         >
           {creating
             ? t("Preparando vídeo…", "Preparing video…")
+            : backgroundActive
+              ? t("Gerando em segundo plano…", "Creating in background…")
             : videoUri
-              ? t("Salvar vídeo no dispositivo", "Save video to device")
-              : t("Gerar e salvar vídeo", "Create and save video")}
+              ? t("Salvar vídeo novamente", "Save video again")
+              : t("Gerar vídeo em segundo plano", "Create video in background")}
         </SecondaryButton>
         <SecondaryButton
           icon="share-social-outline"
-          disabled={creating}
+          disabled={creating || backgroundActive}
           onPress={() => void runVideoAction("share")}
         >
           {videoUri
@@ -260,10 +325,22 @@ function Stat({
     </View>
   );
 }
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+function formatTime(seconds: number, language: "pt-BR" | "en") {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const remaining = total % 60;
+  if (hours > 0) {
+    return language === "en"
+      ? `${hours} hr ${minutes} min`
+      : `${hours} h ${minutes} min`;
+  }
+  if (minutes > 0) {
+    return language === "en"
+      ? `${minutes} min ${remaining} sec`
+      : `${minutes} min ${remaining} s`;
+  }
+  return language === "en" ? `${remaining} sec` : `${remaining} s`;
 }
 const styles = StyleSheet.create({
   safe: { flex: 1 },

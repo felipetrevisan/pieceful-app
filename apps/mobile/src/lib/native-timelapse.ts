@@ -1,8 +1,11 @@
 import type { PuzzlePiece, PuzzleTimelapse, PuzzleTimelapsePiece } from "@puzzled/puzzle-engine";
 import { Asset } from "expo-asset";
 import * as Sharing from "expo-sharing";
+import { PermissionsAndroid, Platform } from "react-native";
 import type { AppLanguage, MobilePuzzle } from "@/state/app-provider";
-import PiecefulGameServices from "../../modules/my-module/src/PiecefulGameServicesModule";
+import PiecefulGameServices, {
+  type TimelapseJob,
+} from "../../modules/my-module/src/PiecefulGameServicesModule";
 
 function finalState(piece: PuzzlePiece): PuzzleTimelapsePiece {
   return {
@@ -47,18 +50,11 @@ function timelineFor(puzzle: MobilePuzzle): PuzzleTimelapse {
   };
 }
 
-export async function createTimelapse(puzzle: MobilePuzzle, language: AppLanguage) {
-  if (!PiecefulGameServices?.createTimelapse) {
-    throw new Error(
-      language === "en"
-        ? "Video creation requires the installed Pieceful app, not Expo Go."
-        : "A criação do vídeo requer o app Pieceful instalado, não o Expo Go.",
-    );
-  }
+async function timelapsePayload(puzzle: MobilePuzzle, language: AppLanguage) {
   const timeline = timelineFor(puzzle);
   const logoAsset = Asset.fromModule(require("../../assets/images/pieceful-logo.png"));
   await logoAsset.downloadAsync();
-  const payload = JSON.stringify({
+  return JSON.stringify({
     imageUri: puzzle.imageUri,
     logoUri: logoAsset.localUri ?? logoAsset.uri,
     name: puzzle.name,
@@ -75,7 +71,42 @@ export async function createTimelapse(puzzle: MobilePuzzle, language: AppLanguag
     })),
     timelapse: timeline,
   });
+}
+
+export async function createTimelapse(puzzle: MobilePuzzle, language: AppLanguage) {
+  if (!PiecefulGameServices?.createTimelapse) {
+    throw new Error(
+      language === "en"
+        ? "Video creation requires the installed Pieceful app, not Expo Go."
+        : "A criação do vídeo requer o app Pieceful instalado, não o Expo Go.",
+    );
+  }
+  const payload = await timelapsePayload(puzzle, language);
   return PiecefulGameServices.createTimelapse(payload);
+}
+
+export async function createTimelapseInBackground(
+  puzzle: MobilePuzzle,
+  language: AppLanguage,
+) {
+  if (Platform.OS !== "android" || !PiecefulGameServices?.enqueueTimelapse) {
+    return { jobId: null, uri: await createTimelapse(puzzle, language) };
+  }
+  if (Platform.Version >= 33) {
+    await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+  }
+  const payload = await timelapsePayload(puzzle, language);
+  const jobId = await PiecefulGameServices.enqueueTimelapse(
+    payload,
+    puzzle.id,
+    puzzle.name,
+    language,
+  );
+  return { jobId, uri: null };
+}
+
+export async function getTimelapseJob(puzzleId: string): Promise<TimelapseJob | null> {
+  return PiecefulGameServices?.getTimelapseJob?.(puzzleId) ?? null;
 }
 
 export async function shareTimelapse(uri: string, language: AppLanguage) {

@@ -1,11 +1,11 @@
 package app.perazzo.piecefulgames
 
-import android.content.ContentValues
-import android.media.MediaScannerConnection
+import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import com.google.android.gms.games.PlayGames
 import com.google.android.gms.games.PlayGamesSdk
 import expo.modules.kotlin.Promise
@@ -13,8 +13,7 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.util.UUID
 
 class PiecefulGameServicesModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -80,6 +79,77 @@ class PiecefulGameServicesModule : Module() {
       }.start()
     }
 
+    AsyncFunction("enqueueTimelapse") { payload: String, puzzleId: String, puzzleName: String, language: String, promise: Promise ->
+      val context = appContext.reactContext?.applicationContext
+      if (context == null) {
+        promise.reject("ERR_NO_CONTEXT", "Unable to schedule a video without an Android context", null)
+        return@AsyncFunction
+      }
+      try {
+        val jobId = UUID.randomUUID().toString()
+        val directory = File(context.filesDir, "timelapse-jobs").apply { mkdirs() }
+        val payloadFile = File(directory, "$jobId.json").apply { writeText(payload) }
+        val input = Data.Builder()
+          .putString(PiecefulTimelapseWorker.KEY_JOB_ID, jobId)
+          .putString(PiecefulTimelapseWorker.KEY_PUZZLE_ID, puzzleId)
+          .putString(PiecefulTimelapseWorker.KEY_PUZZLE_NAME, puzzleName)
+          .putString(PiecefulTimelapseWorker.KEY_LANGUAGE, language)
+          .putString(PiecefulTimelapseWorker.KEY_PAYLOAD_PATH, payloadFile.absolutePath)
+          .build()
+        val request = OneTimeWorkRequest.Builder(PiecefulTimelapseWorker::class.java)
+          .setInputData(input)
+          .addTag("pieceful-timelapse")
+          .addTag("pieceful-timelapse-$puzzleId")
+          .build()
+        val queued = JSONObject().apply {
+          put("jobId", jobId)
+          put("puzzleId", puzzleId)
+          put("status", "queued")
+          put("progress", 0)
+          put("updatedAt", System.currentTimeMillis())
+        }
+        context.getSharedPreferences(PiecefulTimelapseWorker.PREFS_NAME, Context.MODE_PRIVATE)
+          .edit()
+          .putString(puzzleId, queued.toString())
+          .apply()
+        PiecefulTimelapseWorker.createNotificationChannel(context)
+        WorkManager.getInstance(context).enqueueUniqueWork(
+          "pieceful-timelapse-$puzzleId",
+          ExistingWorkPolicy.REPLACE,
+          request,
+        )
+        promise.resolve(jobId)
+      } catch (error: Throwable) {
+        promise.reject("ERR_TIMELAPSE_QUEUE", error.localizedMessage ?: "Unable to schedule timelapse", error)
+      }
+    }
+
+    AsyncFunction("getTimelapseJob") { puzzleId: String, promise: Promise ->
+      val context = appContext.reactContext?.applicationContext
+      if (context == null) {
+        promise.resolve(null)
+        return@AsyncFunction
+      }
+      val value = context.getSharedPreferences(PiecefulTimelapseWorker.PREFS_NAME, Context.MODE_PRIVATE)
+        .getString(puzzleId, null)
+      if (value == null) {
+        promise.resolve(null)
+      } else {
+        val json = JSONObject(value)
+        promise.resolve(
+          mapOf(
+            "jobId" to json.optString("jobId"),
+            "puzzleId" to json.optString("puzzleId"),
+            "status" to json.optString("status"),
+            "progress" to json.optInt("progress"),
+            "fileUri" to json.optString("fileUri").takeIf { it.isNotBlank() && it != "null" },
+            "galleryUri" to json.optString("galleryUri").takeIf { it.isNotBlank() && it != "null" },
+            "error" to json.optString("error").takeIf { it.isNotBlank() && it != "null" },
+          ),
+        )
+      }
+    }
+
     AsyncFunction("saveVideoToGallery") { value: String, promise: Promise ->
       val context = appContext.reactContext
       if (context == null) {
@@ -88,52 +158,12 @@ class PiecefulGameServicesModule : Module() {
       }
       Thread {
         try {
-          val source = Uri.parse(value)
-          val name = "pieceful-${System.currentTimeMillis()}.mp4"
-          val savedUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-              put(MediaStore.Video.Media.DISPLAY_NAME, name)
-              put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-              put(MediaStore.Video.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/Pieceful")
-              put(MediaStore.Video.Media.IS_PENDING, 1)
-            }
-            val destination = requireNotNull(
-              context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values),
-            ) { "Unable to create the video in the media library" }
-            try {
-              openVideoInput(context, source).use { input ->
-                requireNotNull(context.contentResolver.openOutputStream(destination)).use { output ->
-                  input.copyTo(output)
-                }
-              }
-              values.clear()
-              values.put(MediaStore.Video.Media.IS_PENDING, 0)
-              context.contentResolver.update(destination, values, null, null)
-              destination.toString()
-            } catch (error: Throwable) {
-              context.contentResolver.delete(destination, null, null)
-              throw error
-            }
-          } else {
-            val directory = requireNotNull(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES))
-            val destination = File(directory, name)
-            openVideoInput(context, source).use { input ->
-              FileOutputStream(destination).use { output -> input.copyTo(output) }
-            }
-            MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf("video/mp4"), null)
-            Uri.fromFile(destination).toString()
-          }
+          val savedUri = PiecefulVideoStorage.save(context, Uri.parse(value))
           promise.resolve(savedUri)
         } catch (error: Throwable) {
           promise.reject("ERR_SAVE_VIDEO", error.localizedMessage ?: "Unable to save the video", error)
         }
       }.start()
     }
-  }
-
-  private fun openVideoInput(context: android.content.Context, uri: Uri) = when (uri.scheme) {
-    "content" -> requireNotNull(context.contentResolver.openInputStream(uri))
-    "file" -> FileInputStream(requireNotNull(uri.path))
-    else -> FileInputStream(uri.toString())
   }
 }
