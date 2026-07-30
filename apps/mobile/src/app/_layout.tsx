@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AgeGate } from "@/components/age-gate";
+import { AppUpdateNotice } from "@/components/app-update-notice";
 import { AuthGate } from "@/components/auth-gate";
 import { FrostedScene } from "@/components/frosted-surface";
 import { GuidedTour } from "@/components/guided-tour";
@@ -88,6 +89,7 @@ function RootNavigator() {
         </View>
       ) : null}
       {hasAppAccess && !showStartupSplash ? <GuidedTour /> : null}
+      <AppUpdateNotice enabled={hasAppAccess && !showStartupSplash} />
     </>
   );
 }

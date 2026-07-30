@@ -8,6 +8,10 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import com.google.android.gms.games.PlayGames
 import com.google.android.gms.games.PlayGamesSdk
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.appupdate.AppUpdateOptions
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.UpdateAvailability
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -58,6 +62,62 @@ class PiecefulGameServicesModule : Module() {
         promise.resolve(null)
       }.addOnFailureListener { error ->
         promise.reject("ERR_PLAY_GAMES_UI", error.localizedMessage, error)
+      }
+    }
+
+    AsyncFunction("checkForAppUpdate") { promise: Promise ->
+      val activity = appContext.currentActivity
+      if (activity == null) {
+        promise.resolve(mapOf("available" to false, "inProgress" to false))
+        return@AsyncFunction
+      }
+      val manager = AppUpdateManagerFactory.create(activity.applicationContext)
+      manager.appUpdateInfo.addOnSuccessListener { info ->
+        val availability = info.updateAvailability()
+        promise.resolve(
+          mapOf(
+            "available" to (
+              availability == UpdateAvailability.UPDATE_AVAILABLE &&
+                info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
+            ),
+            "inProgress" to (availability == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS),
+            "versionCode" to info.availableVersionCode(),
+          ),
+        )
+      }.addOnFailureListener {
+        // This can fail outside Google Play or while offline. An update check
+        // must never prevent the player from opening Pieceful.
+        promise.resolve(mapOf("available" to false, "inProgress" to false))
+      }
+    }
+
+    AsyncFunction("startAppUpdate") { promise: Promise ->
+      val activity = appContext.currentActivity
+      if (activity == null) {
+        promise.reject("ERR_NO_ACTIVITY", "Unable to start an update without an Activity", null)
+        return@AsyncFunction
+      }
+      val manager = AppUpdateManagerFactory.create(activity.applicationContext)
+      manager.appUpdateInfo.addOnSuccessListener { info ->
+        val availability = info.updateAvailability()
+        val canStart =
+          availability == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS ||
+            (availability == UpdateAvailability.UPDATE_AVAILABLE &&
+              info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE))
+        if (!canStart) {
+          promise.resolve(false)
+          return@addOnSuccessListener
+        }
+        val options = AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build()
+        manager.startUpdateFlow(info, activity, options).addOnCompleteListener { task ->
+          if (task.isSuccessful) {
+            promise.resolve(true)
+          } else {
+            promise.reject("ERR_APP_UPDATE", task.exception?.localizedMessage, task.exception)
+          }
+        }
+      }.addOnFailureListener { error ->
+        promise.reject("ERR_APP_UPDATE_CHECK", error.localizedMessage, error)
       }
     }
 

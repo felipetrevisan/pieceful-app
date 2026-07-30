@@ -20,10 +20,18 @@ export interface TimelapseJob {
   error?: string | null;
 }
 
+export interface AppUpdateAvailability {
+  available: boolean;
+  inProgress: boolean;
+  versionCode?: number;
+}
+
 declare class PiecefulGameServicesModule extends NativeModule<PiecefulGameServicesEvents> {
   authenticate(): Promise<PlatformPlayer>;
   reportAchievement(identifier: string, percent: number): Promise<void>;
   showAchievements(): Promise<void>;
+  checkForAppUpdate?(): Promise<AppUpdateAvailability>;
+  startAppUpdate?(): Promise<boolean>;
   createTimelapse(payload: string): Promise<string>;
   enqueueTimelapse?(
     payload: string,

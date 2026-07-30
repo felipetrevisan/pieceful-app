@@ -1,5 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { PuzzlePiece, PuzzlePieceShape } from "@puzzled/puzzle-engine";
+import {
+  normalizeQuarterTurn,
+  type PuzzlePiece,
+  type PuzzlePieceShape,
+} from "@puzzled/puzzle-engine";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -580,7 +584,15 @@ function DrawerPiece({
             />
           </>
         ) : null}
-        <Svg width={extent} height={extent}>
+        <Svg
+          width={extent}
+          height={extent}
+          style={{
+            transform: [
+              { rotate: `${normalizeQuarterTurn(piece.currentPosition.rotation)}deg` },
+            ],
+          }}
+        >
           <Defs>
             <ClipPath id={clipId}>
               <Path d={path} />
@@ -679,7 +691,15 @@ export function PuzzlePieceDragOverlay({
           </View>
         </>
       ) : null}
-      <Svg width={extent} height={extent}>
+      <Svg
+        width={extent}
+        height={extent}
+        style={{
+          transform: [
+            { rotate: `${normalizeQuarterTurn(preview.piece.currentPosition.rotation)}deg` },
+          ],
+        }}
+      >
         <Defs>
           <ClipPath id={clipId}>
             <Path d={path} />
