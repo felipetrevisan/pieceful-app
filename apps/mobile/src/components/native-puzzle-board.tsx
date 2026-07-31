@@ -2,7 +2,7 @@ import { neighborSnapOffset, normalizeQuarterTurn, type PuzzlePiece, type Puzzle
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -91,14 +91,9 @@ function cameraBounds({
   return { horizontalLimit, minimumY, maximumY };
 }
 
-function piecePath(
-  shape: PuzzlePieceShape,
-  size: number,
-  offsetX: number,
-  offsetY = offsetX,
-) {
-  const x = offsetX;
-  const y = offsetY;
+function piecePath(shape: PuzzlePieceShape, size: number, margin: number) {
+  const x = margin;
+  const y = margin;
   const bump = size * 0.22;
   const edge = (kind: "top" | "right" | "bottom" | "left") => {
     const value = shape[kind];
@@ -700,9 +695,10 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
             ))}
           </Svg>
 
-          {placedPieces.length ? (
-            <PlacedPiecesLayer
-              pieces={placedPieces}
+          {placedPieces.map((piece) => (
+            <StaticPlacedPiece
+              key={piece.id}
+              piece={piece}
               imageUri={imageUri}
               boardWidth={boardWidth}
               boardHeight={boardHeight}
@@ -710,7 +706,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
               cell={cell}
               stroke={colors.accent}
             />
-          ) : null}
+          ))}
 
           {!externalDrawer ? <GestureDetector gesture={drawerTap}>
             <View
@@ -806,8 +802,8 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   );
 });
 
-const PlacedPiecesLayer = memo(function PlacedPiecesLayer({
-  pieces,
+const StaticPlacedPiece = memo(function StaticPlacedPiece({
+  piece,
   imageUri,
   boardWidth,
   boardHeight,
@@ -815,7 +811,7 @@ const PlacedPiecesLayer = memo(function PlacedPiecesLayer({
   cell,
   stroke,
 }: {
-  pieces: PuzzlePiece[];
+  piece: PuzzlePiece;
   imageUri: string;
   boardWidth: number;
   boardHeight: number;
@@ -823,55 +819,46 @@ const PlacedPiecesLayer = memo(function PlacedPiecesLayer({
   cell: number;
   stroke: string;
 }) {
-  const clipId = `pieceful-placed-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const entries = useMemo(
-    () =>
-      pieces.map((piece) => ({
-        id: piece.id,
-        path: piecePath(
-          piece.shape,
-          cell,
-          piece.correctPosition.x * cell,
-          piece.correctPosition.y * cell,
-        ),
-      })),
-    [cell, pieces],
+  const margin = cell * 0.24;
+  const extent = cell + margin * 2;
+  const path = useMemo(
+    () => piecePath(piece.shape, cell, margin),
+    [cell, margin, piece.shape],
   );
-  const clipPath = useMemo(
-    () => entries.map((entry) => entry.path).join(" "),
-    [entries],
-  );
+  const clipId = `placed-${piece.id}`;
   return (
     <Svg
       pointerEvents="none"
-      width={boardWidth}
-      height={boardHeight}
-      style={{ position: "absolute", left: boardOffsetX, top: 0, zIndex: 1 }}
+      width={extent}
+      height={extent}
+      style={{
+        position: "absolute",
+        left: boardOffsetX + piece.correctPosition.x * cell - margin,
+        top: piece.correctPosition.y * cell - margin,
+        zIndex: 1,
+      }}
     >
       <Defs>
         <ClipPath id={clipId}>
-          <Path d={clipPath} fill="#fff" fillRule="nonzero" />
+          <Path d={path} />
         </ClipPath>
       </Defs>
       <SvgImage
         href={{ uri: imageUri }}
-        x={0}
-        y={0}
+        x={margin - piece.column * cell}
+        y={margin - piece.row * cell}
         width={boardWidth}
         height={boardHeight}
         preserveAspectRatio="xMidYMid slice"
         clipPath={`url(#${clipId})`}
       />
-      {entries.map((entry) => (
-        <Path
-          key={`stroke-${entry.id}`}
-          d={entry.path}
-          fill="transparent"
-          stroke={stroke}
-          strokeOpacity={0.32}
-          strokeWidth={Math.max(0.7, cell * 0.022)}
-        />
-      ))}
+      <Path
+        d={path}
+        fill="transparent"
+        stroke={stroke}
+        strokeOpacity={0.32}
+        strokeWidth={Math.max(0.7, cell * 0.022)}
+      />
     </Svg>
   );
 });
