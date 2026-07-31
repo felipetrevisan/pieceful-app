@@ -2,7 +2,7 @@ import { neighborSnapOffset, normalizeQuarterTurn, type PuzzlePiece, type Puzzle
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -91,9 +91,14 @@ function cameraBounds({
   return { horizontalLimit, minimumY, maximumY };
 }
 
-function piecePath(shape: PuzzlePieceShape, size: number, margin: number) {
-  const x = margin;
-  const y = margin;
+function piecePath(
+  shape: PuzzlePieceShape,
+  size: number,
+  offsetX: number,
+  offsetY = offsetX,
+) {
+  const x = offsetX;
+  const y = offsetY;
   const bump = size * 0.22;
   const edge = (kind: "top" | "right" | "bottom" | "left") => {
     const value = shape[kind];
@@ -818,16 +823,23 @@ const PlacedPiecesLayer = memo(function PlacedPiecesLayer({
   cell: number;
   stroke: string;
 }) {
-  const clipId = "pieceful-placed-pieces";
+  const clipId = `pieceful-placed-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const entries = useMemo(
     () =>
       pieces.map((piece) => ({
         id: piece.id,
-        path: piecePath(piece.shape, cell, 0),
-        x: piece.correctPosition.x * cell,
-        y: piece.correctPosition.y * cell,
+        path: piecePath(
+          piece.shape,
+          cell,
+          piece.correctPosition.x * cell,
+          piece.correctPosition.y * cell,
+        ),
       })),
     [cell, pieces],
+  );
+  const clipPath = useMemo(
+    () => entries.map((entry) => entry.path).join(" "),
+    [entries],
   );
   return (
     <Svg
@@ -838,13 +850,7 @@ const PlacedPiecesLayer = memo(function PlacedPiecesLayer({
     >
       <Defs>
         <ClipPath id={clipId}>
-          {entries.map((entry) => (
-            <Path
-              key={`clip-${entry.id}`}
-              d={entry.path}
-              transform={`translate(${entry.x} ${entry.y})`}
-            />
-          ))}
+          <Path d={clipPath} fill="#fff" fillRule="nonzero" />
         </ClipPath>
       </Defs>
       <SvgImage
@@ -860,7 +866,6 @@ const PlacedPiecesLayer = memo(function PlacedPiecesLayer({
         <Path
           key={`stroke-${entry.id}`}
           d={entry.path}
-          transform={`translate(${entry.x} ${entry.y})`}
           fill="transparent"
           stroke={stroke}
           strokeOpacity={0.32}
