@@ -92,6 +92,7 @@ export const DraggablePiece = memo(function DraggablePiece({
   headerScreenTarget,
   storageScreenTarget,
   rotationEnabled,
+  magnetismEnabled,
   stored,
   stroke,
   onChange,
@@ -117,6 +118,7 @@ export const DraggablePiece = memo(function DraggablePiece({
   headerScreenTarget?: ScreenFrame | null;
   storageScreenTarget?: ScreenFrame | null;
   rotationEnabled: boolean;
+  magnetismEnabled: boolean;
   stored: boolean;
   stroke: string;
   onChange: (
@@ -141,7 +143,10 @@ export const DraggablePiece = memo(function DraggablePiece({
   const dragging = useSharedValue(false);
   const path = useMemo(() => piecePath(piece.shape, cell, margin), [cell, margin, piece.shape]);
   const clipId = `clip-${piece.id}`;
-  const snapRadius = Math.max(cell * 0.52, 10);
+  // With magnetism off, the piece still clicks into its exact slot once close
+  // enough, but the forgiveness radius shrinks a lot instead of disappearing
+  // entirely (a literal zero tolerance would be unplayable given touch imprecision).
+  const snapRadius = magnetismEnabled ? Math.max(cell * 0.52, 10) : Math.max(cell * 0.12, 4);
   const lastHintCommandId = useRef(0);
 
   useEffect(() => {

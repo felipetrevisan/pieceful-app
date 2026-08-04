@@ -14,6 +14,7 @@ export interface PieceTransitionContext {
   columns: number;
   cell: number;
   rotationEnabled: boolean;
+  magnetismEnabled: boolean;
 }
 
 export interface PieceTransitionResult {
@@ -28,7 +29,7 @@ export function applyPieceTransition(
   context: PieceTransitionContext,
 ): PieceTransitionResult | null {
   const { id, x, y, rotation, isPlaced, destination } = input;
-  const { rows, columns, cell, rotationEnabled } = context;
+  const { rows, columns, cell, rotationEnabled, magnetismEnabled } = context;
   const movingPiece = pieces.find((piece) => piece.id === id);
   if (!movingPiece) return null;
   const effectiveRotation = rotationEnabled
@@ -104,7 +105,11 @@ export function applyPieceTransition(
       for (const stationary of next) {
         if (memberIds.has(stationary.id) || stationary.trayId !== null) continue;
         if (normalizeQuarterTurn(stationary.currentPosition.rotation) !== 0) continue;
-        const neighborTolerance = Math.min(0.68, Math.max(0.38, 10 / Math.max(1, cell)));
+        // With magnetism off, neighbors only connect when dropped almost exactly
+        // adjacent instead of the generous default forgiveness radius.
+        const neighborTolerance = magnetismEnabled
+          ? Math.min(0.68, Math.max(0.38, 10 / Math.max(1, cell)))
+          : Math.min(0.15, Math.max(0.08, 4 / Math.max(1, cell)));
         const offset = neighborSnapOffset(moving, stationary, neighborTolerance);
         if (offset) {
           match = { offsetX: offset.x, offsetY: offset.y, stationary };

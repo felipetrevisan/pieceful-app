@@ -21,7 +21,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { FrostedBackdrop } from "@/components/frosted-surface";
 import { ThemeParallaxBackground } from "@/components/theme-parallax-background";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
@@ -38,12 +38,23 @@ export function Screen({
 }) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
+  const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.set(event.contentOffset.y);
   });
   const content = (
-    <View style={{ paddingHorizontal: 20, paddingBottom: 126, paddingTop: 8, flexGrow: 1 }}>
+    <View
+      style={{
+        paddingHorizontal: 20,
+        // 126 clears the floating tab bar on iOS, where the home indicator inset
+        // is already small and baked in; Android's edge-to-edge system nav bar
+        // isn't covered by that margin, so add its inset on top here.
+        paddingBottom: 126 + insets.bottom,
+        paddingTop: 8,
+        flexGrow: 1,
+      }}
+    >
       {Children.map(children, (child, index) => (
         <Reveal delay={Math.min(index * 75, 375)}>{child}</Reveal>
       ))}

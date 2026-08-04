@@ -555,6 +555,7 @@ export default function PuzzleScreen() {
             preferences={preferences}
             theme={theme}
             rotationEnabled={puzzle.configuration.rotationEnabled}
+            magnetismEnabled={puzzle.configuration.magnetismEnabled}
             zoomCommand={zoomCommand}
             hintCommand={hintCommand}
             cameraViewportTop={cameraViewportTop}

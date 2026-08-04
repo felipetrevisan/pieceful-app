@@ -27,6 +27,7 @@ function savedPuzzle(rotationEnabled: boolean, rotation: number): SavedPuzzle {
       hintsEnabled: true,
       referenceEnabled: true,
       timerEnabled: true,
+      magnetismEnabled: true,
     },
     session: {
       puzzleId: "puzzle-1",

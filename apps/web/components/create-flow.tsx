@@ -33,6 +33,7 @@ const initialConfiguration: PuzzleConfiguration = {
   hintsEnabled: true,
   referenceEnabled: true,
   timerEnabled: true,
+  magnetismEnabled: true,
 };
 
 export function CreateFlow() {

@@ -16,6 +16,8 @@ const expectedRoutes = [
   "(tabs)/settings.tsx",
   "_layout.tsx",
   "auth/callback.tsx",
+  "create/difficulty.tsx",
+  "create/options.tsx",
   "help/controller.tsx",
   "help/touch.tsx",
   "notifications.tsx",

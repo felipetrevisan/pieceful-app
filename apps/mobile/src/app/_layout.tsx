@@ -24,6 +24,7 @@ import { StartupSplash } from "@/components/startup-splash";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { reportInsecureAuthCallbackIfNeeded } from "@/services/social-auth";
 import { AppProvider, useApp } from "@/state/app-provider";
+import { CreateFlowProvider } from "@/state/create-flow-provider";
 import { MonetizationProvider } from "@/state/monetization-provider";
 import { SocialProvider, useSocial } from "@/state/social-provider";
 
@@ -73,6 +74,8 @@ function RootNavigator() {
         >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="auth/callback" />
+          <Stack.Screen name="create/difficulty" />
+          <Stack.Screen name="create/options" />
           <Stack.Screen name="puzzle/[id]" />
           <Stack.Screen name="result/[id]" />
           <Stack.Screen name="notifications" />
@@ -113,7 +116,9 @@ function RootLayout() {
         <PiecefulAlertProvider>
           <SocialProvider>
             <MonetizationProvider>
-              <RootNavigator />
+              <CreateFlowProvider>
+                <RootNavigator />
+              </CreateFlowProvider>
             </MonetizationProvider>
           </SocialProvider>
         </PiecefulAlertProvider>

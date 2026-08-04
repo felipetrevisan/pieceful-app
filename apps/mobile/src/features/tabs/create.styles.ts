@@ -1,37 +1,13 @@
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
-  stepCardWrap: { width: "100%", marginBottom: 16 },
-  collapsibleCard: { padding: 0 },
-  stepHeader: {
-    minHeight: 78,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    overflow: "hidden",
+  wizardStep: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    letterSpacing: 1,
+    marginTop: -4,
+    marginBottom: 16,
   },
-  stepNumber: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepNumberText: { fontFamily: "Inter_700Bold", fontSize: 15 },
-  stepHeadingCopy: { flex: 1, minWidth: 0 },
-  stepTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
-  stepSubtitle: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
-  stepChevron: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepContent: { gap: 14, paddingHorizontal: 18, paddingBottom: 18 },
   kidGallery: { gap: 12 },
   galleryTabs: { marginHorizontal: -20 },
   galleryTabsContent: { paddingHorizontal: 20, gap: 8 },

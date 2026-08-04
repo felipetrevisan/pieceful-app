@@ -22,6 +22,7 @@ function puzzle(
       hintsEnabled: true,
       referenceEnabled: true,
       timerEnabled: true,
+      magnetismEnabled: true,
     },
     session: {
       completedAt: overrides.completed ? "2026-08-01T00:00:00Z" : null,

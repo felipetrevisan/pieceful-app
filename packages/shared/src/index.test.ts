@@ -16,6 +16,7 @@ describe("shared puzzle contracts", () => {
       hintsEnabled: true,
       referenceEnabled: true,
       timerEnabled: true,
+      magnetismEnabled: true,
     });
   });
 

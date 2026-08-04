@@ -2,12 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet, Text, type ColorValue } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 
 export default function TabsLayout() {
   const { t, theme } = useApp();
   const colors = mobileThemes[theme];
+  const insets = useSafeAreaInsets();
   const glass = Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   return (
     <Tabs
@@ -19,7 +21,11 @@ export default function TabsLayout() {
           position: "absolute",
           left: 18,
           right: 18,
-          bottom: 12,
+          // Android's edge-to-edge system nav bar (gesture pill or 3-button)
+          // isn't reserved automatically; without its inset the bar sits under
+          // or is clipped by it. iOS's home indicator inset is small enough
+          // that the existing 12 already read fine, so only add insets.bottom.
+          bottom: 12 + insets.bottom,
           height: 70,
           paddingTop: 7,
           paddingBottom: 8,

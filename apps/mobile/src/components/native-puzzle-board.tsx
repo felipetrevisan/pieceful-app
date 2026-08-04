@@ -20,6 +20,7 @@ interface NativePuzzleBoardProps {
   preferences: MobilePreferences;
   theme: MobileTheme;
   rotationEnabled: boolean;
+  magnetismEnabled: boolean;
   zoomCommand?: PuzzleZoomCommand | null;
   hintCommand?: PuzzleHintCommand | null;
   cameraViewportTop: number;
@@ -58,6 +59,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   preferences,
   theme,
   rotationEnabled,
+  magnetismEnabled,
   zoomCommand,
   hintCommand,
   cameraViewportTop,
@@ -175,7 +177,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
       const result = applyPieceTransition(
         piecesRef.current,
         { id, x, y, rotation, isPlaced, destination },
-        { rows, columns, cell, rotationEnabled },
+        { rows, columns, cell, rotationEnabled, magnetismEnabled },
       );
       if (!result) return;
       onPiecesChange(result.pieces);
@@ -186,7 +188,16 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     },
-    [cell, columns, onPieceStored, onPiecesChange, preferences.haptics, rotationEnabled, rows],
+    [
+      cell,
+      columns,
+      magnetismEnabled,
+      onPieceStored,
+      onPiecesChange,
+      preferences.haptics,
+      rotationEnabled,
+      rows,
+    ],
   );
 
   useEffect(() => {
@@ -311,6 +322,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
                 headerScreenTarget={headerScreenTarget}
                 storageScreenTarget={storageScreenTarget}
                 rotationEnabled={rotationEnabled}
+                magnetismEnabled={magnetismEnabled}
                 stored={false}
                 stroke={piece.isPlaced ? colors.accent : `${colors.text}99`}
                 onChange={updatePiece}

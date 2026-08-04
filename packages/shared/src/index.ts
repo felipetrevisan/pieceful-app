@@ -60,6 +60,7 @@ export interface PuzzleConfiguration {
   hintsEnabled: boolean;
   referenceEnabled: boolean;
   timerEnabled: boolean;
+  magnetismEnabled: boolean;
 }
 
 export interface StoredPuzzleSummary {
@@ -94,5 +95,6 @@ export function validateConfiguration(value: unknown): PuzzleConfiguration {
     hintsEnabled: candidate.hintsEnabled !== false,
     referenceEnabled: candidate.referenceEnabled !== false,
     timerEnabled: candidate.timerEnabled !== false,
+    magnetismEnabled: candidate.magnetismEnabled !== false,
   };
 }

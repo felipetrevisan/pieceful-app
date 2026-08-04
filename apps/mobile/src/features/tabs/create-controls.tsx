@@ -6,20 +6,16 @@ import {
   type resolvePuzzleOrientation,
 } from "@puzzled/shared";
 import { LinearGradient } from "expo-linear-gradient";
-import { type ReactNode, useEffect, useState } from "react";
-import { Pressable, Switch, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Switch, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  FadeIn,
-  FadeOut,
-  LinearTransition,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
-import { Card, Label, MutedText } from "@/components/pieceful-ui";
+import { Label, MutedText } from "@/components/pieceful-ui";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 import { styles } from "./create.styles";
@@ -36,91 +32,6 @@ const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
   legendary: ["Lendário", "Legendary"],
   custom: ["Personalizado", "Custom"],
 };
-
-export function CollapsibleStepCard({
-  children,
-  expanded,
-  onToggle,
-  step,
-  subtitle,
-  title,
-}: {
-  children: ReactNode;
-  expanded: boolean;
-  onToggle: () => void;
-  step: string;
-  subtitle: string;
-  title: string;
-}) {
-  const { preferences, theme } = useApp();
-  const colors = mobileThemes[theme];
-  const chevronProgress = useSharedValue(expanded ? 1 : 0);
-
-  useEffect(() => {
-    chevronProgress.set(
-      preferences.reducedMotion
-        ? expanded
-          ? 1
-          : 0
-        : withTiming(expanded ? 1 : 0, { duration: 220 }),
-    );
-  }, [chevronProgress, expanded, preferences.reducedMotion]);
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${chevronProgress.value * 180}deg` }],
-  }));
-
-  return (
-    <Animated.View
-      layout={
-        preferences.reducedMotion
-          ? undefined
-          : LinearTransition.springify().damping(18).stiffness(180)
-      }
-      style={styles.stepCardWrap}
-    >
-      <Card style={styles.collapsibleCard}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          accessibilityLabel={`${title}. ${subtitle}`}
-          android_ripple={{ color: `${colors.accent}18` }}
-          onPress={onToggle}
-          style={styles.stepHeader}
-        >
-          <View style={[styles.stepNumber, { backgroundColor: colors.panelAlt }]}>
-            <Text style={[styles.stepNumberText, { color: colors.accent }]}>{step}</Text>
-          </View>
-          <View style={styles.stepHeadingCopy}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>{title}</Text>
-            <Text numberOfLines={2} style={[styles.stepSubtitle, { color: colors.muted }]}>
-              {subtitle}
-            </Text>
-          </View>
-          <Animated.View
-            style={[
-              styles.stepChevron,
-              { backgroundColor: `${colors.accent}14`, borderColor: `${colors.accent}35` },
-              chevronStyle,
-            ]}
-          >
-            <Ionicons name="chevron-down" size={20} color={colors.accent} />
-          </Animated.View>
-        </Pressable>
-
-        {expanded ? (
-          <Animated.View
-            entering={preferences.reducedMotion ? undefined : FadeIn.duration(220)}
-            exiting={preferences.reducedMotion ? undefined : FadeOut.duration(150)}
-            style={styles.stepContent}
-          >
-            {children}
-          </Animated.View>
-        ) : null}
-      </Card>
-    </Animated.View>
-  );
-}
 
 export function DifficultySlider({
   selectedIndex,
