@@ -15,6 +15,7 @@ interface AdminPackImage {
   bytes: number;
   sort_order: number;
   is_published: boolean;
+  display_thumbnail_url?: string;
 }
 
 interface AdminImagePack {
@@ -35,6 +36,7 @@ interface AdminImagePack {
   minimum_app_version: string | null;
   reward_level: number | null;
   pack_images: AdminPackImage[];
+  display_cover_url?: string;
 }
 
 interface ApiResult<T = unknown> {
@@ -43,16 +45,18 @@ interface ApiResult<T = unknown> {
   packs?: AdminImagePack[];
   pack?: T;
   image?: T;
-  token?: string;
 }
 
 const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").replace(/\/+$/, "");
-let adminToken = "";
 
 async function api<T = unknown>(url: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
-  if (adminToken) headers.set("Authorization", `Bearer ${adminToken}`);
-  const response = await fetch(`${apiBase}${url}`, { ...init, headers });
+  const response = await fetch(`${apiBase}${url}`, {
+    ...init,
+    headers,
+    credentials: "include",
+    cache: "no-store",
+  });
   const data = (await response.json()) as ApiResult<T>;
   if (!response.ok || !data.ok) throw new Error(data.message ?? "Operação não concluída.");
   return data;
@@ -77,19 +81,10 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const storedToken = window.sessionStorage.getItem("pieceful.admin.session") ?? "";
-    if (!storedToken) {
-      setChecking(false);
-      return;
-    }
-    adminToken = storedToken;
-    setAuthenticated(true);
     void loadPacks()
+      .then(() => setAuthenticated(true))
       .catch(() => {
-        adminToken = "";
-        window.sessionStorage.removeItem("pieceful.admin.session");
         setAuthenticated(false);
-        setMessage("Sua sessão expirou. Entre novamente.");
       })
       .finally(() => setChecking(false));
   }, [loadPacks]);
@@ -103,11 +98,13 @@ export function AdminDashboard() {
       const result = await api("/api/admin/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: form.get("password") }),
+        body: JSON.stringify({
+          email: form.get("email"),
+          password: form.get("password"),
+          totp: String(form.get("totp") ?? "").trim() || undefined,
+        }),
       });
-      if (!result.token) throw new Error("A API não retornou uma sessão válida.");
-      adminToken = result.token;
-      window.sessionStorage.setItem("pieceful.admin.session", result.token);
+      if (!result.ok) throw new Error("A API não retornou uma sessão válida.");
       setAuthenticated(true);
       await loadPacks();
     } catch (error) {
@@ -120,8 +117,11 @@ export function AdminDashboard() {
   }
 
   async function logout() {
-    adminToken = "";
-    window.sessionStorage.removeItem("pieceful.admin.session");
+    try {
+      await api("/api/admin/session", { method: "DELETE" });
+    } catch {
+      // Local logout still completes if the API is temporarily unavailable.
+    }
     setAuthenticated(false);
     setPacks([]);
   }
@@ -186,7 +186,7 @@ export function AdminDashboard() {
                 onClick={() => setSelectedId(pack.id)}
               >
                 <span className={styles.packThumb}>
-                  {pack.cover_url ? <img src={pack.cover_url} alt="" /> : "✦"}
+                  {pack.display_cover_url ? <img src={pack.display_cover_url} alt="" /> : "✦"}
                 </span>
                 <span>
                   <strong>{pack.title_pt || pack.slug}</strong>
@@ -252,7 +252,9 @@ function AdminLogin({
   message: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const emailId = useId();
   const passwordId = useId();
+  const totpId = useId();
   return (
     <main className={styles.loginPage}>
       <section className={styles.loginCard}>
@@ -266,7 +268,16 @@ function AdminLogin({
           </div>
         ) : null}
         <form onSubmit={onSubmit}>
-          <label htmlFor={passwordId}>Senha administrativa</label>
+          <label htmlFor={emailId}>E-mail administrativo</label>
+          <input
+            id={emailId}
+            name="email"
+            type="email"
+            autoComplete="username"
+            maxLength={254}
+            required
+          />
+          <label htmlFor={passwordId}>Senha</label>
           <input
             id={passwordId}
             name="password"
@@ -274,6 +285,17 @@ function AdminLogin({
             autoComplete="current-password"
             minLength={12}
             required
+          />
+          <label htmlFor={totpId}>Código MFA</label>
+          <input
+            id={totpId}
+            name="totp"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6,8}"
+            maxLength={8}
+            placeholder="000000"
           />
           <button disabled={busy || !configured} type="submit">
             {busy ? "Entrando…" : "Entrar no Studio"}
@@ -483,7 +505,7 @@ function PackEditor({
             label="Versão mínima do app"
             name="minimum_app_version"
             defaultValue={pack.minimum_app_version ?? ""}
-            pattern="[0-9]+(?:\.[0-9]+){0,2}"
+            pattern="[0-9]+\.[0-9]+\.[0-9]+(?:[-+].*)?"
           />
           <Field
             label="ID do produto na loja"
@@ -588,8 +610,6 @@ function ImageUpload({
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     form.set("file", file);
-    form.set("width", String(dimensions.width));
-    form.set("height", String(dimensions.height));
     form.set("make_cover", String(!pack.cover_url || form.get("make_cover") === "on"));
     form.set("is_published", String(form.get("is_published") === "on"));
     await api(`/api/admin/packs/${pack.id}/images`, { method: "POST", body: form });
@@ -682,10 +702,7 @@ function ImageCard({
   async function remove() {
     if (!window.confirm(`Excluir “${image.title_pt}”?`)) return;
     await run(async () => {
-      await api(
-        `/api/admin/images/${image.id}?packId=${packId}&imageUrl=${encodeURIComponent(image.image_url)}`,
-        { method: "DELETE" },
-      );
+      await api(`/api/admin/images/${image.id}`, { method: "DELETE" });
       if (coverUrl === image.image_url)
         await api(`/api/admin/packs/${packId}`, {
           method: "PATCH",
@@ -698,7 +715,7 @@ function ImageCard({
   return (
     <article className={styles.imageCard}>
       <div className={styles.imagePreview}>
-        <img src={image.thumbnail_url} alt={image.title_pt} />
+        <img src={image.display_thumbnail_url || image.thumbnail_url} alt={image.title_pt} />
         {coverUrl === image.image_url ? (
           <span>CAPA</span>
         ) : (

@@ -16,6 +16,7 @@ import { PrimaryButton, SecondaryButton } from "@/components/pieceful-ui";
 import { ThemeParallaxBackground } from "@/components/theme-parallax-background";
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { getPuzzleXp } from "@/lib/progression";
+import { requestStoreReviewIfEligible } from "@/lib/store-review";
 import {
   createTimelapseInBackground,
   getTimelapseJob,
@@ -38,6 +39,10 @@ export default function ResultScreen() {
   const { showAlert } = usePiecefulAlert();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const puzzle = puzzles.find((item) => item.id === id);
+  const completedPuzzleCount = puzzles.reduce(
+    (total, item) => total + (item.session.completedAt ? 1 : 0),
+    0,
+  );
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoUri, setVideoUri] = useState<string | null>(null);
@@ -55,6 +60,19 @@ export default function ResultScreen() {
     );
     return () => subscription?.remove();
   }, []);
+
+  useEffect(() => {
+    if (!puzzle?.id || !puzzle.session.completedAt) return;
+
+    const timer = setTimeout(() => {
+      void requestStoreReviewIfEligible({
+        completedPuzzles: completedPuzzleCount,
+        puzzleId: puzzle.id,
+      });
+    }, 2_500);
+
+    return () => clearTimeout(timer);
+  }, [completedPuzzleCount, puzzle?.id, puzzle?.session.completedAt]);
 
   useEffect(() => {
     if (!puzzle?.id) return;

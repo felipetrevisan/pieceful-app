@@ -8,6 +8,7 @@ import {
 } from "@puzzled/puzzle-engine";
 import type { PuzzleConfiguration, PuzzleDifficulty } from "@puzzled/shared";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getLocales } from "expo-localization";
 import {
   createContext,
   type ReactNode,
@@ -15,11 +16,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { AppState as NativeAppState } from "react-native";
+import {
+  resolveDeviceLanguage,
+  type SupportedAppLanguage,
+} from "@/lib/language";
 import { getLevelRewards, getPlayerProgression } from "@/lib/progression";
 
-export type AppLanguage = "pt-BR" | "en";
+export type AppLanguage = SupportedAppLanguage;
 export type AgeGroup = "child" | "teen" | "adult";
 export type MobileTheme =
   | "cosmic"
@@ -178,7 +185,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [tourCompleted, setTourCompleted] = useState(false);
-  const [language, setLanguageState] = useState<AppLanguage>("pt-BR");
+  const [language, setLanguageState] = useState<AppLanguage>(() =>
+    resolveDeviceLanguage(getLocales()[0]?.languageCode),
+  );
   const [ageGroup, setAgeGroupState] = useState<AgeGroup | null>(null);
   const [theme, setThemeState] = useState<MobileTheme>("cosmic");
   const [preferences, setPreferences] = useState(defaultPreferences);
@@ -262,25 +271,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .finally(() => setReady(true));
   }, []);
 
+  const writeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPayloadRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!ready) return;
-    void AsyncStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        ageGroup,
-        language,
-        theme,
-        puzzles,
-        deletedPuzzleIds,
-        preferences,
-        tourCompleted,
-        lastNotificationsReadAt,
-        hintCredits,
-        claimedRewardIds,
-        selectedAvatarRewardId,
-        selectedFrameRewardId,
-      }),
-    );
+    const payload = JSON.stringify({
+      ageGroup,
+      language,
+      theme,
+      puzzles,
+      deletedPuzzleIds,
+      preferences,
+      tourCompleted,
+      lastNotificationsReadAt,
+      hintCredits,
+      claimedRewardIds,
+      selectedAvatarRewardId,
+      selectedFrameRewardId,
+    });
+    pendingPayloadRef.current = payload;
+    if (writeTimeoutRef.current) clearTimeout(writeTimeoutRef.current);
+    // Coalesces rapid successive updates (e.g. one per piece drop) into a
+    // single AsyncStorage write instead of stringifying the whole app state
+    // on every change. Background/unmount flush below covers the last write.
+    writeTimeoutRef.current = setTimeout(() => {
+      writeTimeoutRef.current = null;
+      pendingPayloadRef.current = null;
+      void AsyncStorage.setItem(STORAGE_KEY, payload);
+    }, 600);
   }, [
     ageGroup,
     language,
@@ -296,6 +315,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     theme,
     tourCompleted,
   ]);
+
+  useEffect(() => {
+    const flushPendingWrite = () => {
+      if (writeTimeoutRef.current) {
+        clearTimeout(writeTimeoutRef.current);
+        writeTimeoutRef.current = null;
+      }
+      if (pendingPayloadRef.current !== null) {
+        const payload = pendingPayloadRef.current;
+        pendingPayloadRef.current = null;
+        void AsyncStorage.setItem(STORAGE_KEY, payload);
+      }
+    };
+    const subscription = NativeAppState.addEventListener("change", (state) => {
+      if (state !== "active") flushPendingWrite();
+    });
+    return () => {
+      subscription.remove();
+      flushPendingWrite();
+    };
+  }, []);
 
   const setLanguage = useCallback((next: AppLanguage) => setLanguageState(next), []);
   const setAgeGroup = useCallback((next: AgeGroup) => {

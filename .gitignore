@@ -53,6 +53,11 @@ next-env.d.ts
 # generated native module build artifacts
 /apps/mobile/modules/my-module/android/build/
 
+# local mobile release artifacts
+*.aab
+*.apk
+*.ipa
+
 # local Supabase CLI state
 /supabase/.temp/
 

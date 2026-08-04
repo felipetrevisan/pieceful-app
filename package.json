@@ -1,10 +1,18 @@
 {
   "name": "pieceful-app",
   "private": true,
-  "packageManager": "bun@1.2.20",
+  "packageManager": "bun@1.3.14",
   "workspaces": [
     "apps/*",
     "packages/*"
+  ],
+  "overrides": {
+    "postcss": "8.5.25",
+    "sharp": "0.35.3",
+    "uuid": "11.1.1"
+  },
+  "trustedDependencies": [
+    "@sentry/cli"
   ],
   "scripts": {
     "dev": "turbo run dev",
@@ -15,12 +23,13 @@
     "format": "biome check --write .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "doctor": "cd apps/mobile && bunx expo-doctor",
     "clean": "rm -rf apps/web/.next apps/api/dist"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.0",
-    "@types/bun": "1.2.20",
-    "turbo": "^2.10.5",
+    "@biomejs/biome": "2.5.6",
+    "@types/bun": "1.3.14",
+    "turbo": "2.10.8",
     "typescript": "5.9.2"
   }
 }

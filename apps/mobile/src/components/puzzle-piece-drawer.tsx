@@ -1,9 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import {
-  normalizeQuarterTurn,
-  type PuzzlePiece,
-  type PuzzlePieceShape,
-} from "@puzzled/puzzle-engine";
+import { normalizeQuarterTurn, type PuzzlePiece } from "@puzzled/puzzle-engine";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -26,11 +22,9 @@ import Animated, {
 import Svg, { ClipPath, Defs, Path, Image as SvgImage } from "react-native-svg";
 import { FrostedBackdrop } from "@/components/frosted-surface";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
-import type {
-  AppLanguage,
-  MobilePreferences,
-  MobileTheme,
-} from "@/state/app-provider";
+import { piecePath } from "@/lib/piece-path";
+import type { AppLanguage, MobilePreferences, MobileTheme } from "@/state/app-provider";
+import { styles } from "./puzzle-piece-drawer.styles";
 
 export interface ScreenFrame {
   x: number;
@@ -64,31 +58,6 @@ interface PuzzlePieceDrawerProps {
   onDragPreviewChange: (preview: TrayDragPreview | null) => void;
   onReleasePieces: (ids: string[], x: number, y: number, anchorId: string) => void;
   onStorageFrameChange: (frame: ScreenFrame | null) => void;
-}
-
-function piecePath(shape: PuzzlePieceShape, size: number, margin: number) {
-  const x = margin;
-  const y = margin;
-  const bump = size * 0.22;
-  const edge = (kind: "top" | "right" | "bottom" | "left") => {
-    const value = shape[kind];
-    const direction = value === "tab" ? 1 : value === "blank" ? -1 : 0;
-    if (kind === "top") {
-      if (!direction) return `L ${x + size} ${y}`;
-      return `L ${x + size * 0.32} ${y} C ${x + size * 0.34} ${y - bump * direction} ${x + size * 0.66} ${y - bump * direction} ${x + size * 0.68} ${y} L ${x + size} ${y}`;
-    }
-    if (kind === "right") {
-      if (!direction) return `L ${x + size} ${y + size}`;
-      return `L ${x + size} ${y + size * 0.32} C ${x + size + bump * direction} ${y + size * 0.34} ${x + size + bump * direction} ${y + size * 0.66} ${x + size} ${y + size * 0.68} L ${x + size} ${y + size}`;
-    }
-    if (kind === "bottom") {
-      if (!direction) return `L ${x} ${y + size}`;
-      return `L ${x + size * 0.68} ${y + size} C ${x + size * 0.66} ${y + size + bump * direction} ${x + size * 0.34} ${y + size + bump * direction} ${x + size * 0.32} ${y + size} L ${x} ${y + size}`;
-    }
-    if (!direction) return `L ${x} ${y}`;
-    return `L ${x} ${y + size * 0.68} C ${x - bump * direction} ${y + size * 0.66} ${x - bump * direction} ${y + size * 0.34} ${x} ${y + size * 0.32} L ${x} ${y}`;
-  };
-  return `M ${x} ${y} ${edge("top")} ${edge("right")} ${edge("bottom")} ${edge("left")} Z`;
 }
 
 function drawerOrder(id: string) {
@@ -129,8 +98,7 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
   onStorageFrameChange,
 }: PuzzlePieceDrawerProps) {
   const { width } = useWindowDimensions();
-  const t = (portuguese: string, english: string) =>
-    language === "en" ? english : portuguese;
+  const t = (portuguese: string, english: string) => (language === "en" ? english : portuguese);
   const colors = mobileThemes[theme];
   const storedPieces = useMemo(
     () =>
@@ -163,10 +131,7 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
     return next.length ? next : [[]];
   }, [filteredPieces, pageSize]);
   function finishTrayScroll(offsetX: number) {
-    const nextIndex = Math.max(
-      0,
-      Math.min(pages.length - 1, Math.round(offsetX / pageWidth)),
-    );
+    const nextIndex = Math.max(0, Math.min(pages.length - 1, Math.round(offsetX / pageWidth)));
     setPageIndex((current) => {
       if (current !== nextIndex && preferences.haptics) {
         void Haptics.selectionAsync();
@@ -204,7 +169,7 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
     };
     const timeout = setTimeout(measure, 120);
     return () => clearTimeout(timeout);
-  }, [onStorageFrameChange, pageWidth]);
+  }, [onStorageFrameChange]);
 
   const visibleDots = useMemo(() => {
     if (pages.length <= 7) return pages.map((_, index) => index);
@@ -264,40 +229,40 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.header}>
-          <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}1b` }]}>
-            <Ionicons name="file-tray-full-outline" size={22} color={colors.accent} />
-          </View>
-          <View style={styles.headerCopy}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {t("Bandeja de peças", "Piece tray")}
-            </Text>
-            <Text style={[styles.meta, { color: colors.muted }]}>
-              {selectedIds.length
-                ? `${selectedIds.length} ${t("selecionadas · segure para arrastar", "selected · hold to drag")}`
-                : `${storedPieces.length} ${t("guardadas · toque para selecionar", "stored · tap to select")}`}
-            </Text>
-          </View>
-          {selectedIds.length ? (
-            <Pressable
-              accessibilityLabel={t("Limpar seleção", "Clear selection")}
-              hitSlop={8}
-              onPress={() => setSelectedIds([])}
-              style={[styles.selectionBadge, { backgroundColor: colors.accent }]}
-            >
-              <Text style={[styles.selectionCount, { color: colors.background }]}>
-                {selectedIds.length}
-              </Text>
-              <Ionicons name="close" size={14} color={colors.background} />
-            </Pressable>
-          ) : null}
-          <View
-            style={[
-              styles.storage,
-              { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}70` },
-            ]}
+        <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}1b` }]}>
+          <Ionicons name="file-tray-full-outline" size={22} color={colors.accent} />
+        </View>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {t("Bandeja de peças", "Piece tray")}
+          </Text>
+          <Text style={[styles.meta, { color: colors.muted }]}>
+            {selectedIds.length
+              ? `${selectedIds.length} ${t("selecionadas · segure para arrastar", "selected · hold to drag")}`
+              : `${storedPieces.length} ${t("guardadas · toque para selecionar", "stored · tap to select")}`}
+          </Text>
+        </View>
+        {selectedIds.length ? (
+          <Pressable
+            accessibilityLabel={t("Limpar seleção", "Clear selection")}
+            hitSlop={8}
+            onPress={() => setSelectedIds([])}
+            style={[styles.selectionBadge, { backgroundColor: colors.accent }]}
           >
-            <Ionicons name="archive-outline" size={22} color={colors.accent} />
-          </View>
+            <Text style={[styles.selectionCount, { color: colors.background }]}>
+              {selectedIds.length}
+            </Text>
+            <Ionicons name="close" size={14} color={colors.background} />
+          </Pressable>
+        ) : null}
+        <View
+          style={[
+            styles.storage,
+            { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}70` },
+          ]}
+        >
+          <Ionicons name="archive-outline" size={22} color={colors.accent} />
+        </View>
       </View>
 
       <View style={[styles.divider, { backgroundColor: `${colors.accent}30` }]} />
@@ -342,91 +307,87 @@ export const PuzzlePieceDrawer = memo(function PuzzlePieceDrawer({
           </View>
           {filteredPieces.length ? (
             <>
-            <View style={styles.pieceList}>
-            <FlatList
-              ref={listRef}
-              key={`tray-pages-${trayColumns}`}
-              style={styles.pageScroller}
-              data={pages}
-              horizontal
-              scrollEnabled={pages.length > 1}
-              pagingEnabled
-              bounces={false}
-              directionalLockEnabled
-              nestedScrollEnabled
-              overScrollMode="never"
-              decelerationRate="fast"
-              snapToInterval={pageWidth}
-              disableIntervalMomentum
-              keyExtractor={(_page, index) => `tray-page-${index}`}
-              showsHorizontalScrollIndicator={false}
-              initialNumToRender={2}
-              maxToRenderPerBatch={2}
-              windowSize={3}
-              onMomentumScrollEnd={(event) => {
-                finishTrayScroll(event.nativeEvent.contentOffset.x);
-              }}
-              getItemLayout={(_data, index) => ({
-                length: pageWidth,
-                offset: pageWidth * index,
-                index,
-              })}
-              renderItem={({ item: page }) => (
-                <View style={[styles.page, { width: pageWidth }]}>
-                  {page.map((piece) => (
-                    <View
-                      key={piece.id}
-                      style={[
-                        styles.pieceCell,
-                        { width: (pageWidth - 8) / trayColumns },
-                      ]}
-                    >
-                      <DrawerPiece
-                        piece={piece}
-                        imageUri={imageUri}
-                        rows={rows}
-                        columns={columns}
-                        size={pieceSize}
-                        boardFrame={boardFrame}
-                        headerFrame={headerFrame}
-                        storageFrame={storageFrame}
-                        boardZoom={boardZoom}
-                        boardPanX={boardPanX}
-                        boardPanY={boardPanY}
-                        dragScreenX={dragScreenX}
-                        dragScreenY={dragScreenY}
-                        selected={selectedIds.includes(piece.id)}
-                        selectedIds={selectedIds}
-                        onDragPreviewChange={onDragPreviewChange}
-                        onToggleSelected={toggleSelected}
-                        onRelease={releaseSelected}
-                      />
+              <View style={styles.pieceList}>
+                <FlatList
+                  ref={listRef}
+                  key={`tray-pages-${trayColumns}`}
+                  style={styles.pageScroller}
+                  data={pages}
+                  horizontal
+                  scrollEnabled={pages.length > 1}
+                  pagingEnabled
+                  bounces={false}
+                  directionalLockEnabled
+                  nestedScrollEnabled
+                  overScrollMode="never"
+                  decelerationRate="fast"
+                  snapToInterval={pageWidth}
+                  disableIntervalMomentum
+                  keyExtractor={(_page, index) => `tray-page-${index}`}
+                  showsHorizontalScrollIndicator={false}
+                  initialNumToRender={2}
+                  maxToRenderPerBatch={2}
+                  windowSize={3}
+                  onMomentumScrollEnd={(event) => {
+                    finishTrayScroll(event.nativeEvent.contentOffset.x);
+                  }}
+                  getItemLayout={(_data, index) => ({
+                    length: pageWidth,
+                    offset: pageWidth * index,
+                    index,
+                  })}
+                  renderItem={({ item: page }) => (
+                    <View style={[styles.page, { width: pageWidth }]}>
+                      {page.map((piece) => (
+                        <View
+                          key={piece.id}
+                          style={[styles.pieceCell, { width: (pageWidth - 8) / trayColumns }]}
+                        >
+                          <DrawerPiece
+                            piece={piece}
+                            imageUri={imageUri}
+                            rows={rows}
+                            columns={columns}
+                            size={pieceSize}
+                            boardFrame={boardFrame}
+                            headerFrame={headerFrame}
+                            storageFrame={storageFrame}
+                            boardZoom={boardZoom}
+                            boardPanX={boardPanX}
+                            boardPanY={boardPanY}
+                            dragScreenX={dragScreenX}
+                            dragScreenY={dragScreenY}
+                            selected={selectedIds.includes(piece.id)}
+                            selectedIds={selectedIds}
+                            onDragPreviewChange={onDragPreviewChange}
+                            onToggleSelected={toggleSelected}
+                            onRelease={releaseSelected}
+                          />
+                        </View>
+                      ))}
                     </View>
-                  ))}
-                </View>
-              )}
-            />
-            </View>
-            <View style={styles.pagination}>
-              {visibleDots.map((index) => (
-                <View
-                  key={`tray-dot-${index}`}
-                  style={[
-                    styles.dot,
-                    {
-                      width: index === pageIndex ? 18 : 6,
-                      backgroundColor:
-                        index === pageIndex ? colors.accent : `${colors.muted}65`,
-                    },
-                  ]}
+                  )}
                 />
-              ))}
-              {pages.length > 7 ? (
-                <Text style={[styles.pageCount, { color: colors.muted }]}>
-                  {pageIndex + 1}/{pages.length}
-                </Text>
-              ) : null}
-            </View>
+              </View>
+              <View style={styles.pagination}>
+                {visibleDots.map((index) => (
+                  <View
+                    key={`tray-dot-${index}`}
+                    style={[
+                      styles.dot,
+                      {
+                        width: index === pageIndex ? 18 : 6,
+                        backgroundColor: index === pageIndex ? colors.accent : `${colors.muted}65`,
+                      },
+                    ]}
+                  />
+                ))}
+                {pages.length > 7 ? (
+                  <Text style={[styles.pageCount, { color: colors.muted }]}>
+                    {pageIndex + 1}/{pages.length}
+                  </Text>
+                ) : null}
+              </View>
             </>
           ) : (
             <View style={styles.empty}>
@@ -524,9 +485,7 @@ function DrawerPiece({
         const insideHeader = headerFrame
           ? event.absoluteY <= headerFrame.y + headerFrame.height
           : false;
-        const insideTray = storageFrame
-          ? event.absoluteY >= storageFrame.y
-          : false;
+        const insideTray = storageFrame ? event.absoluteY >= storageFrame.y : false;
         if (insideHeader || insideTray) {
           dragging.set(0);
           runOnJS(onDragPreviewChange)(null);
@@ -588,9 +547,7 @@ function DrawerPiece({
           width={extent}
           height={extent}
           style={{
-            transform: [
-              { rotate: `${normalizeQuarterTurn(piece.currentPosition.rotation)}deg` },
-            ],
+            transform: [{ rotate: `${normalizeQuarterTurn(piece.currentPosition.rotation)}deg` }],
           }}
         >
           <Defs>
@@ -719,157 +676,3 @@ export function PuzzlePieceDragOverlay({
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  sheet: {
-    position: "absolute",
-    left: 8,
-    right: 8,
-    bottom: 0,
-    zIndex: 80,
-    borderWidth: 1.5,
-    borderRadius: 26,
-    overflow: "hidden",
-    shadowOpacity: 0.28,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -10 },
-    elevation: 18,
-  },
-  header: {
-    height: 54,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  headerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerCopy: { flex: 1, minWidth: 0 },
-  title: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 15 },
-  meta: { fontFamily: "Inter_600SemiBold", fontSize: 9, marginTop: 2 },
-  storage: {
-    width: 43,
-    height: 43,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  selectionBadge: {
-    minWidth: 42,
-    height: 32,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
-  selectionCount: { fontFamily: "Inter_700Bold", fontSize: 12 },
-  divider: { height: 1 },
-  filters: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  filterButton: {
-    flex: 1,
-    minHeight: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  filterLabel: { fontFamily: "Inter_700Bold", fontSize: 12 },
-  pieceList: { height: 124, flexGrow: 0 },
-  pageScroller: { flex: 1 },
-  page: {
-    height: 124,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignContent: "center",
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  pieceCell: { alignItems: "center", justifyContent: "center" },
-  pagination: {
-    height: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingBottom: 4,
-  },
-  dot: { height: 6, borderRadius: 99 },
-  pageCount: { marginLeft: 4, fontFamily: "Inter_700Bold", fontSize: 9 },
-  stackLayer: {
-    position: "absolute",
-    inset: 7,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    backgroundColor: "rgba(18,27,55,.88)",
-  },
-  stackLayerBack: { transform: [{ translateX: 8 }, { translateY: -7 }, { rotate: "7deg" }] },
-  stackLayerMiddle: { transform: [{ translateX: 4 }, { translateY: -4 }, { rotate: "3deg" }] },
-  selectedOutline: {
-    position: "absolute",
-    inset: 2,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#67edf3",
-  },
-  selectedCheck: {
-    position: "absolute",
-    top: -7,
-    right: -7,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#67edf3",
-  },
-  dragOverlay: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    zIndex: 300,
-    elevation: 30,
-    shadowOpacity: 0.55,
-    shadowRadius: 13,
-    shadowOffset: { width: 0, height: 7 },
-  },
-  dragStack: {
-    position: "absolute",
-    inset: 8,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    backgroundColor: "rgba(12,20,44,.92)",
-  },
-  dragStackBack: { transform: [{ translateX: 10 }, { translateY: -8 }, { rotate: "8deg" }] },
-  dragStackMiddle: { transform: [{ translateX: 5 }, { translateY: -4 }, { rotate: "4deg" }] },
-  dragCount: {
-    position: "absolute",
-    right: -10,
-    top: -10,
-    zIndex: 4,
-    minWidth: 25,
-    height: 25,
-    borderRadius: 13,
-    paddingHorizontal: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dragCountText: { color: "#071126", fontFamily: "Inter_800ExtraBold", fontSize: 11 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 9 },
-  emptyText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
-});

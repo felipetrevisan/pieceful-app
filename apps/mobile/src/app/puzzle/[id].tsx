@@ -7,9 +7,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  AppState as NativeAppState,
   InteractionManager,
   Modal,
+  AppState as NativeAppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,6 +35,7 @@ import {
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { useApp } from "@/state/app-provider";
 import { useMonetization } from "@/state/monetization-provider";
+import { styles } from "@/features/puzzle/puzzle-screen.styles";
 
 function releaseOffsets(count: number) {
   const offsets = [{ x: 0, y: 0 }];
@@ -94,9 +95,7 @@ export default function PuzzleScreen() {
   const [zoomCommand, setZoomCommand] = useState<PuzzleZoomCommand | null>(null);
   const [hintCommand, setHintCommand] = useState<PuzzleHintCommand | null>(null);
   const [elapsedTime, setElapsedTime] = useState(puzzle?.session.elapsedTime ?? 0);
-  const [workspaceReady, setWorkspaceReady] = useState(
-    (puzzle?.session.pieces.length ?? 0) < 300,
-  );
+  const [workspaceReady, setWorkspaceReady] = useState((puzzle?.session.pieces.length ?? 0) < 300);
   const elapsedTimeRef = useRef(puzzle?.session.elapsedTime ?? 0);
   const [trayDragPreview, setTrayDragPreview] = useState<TrayDragPreview | null>(null);
   const [pieceStoredNoticeCount, setPieceStoredNoticeCount] = useState(0);
@@ -109,7 +108,9 @@ export default function PuzzleScreen() {
   const activeHintPieceId = useRef<string | null>(null);
   const pieceStoredNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardedHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const rewardedHintAppStateSubscription = useRef<ReturnType<typeof NativeAppState.addEventListener> | null>(null);
+  const rewardedHintAppStateSubscription = useRef<ReturnType<
+    typeof NativeAppState.addEventListener
+  > | null>(null);
   const largeWorkspace = (puzzle?.session.pieces.length ?? 0) >= 300;
 
   useEffect(() => {
@@ -124,7 +125,7 @@ export default function PuzzleScreen() {
       cancelled = true;
       task.cancel();
     };
-  }, [largeWorkspace, puzzle?.id]);
+  }, [largeWorkspace]);
 
   const placed = useMemo(() => pieces.filter((piece) => piece.isPlaced).length, [pieces]);
   const looseBoardPieces = useMemo(
@@ -133,9 +134,7 @@ export default function PuzzleScreen() {
   );
   const progress = pieces.length ? Math.round((placed / pieces.length) * 100) : 0;
   const completed = pieces.length > 0 && placed === pieces.length;
-  const imageAspect = puzzle
-    ? puzzle.configuration.columns / puzzle.configuration.rows
-    : 1;
+  const imageAspect = puzzle ? puzzle.configuration.columns / puzzle.configuration.rows : 1;
   const referenceMaxWidth = Math.min(532, viewportWidth - 64);
   const referenceMaxHeight = viewportHeight * 0.58;
   const referenceImageWidth = Math.min(referenceMaxWidth, referenceMaxHeight * imageAspect);
@@ -144,9 +143,10 @@ export default function PuzzleScreen() {
     boardFrame && headerFrame
       ? Math.max(0, headerFrame.y + headerFrame.height + 10 - boardFrame.y)
       : 0;
-  const cameraViewportBottom = boardFrame && storageFrame
-    ? Math.max(cameraViewportTop + 120, storageFrame.y - 10 - boardFrame.y)
-    : Math.max(cameraViewportTop + 120, viewportHeight - 356);
+  const cameraViewportBottom =
+    boardFrame && storageFrame
+      ? Math.max(cameraViewportTop + 120, storageFrame.y - 10 - boardFrame.y)
+      : Math.max(cameraViewportTop + 120, viewportHeight - 356);
 
   useEffect(() => {
     if (!puzzle?.id || completed) return;
@@ -162,11 +162,14 @@ export default function PuzzleScreen() {
     };
   }, [completed, id, puzzle?.id, updatePuzzleElapsedTime]);
 
-  useEffect(() => () => {
-    if (pieceStoredNoticeTimer.current) clearTimeout(pieceStoredNoticeTimer.current);
-    if (rewardedHintTimer.current) clearTimeout(rewardedHintTimer.current);
-    rewardedHintAppStateSubscription.current?.remove();
-  }, []);
+  useEffect(
+    () => () => {
+      if (pieceStoredNoticeTimer.current) clearTimeout(pieceStoredNoticeTimer.current);
+      if (rewardedHintTimer.current) clearTimeout(rewardedHintTimer.current);
+      rewardedHintAppStateSubscription.current?.remove();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!puzzle?.id || completed) return;
@@ -176,13 +179,16 @@ export default function PuzzleScreen() {
     return () => subscription.remove();
   }, [completed, id, puzzle?.id, updatePuzzleElapsedTime]);
 
-  const savePieces = useCallback((next: PuzzlePiece[]) => {
-    setPieces(next);
-    updatePuzzlePieces(id, next, elapsedTimeRef.current);
-    if (next.length > 0 && next.every((piece) => piece.isPlaced)) {
-      setTimeout(() => router.replace(`/result/${id}` as never), 500);
-    }
-  }, [id, updatePuzzlePieces]);
+  const savePieces = useCallback(
+    (next: PuzzlePiece[]) => {
+      setPieces(next);
+      updatePuzzlePieces(id, next, elapsedTimeRef.current);
+      if (next.length > 0 && next.every((piece) => piece.isPlaced)) {
+        setTimeout(() => router.replace(`/result/${id}` as never), 500);
+      }
+    },
+    [id, updatePuzzlePieces],
+  );
 
   const placeHint = useCallback(() => {
     if (hintCommand || !puzzle) return;
@@ -191,14 +197,26 @@ export default function PuzzleScreen() {
       pieces.find((piece) => !piece.isPlaced);
     if (!candidate) return;
     incrementPuzzleHints(id);
-    const startOffsetX = candidate.correctPosition.x < puzzle.configuration.columns / 2 ? 2.1 : -2.1;
+    const startOffsetX =
+      candidate.correctPosition.x < puzzle.configuration.columns / 2 ? 2.1 : -2.1;
     const startOffsetY = candidate.correctPosition.y < puzzle.configuration.rows / 2 ? 1.4 : -1.4;
-    const startX = candidate.trayId === null
-      ? candidate.currentPosition.x
-      : Math.max(-0.15, Math.min(puzzle.configuration.columns - 0.85, candidate.correctPosition.x + startOffsetX));
-    const startY = candidate.trayId === null
-      ? candidate.currentPosition.y
-      : Math.max(-0.15, Math.min(puzzle.configuration.rows - 0.85, candidate.correctPosition.y + startOffsetY));
+    const startX =
+      candidate.trayId === null
+        ? candidate.currentPosition.x
+        : Math.max(
+            -0.15,
+            Math.min(
+              puzzle.configuration.columns - 0.85,
+              candidate.correctPosition.x + startOffsetX,
+            ),
+          );
+    const startY =
+      candidate.trayId === null
+        ? candidate.currentPosition.y
+        : Math.max(
+            -0.15,
+            Math.min(puzzle.configuration.rows - 0.85, candidate.correctPosition.y + startOffsetY),
+          );
     const prepared = pieces.map((piece) => {
       if (piece.id === candidate.id)
         return {
@@ -218,25 +236,28 @@ export default function PuzzleScreen() {
     setHintCommand({ id: hintCommandId.current, pieceId: candidate.id });
   }, [hintCommand, id, incrementPuzzleHints, pieces, puzzle]);
 
-  const completeHintAnimation = useCallback((pieceId: string) => {
-    if (activeHintPieceId.current !== pieceId) return;
-    activeHintPieceId.current = null;
-    const next = pieces.map((piece) =>
-      piece.id === pieceId
-        ? {
-            ...piece,
-            isPlaced: true,
-            groupId: "tabuleiro",
-            trayId: null,
-            currentPosition: { ...piece.correctPosition },
-          }
-        : piece,
-    );
-    setHintCommand(null);
-    savePieces(next);
-    if (preferences.haptics)
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [pieces, preferences.haptics, savePieces]);
+  const completeHintAnimation = useCallback(
+    (pieceId: string) => {
+      if (activeHintPieceId.current !== pieceId) return;
+      activeHintPieceId.current = null;
+      const next = pieces.map((piece) =>
+        piece.id === pieceId
+          ? {
+              ...piece,
+              isPlaced: true,
+              groupId: "tabuleiro",
+              trayId: null,
+              currentPosition: { ...piece.correctPosition },
+            }
+          : piece,
+      );
+      setHintCommand(null);
+      savePieces(next);
+      if (preferences.haptics)
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [pieces, preferences.haptics, savePieces],
+  );
 
   useEffect(() => {
     if (!hintCommand) return;
@@ -286,13 +307,15 @@ export default function PuzzleScreen() {
       [
         { text: t("Agora não", "Not now"), style: "cancel" },
         ...(hintCredits > 0
-          ? [{
-              text: t(`Usar dica grátis (${hintCredits})`, `Use free hint (${hintCredits})`),
-              icon: "bulb" as const,
-              onPress: () => {
-                if (consumeHintCredit()) placeHint();
+          ? [
+              {
+                text: t(`Usar dica grátis (${hintCredits})`, `Use free hint (${hintCredits})`),
+                icon: "bulb" as const,
+                onPress: () => {
+                  if (consumeHintCredit()) placeHint();
+                },
               },
-            }]
+            ]
           : []),
         {
           text: t("Assistir anúncio", "Watch ad"),
@@ -314,37 +337,40 @@ export default function PuzzleScreen() {
     );
   }
 
-  const releasePieces = useCallback((ids: string[], x: number, y: number, anchorId: string) => {
-    const released = pieces.filter((piece) => ids.includes(piece.id));
-    if (!released.length) return;
+  const releasePieces = useCallback(
+    (ids: string[], x: number, y: number, anchorId: string) => {
+      const released = pieces.filter((piece) => ids.includes(piece.id));
+      if (!released.length) return;
 
-    const orderedReleased = [
-      ...released.filter((piece) => piece.id === anchorId),
-      ...released.filter((piece) => piece.id !== anchorId),
-    ];
-    const offsets = releaseOffsets(orderedReleased.length);
-    const releasedIds = new Set(ids);
+      const orderedReleased = [
+        ...released.filter((piece) => piece.id === anchorId),
+        ...released.filter((piece) => piece.id !== anchorId),
+      ];
+      const offsets = releaseOffsets(orderedReleased.length);
+      const releasedIds = new Set(ids);
 
-    savePieces(
-      pieces.map((piece) => {
-        if (!releasedIds.has(piece.id)) return piece;
-        const index = orderedReleased.findIndex((candidate) => candidate.id === piece.id);
-        const offset = offsets[index] ?? { x: 0, y: 0 };
-        return {
-          ...piece,
-          isPlaced: false,
-          trayId: null,
-          groupId: null,
-          currentPosition: {
-            x: x + offset.x,
-            y: y + offset.y,
-            rotation: piece.currentPosition.rotation,
-          },
-        };
-      }),
-    );
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-  }, [pieces, savePieces]);
+      savePieces(
+        pieces.map((piece) => {
+          if (!releasedIds.has(piece.id)) return piece;
+          const index = orderedReleased.findIndex((candidate) => candidate.id === piece.id);
+          const offset = offsets[index] ?? { x: 0, y: 0 };
+          return {
+            ...piece,
+            isPlaced: false,
+            trayId: null,
+            groupId: null,
+            currentPosition: {
+              x: x + offset.x,
+              y: y + offset.y,
+              rotation: piece.currentPosition.rotation,
+            },
+          };
+        }),
+      );
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+    },
+    [pieces, savePieces],
+  );
 
   const handleCameraChange = useCallback(
     (panX: number, panY: number, zoom: number) => {
@@ -499,7 +525,7 @@ export default function PuzzleScreen() {
                   ? t("Usar dica", "Use hint")
                   : hintCredits > 0
                     ? t(`Usar dica grátis · ${hintCredits}`, `Use free hint · ${hintCredits}`)
-                  : t("Assistir anúncio para ganhar dica", "Watch ad to get a hint")
+                    : t("Assistir anúncio para ganhar dica", "Watch ad to get a hint")
               }
               onPress={useHint}
             />
@@ -520,31 +546,31 @@ export default function PuzzleScreen() {
             setBoardFrame((current) => (current ? { ...current, y: current.y - delta } : current));
         }}
       >
-        {workspaceReady ? <NativePuzzleBoard
-          imageUri={puzzle.imageUri}
-          rows={puzzle.configuration.rows}
-          columns={puzzle.configuration.columns}
-          pieces={pieces}
-          language={language}
-          preferences={preferences}
-          theme={theme}
-          rotationEnabled={puzzle.configuration.rotationEnabled}
-          zoomCommand={zoomCommand}
-          hintCommand={hintCommand}
-          cameraViewportTop={cameraViewportTop}
-          cameraViewportBottom={cameraViewportBottom}
-          initialZoom={puzzle.session.camera.zoom}
-          initialPanX={puzzle.session.camera.x}
-          initialPanY={puzzle.session.camera.y}
-          externalDrawer
-          headerScreenTarget={headerFrame}
-          storageScreenTarget={storageFrame}
-          onBoardFrameChange={setBoardFrame}
-          onPieceStored={showPieceStoredNotice}
-          onPiecesChange={savePieces}
-          onCameraChange={handleCameraChange}
-          onHintAnimationComplete={completeHintAnimation}
-        /> : (
+        {workspaceReady ? (
+          <NativePuzzleBoard
+            imageUri={puzzle.imageUri}
+            rows={puzzle.configuration.rows}
+            columns={puzzle.configuration.columns}
+            pieces={pieces}
+            preferences={preferences}
+            theme={theme}
+            rotationEnabled={puzzle.configuration.rotationEnabled}
+            zoomCommand={zoomCommand}
+            hintCommand={hintCommand}
+            cameraViewportTop={cameraViewportTop}
+            cameraViewportBottom={cameraViewportBottom}
+            initialZoom={puzzle.session.camera.zoom}
+            initialPanX={puzzle.session.camera.x}
+            initialPanY={puzzle.session.camera.y}
+            headerScreenTarget={headerFrame}
+            storageScreenTarget={storageFrame}
+            onBoardFrameChange={setBoardFrame}
+            onPieceStored={showPieceStoredNotice}
+            onPiecesChange={savePieces}
+            onCameraChange={handleCameraChange}
+            onHintAnimationComplete={completeHintAnimation}
+          />
+        ) : (
           <View style={[styles.workspaceLoading, { borderColor: `${colors.accent}45` }]}>
             <ActivityIndicator size="large" color={colors.accent} />
             <Text style={[styles.workspaceLoadingTitle, { color: colors.text }]}>
@@ -560,44 +586,48 @@ export default function PuzzleScreen() {
         )}
       </ScrollView>
 
-      {workspaceReady ? <View style={styles.zoomControls}>
-        <IconButton
-          round
-          disabled={boardZoom <= 0.8}
-          icon="remove"
-          label={t("Diminuir zoom", "Zoom out")}
-          onPress={() => controlZoom("out")}
-          style={boardZoom <= 0.8 ? styles.zoomButtonDisabled : undefined}
-        />
-        <IconButton
-          round
-          icon="scan-outline"
-          label={t("Restaurar zoom", "Reset zoom")}
-          onPress={() => controlZoom("reset")}
-        />
-        <IconButton
-          round
-          disabled={boardZoom >= 2.4}
-          icon="add"
-          label={t("Aumentar zoom", "Zoom in")}
-          onPress={() => controlZoom("in")}
-          style={boardZoom >= 2.4 ? styles.zoomButtonDisabled : undefined}
-        />
-      </View> : null}
+      {workspaceReady ? (
+        <View style={styles.zoomControls}>
+          <IconButton
+            round
+            disabled={boardZoom <= 0.8}
+            icon="remove"
+            label={t("Diminuir zoom", "Zoom out")}
+            onPress={() => controlZoom("out")}
+            style={boardZoom <= 0.8 ? styles.zoomButtonDisabled : undefined}
+          />
+          <IconButton
+            round
+            icon="scan-outline"
+            label={t("Restaurar zoom", "Reset zoom")}
+            onPress={() => controlZoom("reset")}
+          />
+          <IconButton
+            round
+            disabled={boardZoom >= 2.4}
+            icon="add"
+            label={t("Aumentar zoom", "Zoom in")}
+            onPress={() => controlZoom("in")}
+            style={boardZoom >= 2.4 ? styles.zoomButtonDisabled : undefined}
+          />
+        </View>
+      ) : null}
 
-      {workspaceReady ? <View style={styles.storeLooseControl}>
-        <IconButton
-          round
-          disabled={!looseBoardPieces.length}
-          icon="file-tray-full-outline"
-          label={t(
-            `Mover ${looseBoardPieces.length} peças soltas para a bandeja`,
-            `Move ${looseBoardPieces.length} loose pieces to the tray`,
-          )}
-          onPress={confirmStoreLoosePieces}
-          style={!looseBoardPieces.length ? styles.zoomButtonDisabled : undefined}
-        />
-      </View> : null}
+      {workspaceReady ? (
+        <View style={styles.storeLooseControl}>
+          <IconButton
+            round
+            disabled={!looseBoardPieces.length}
+            icon="file-tray-full-outline"
+            label={t(
+              `Mover ${looseBoardPieces.length} peças soltas para a bandeja`,
+              `Move ${looseBoardPieces.length} loose pieces to the tray`,
+            )}
+            onPress={confirmStoreLoosePieces}
+            style={!looseBoardPieces.length ? styles.zoomButtonDisabled : undefined}
+          />
+        </View>
+      ) : null}
 
       {pieceStoredNoticeCount > 0 ? (
         <Animated.View
@@ -640,40 +670,44 @@ export default function PuzzleScreen() {
         </Animated.View>
       ) : null}
 
-      {workspaceReady ? <PuzzlePieceDrawer
-        imageUri={puzzle.imageUri}
-        rows={puzzle.configuration.rows}
-        columns={puzzle.configuration.columns}
-        pieces={pieces}
-        language={language}
-        preferences={preferences}
-        theme={theme}
-        boardFrame={boardFrame}
-        headerFrame={headerFrame}
-        storageFrame={storageFrame}
-        boardZoom={boardZoom}
-        boardPanX={boardPan.x}
-        boardPanY={boardPan.y}
-        dragScreenX={trayDragX}
-        dragScreenY={trayDragY}
-        onDragPreviewChange={setTrayDragPreview}
-        onReleasePieces={releasePieces}
-        onStorageFrameChange={setStorageFrame}
-      /> : null}
+      {workspaceReady ? (
+        <PuzzlePieceDrawer
+          imageUri={puzzle.imageUri}
+          rows={puzzle.configuration.rows}
+          columns={puzzle.configuration.columns}
+          pieces={pieces}
+          language={language}
+          preferences={preferences}
+          theme={theme}
+          boardFrame={boardFrame}
+          headerFrame={headerFrame}
+          storageFrame={storageFrame}
+          boardZoom={boardZoom}
+          boardPanX={boardPan.x}
+          boardPanY={boardPan.y}
+          dragScreenX={trayDragX}
+          dragScreenY={trayDragY}
+          onDragPreviewChange={setTrayDragPreview}
+          onReleasePieces={releasePieces}
+          onStorageFrameChange={setStorageFrame}
+        />
+      ) : null}
 
-      {workspaceReady ? <PuzzlePieceDragOverlay
-        preview={trayDragPreview}
-        imageUri={puzzle.imageUri}
-        rows={puzzle.configuration.rows}
-        columns={puzzle.configuration.columns}
-        boardFrame={boardFrame}
-        storageFrame={storageFrame}
-        boardZoom={boardZoom}
-        screenX={trayDragX}
-        screenY={trayDragY}
-        screenOffsetY={insets.top}
-        accent={colors.accent}
-      /> : null}
+      {workspaceReady ? (
+        <PuzzlePieceDragOverlay
+          preview={trayDragPreview}
+          imageUri={puzzle.imageUri}
+          rows={puzzle.configuration.rows}
+          columns={puzzle.configuration.columns}
+          boardFrame={boardFrame}
+          storageFrame={storageFrame}
+          boardZoom={boardZoom}
+          screenX={trayDragX}
+          screenY={trayDragY}
+          screenOffsetY={insets.top}
+          accent={colors.accent}
+        />
+      ) : null}
 
       <Modal
         visible={showReference}
@@ -736,137 +770,3 @@ function formatElapsed(seconds: number) {
     ? `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`
     : `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
 }
-
-const styles = StyleSheet.create({
-  toolbar: {
-    marginHorizontal: 12,
-    marginTop: 6,
-    borderRadius: 25,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    overflow: "hidden",
-  },
-  timerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  timerText: { fontFamily: "Inter_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] },
-  workspaceLoading: {
-    minHeight: 420,
-    borderWidth: 1,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    padding: 28,
-  },
-  workspaceLoadingTitle: {
-    fontFamily: "BricolageGrotesque_700Bold",
-    fontSize: 21,
-    marginTop: 5,
-  },
-  workspaceLoadingText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    textAlign: "center",
-  },
-  zoomControls: {
-    position: "absolute",
-    right: 16,
-    bottom: 264,
-    zIndex: 72,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  zoomButtonDisabled: { opacity: 0.38 },
-  storeLooseControl: {
-    position: "absolute",
-    left: 16,
-    bottom: 264,
-    zIndex: 72,
-  },
-  pieceStoredNotice: {
-    position: "absolute",
-    left: 22,
-    right: 22,
-    bottom: 266,
-    zIndex: 90,
-    minHeight: 58,
-    borderRadius: 22,
-    borderWidth: 1,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-  pieceStoredNoticeIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pieceStoredNoticeText: {
-    flexShrink: 1,
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-    lineHeight: 19,
-    textAlign: "center",
-  },
-  hintFollowNotice: {
-    position: "absolute",
-    alignSelf: "center",
-    top: 128,
-    zIndex: 90,
-    minHeight: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 10,
-  },
-  referenceBackdrop: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 18,
-    backgroundColor: "rgba(2,5,16,.84)",
-  },
-  referenceCard: {
-    width: "100%",
-    maxWidth: 560,
-    maxHeight: "82%",
-    padding: 14,
-    borderRadius: 26,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 18,
-  },
-  referenceHeader: {
-    minHeight: 54,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 10,
-  },
-  referenceTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 19 },
-  referenceSubtitle: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
-  referenceImageStage: { width: "100%", alignItems: "center", justifyContent: "center" },
-  referenceImage: { maxWidth: "100%", borderRadius: 18, overflow: "hidden" },
-});

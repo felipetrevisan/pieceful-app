@@ -18,5 +18,8 @@ export function configuredWebOrigins(value?: string) {
 
 export function isAllowedWebOrigin(origin: string, configuredOrigins: string[]) {
   const normalized = normalizeOrigin(origin);
-  return configuredOrigins.includes(normalized) || localNetworkOrigin.test(normalized);
+  return (
+    configuredOrigins.includes(normalized) ||
+    (Bun.env.NODE_ENV !== "production" && localNetworkOrigin.test(normalized))
+  );
 }

@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "app.perazzo.pieceful",
+      "buildNumber": "1",
       "supportsTablet": false,
       "infoPlist": {
         "NSPhotoLibraryAddUsageDescription": "Pieceful saves your completed puzzle timelapse to your photo library."
@@ -21,7 +22,10 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["BROWSABLE", "DEFAULT"],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "data": [
             {
               "scheme": "pieceful",
@@ -44,6 +48,8 @@
     },
     "plugins": [
       "expo-router",
+      "@sentry/react-native/expo",
+      "expo-secure-store",
       [
         "expo-splash-screen",
         {
@@ -55,7 +61,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Pieceful needs access to your photos to create puzzles."
+          "photosPermission": "Pieceful needs access to your photos to create puzzles.",
+          "microphonePermission": false
         }
       ],
       "expo-sharing",
@@ -72,12 +79,18 @@
           "optimizeAdLoading": true
         }
       ],
-      "./plugins/with-game-services",
-      "./plugins/with-release-signing"
+      "./plugins/with-game-services"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9bebe523-1a86-4bd5-859f-f6f0fff1efc0"
+      }
+    },
+    "owner": "felipejs"
   }
 }

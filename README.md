@@ -1,11 +1,12 @@
 # Pieceful
 
-Aplicativo web em português para transformar fotos em quebra-cabeças de 12 a 1.000 peças.
+Aplicativo web e mobile para transformar fotos em quebra-cabeças de 12 a 1.000 peças.
 
 ## Estrutura
 
 - `apps/web`: Next.js App Router, Canvas, GSAP, Web Worker e IndexedDB.
-- `apps/api`: API Elysia independente para futuras sincronizações.
+- `apps/api`: API Elysia para Unsplash, administração e downloads autorizados de pacotes.
+- `apps/mobile`: aplicativo Expo/React Native para Android e iOS, com funcionamento offline.
 - `packages/puzzle-engine`: topologia determinística, geometria e caminhos das peças.
 - `packages/shared`: contratos e validações compartilhadas.
 
@@ -29,6 +30,7 @@ Validação completa:
 bun run lint
 bun run typecheck
 bun run test
+bun run doctor
 bun run build
 ```
 
@@ -39,7 +41,23 @@ Os pipelines usam cache local em `.turbo` e respeitam o grafo de dependências d
 Todas as rotas do frontend e da API são escritas em inglês. A interface pode permanecer localizada
 em português, mas novos caminhos públicos e endpoints devem seguir essa convenção.
 
-As fotos são processadas e armazenadas localmente no navegador. Nenhuma imagem é enviada pela API.
+Na web, as fotos são processadas e armazenadas somente no navegador. No mobile, jogadores
+autenticados podem sincronizar partidas e fotos pessoais com buckets privados do Supabase.
+
+O build principal gera o frontend Next.js, a API Bun e o bundle Android do aplicativo mobile.
+Use `bun run build:ios` dentro de `apps/mobile` para validar o bundle iOS. O Expo web é apenas uma
+prévia opcional; a superfície web de produção é `apps/web`.
+
+## Supabase e segurança
+
+As migrações em `supabase/migrations` devem ser aplicadas em ordem. Elas protegem fotos pessoais,
+derivam XP e conquistas no banco, restringem mutações a RPCs, tornam pacotes privados e criam
+sessões administrativas revogáveis. Consulte `SECURITY.md` para o modelo de confiança e
+`docs/operations-security.md` para implantação, restauração e resposta a incidentes.
+
+Pacotes pagos exigem as variáveis RevenueCat da API e `EXPO_PUBLIC_API_URL` no mobile. A API valida
+a compra ou nível, impõe a versão mínima e emite URLs de 15 minutos; o app valida SHA-256 antes de
+instalar cada imagem.
 
 ## Unsplash
 

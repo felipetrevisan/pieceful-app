@@ -12,37 +12,22 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Platform,
   Pressable,
-  StyleSheet,
-  Switch,
+  ScrollView,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  FadeIn,
-  FadeOut,
-  LinearTransition,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
 import { ImagePackLibrary } from "@/components/kid-pack-library";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
 import {
   AppHeader,
-  Card,
-  Label,
   MutedText,
   PrimaryButton,
   Screen,
@@ -51,6 +36,8 @@ import {
 import { mobileThemes } from "@/constants/pieceful-theme";
 import { getInstalledImagePacks, type ImagePack } from "@/services/image-packs";
 import { useApp } from "@/state/app-provider";
+import { CollapsibleStepCard, DifficultySlider, OptionRow } from "@/features/tabs/create-controls";
+import { styles } from "@/features/tabs/create.styles";
 
 const presets = DIFFICULTIES;
 const kidPictures = [
@@ -163,17 +150,7 @@ interface KidPicture {
   height: number;
 }
 
-const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
-  beginner: ["Iniciante", "Beginner"],
-  easy: ["Fácil", "Easy"],
-  normal: ["Normal", "Normal"],
-  medium: ["Médio", "Medium"],
-  hard: ["Difícil", "Hard"],
-  advanced: ["Avançado", "Advanced"],
-  master: ["Mestre", "Master"],
-  legendary: ["Lendário", "Legendary"],
-  custom: ["Personalizado", "Custom"],
-};
+const BUILT_IN_GALLERY_ID = "built-in";
 
 export default function CreateScreen() {
   const { ageGroup, createPuzzle, preferences, t, theme } = useApp();
@@ -191,6 +168,7 @@ export default function CreateScreen() {
   const [kidCarouselIndex, setKidCarouselIndex] = useState(0);
   const [selectedKidPicture, setSelectedKidPicture] = useState<string | null>(null);
   const [installedPacks, setInstalledPacks] = useState<ImagePack[]>([]);
+  const [activeGalleryId, setActiveGalleryId] = useState(BUILT_IN_GALLERY_ID);
   const [showPackLibrary, setShowPackLibrary] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState({
     photo: true,
@@ -211,40 +189,53 @@ export default function CreateScreen() {
     () => presets.find((preset) => preset.pieces === configuration.totalPieces),
     [configuration.totalPieces],
   );
-  const availableKidPictures = useMemo<KidPicture[]>(
-    () => [
-      ...(ageGroup === "child" ? kidPictures : starterPictures).map((picture) => ({
+  const compatibleInstalledPacks = useMemo(
+    () =>
+      installedPacks.filter((pack) =>
+        pack.audience
+          ? pack.audience === "all" || pack.audience === ageGroup
+          : ageGroup === "child",
+      ),
+    [ageGroup, installedPacks],
+  );
+  const activePack = useMemo(
+    () => compatibleInstalledPacks.find((pack) => pack.id === activeGalleryId) ?? null,
+    [activeGalleryId, compatibleInstalledPacks],
+  );
+  const visibleGalleryId = activePack?.id ?? BUILT_IN_GALLERY_ID;
+  const availableKidPictures = useMemo<KidPicture[]>(() => {
+    if (!activePack) {
+      return (ageGroup === "child" ? kidPictures : starterPictures).map((picture) => ({
         ...picture,
         key: `built-in-${picture.en}`,
         width: 627,
         height: 627,
-      })),
-      ...installedPacks
-        .filter((pack) =>
-          pack.audience
-            ? pack.audience === "all" || pack.audience === ageGroup
-            : ageGroup === "child",
-        )
-        .flatMap((pack) =>
-          pack.pictures
-            .filter((picture) => picture.localUri)
-            .map((picture) => ({
-              key: `${pack.id}-${picture.id}`,
-              source: picture.localUri as string,
-              pt: picture.titlePt,
-              en: picture.titleEn,
-              width: picture.width,
-              height: picture.height,
-            })),
-        ),
-    ],
-    [ageGroup, installedPacks],
-  );
-  const updateInstalledPacks = useCallback((packs: ImagePack[]) => setInstalledPacks(packs), []);
+      }));
+    }
+    return activePack.pictures
+      .filter((picture) => picture.localUri)
+      .map((picture) => ({
+        key: `${activePack.id}-${picture.id}`,
+        source: picture.localUri as string,
+        pt: picture.titlePt,
+        en: picture.titleEn,
+        width: picture.width,
+        height: picture.height,
+      }));
+  }, [activePack, ageGroup]);
+  const updateInstalledPacks = useCallback((packs: ImagePack[]) => {
+    setInstalledPacks(packs);
+    setActiveGalleryId((current) =>
+      current === BUILT_IN_GALLERY_ID || packs.some((pack) => pack.id === current)
+        ? current
+        : BUILT_IN_GALLERY_ID,
+    );
+    setKidCarouselIndex(0);
+  }, []);
 
   useEffect(() => {
-    void getInstalledImagePacks().then(setInstalledPacks);
-  }, []);
+    void getInstalledImagePacks().then(updateInstalledPacks);
+  }, [updateInstalledPacks]);
   const resolvedOrientation = resolvePuzzleOrientation(
     "automatic",
     imageDimensions?.width,
@@ -287,12 +278,14 @@ export default function CreateScreen() {
         const optimized = await ImageManipulator.manipulateAsync(
           asset.uri,
           resizeScale < 1
-            ? [{
-                resize: {
-                  width: Math.max(1, Math.round(asset.width * resizeScale)),
-                  height: Math.max(1, Math.round(asset.height * resizeScale)),
+            ? [
+                {
+                  resize: {
+                    width: Math.max(1, Math.round(asset.width * resizeScale)),
+                    height: Math.max(1, Math.round(asset.height * resizeScale)),
+                  },
                 },
-              }]
+              ]
             : [],
           {
             compress: 0.88,
@@ -428,29 +421,108 @@ export default function CreateScreen() {
         expanded={expandedSteps.photo}
         onToggle={() => toggleStep("photo")}
       >
-
         {availableKidPictures.length ? (
           <View style={styles.kidGallery}>
+            {compatibleInstalledPacks.length ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.galleryTabs}
+                contentContainerStyle={styles.galleryTabsContent}
+              >
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: visibleGalleryId === BUILT_IN_GALLERY_ID }}
+                  onPress={() => {
+                    setActiveGalleryId(BUILT_IN_GALLERY_ID);
+                    setKidCarouselIndex(0);
+                  }}
+                  style={[
+                    styles.galleryTab,
+                    {
+                      backgroundColor:
+                        visibleGalleryId === BUILT_IN_GALLERY_ID
+                          ? colors.primary
+                          : colors.panelAlt,
+                      borderColor:
+                        visibleGalleryId === BUILT_IN_GALLERY_ID
+                          ? colors.primary
+                          : `${colors.accent}45`,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.galleryTabText,
+                      {
+                        color:
+                          visibleGalleryId === BUILT_IN_GALLERY_ID
+                            ? colors.background
+                            : colors.text,
+                      },
+                    ]}
+                  >
+                    {t("Inicial", "Starter")}
+                  </Text>
+                </Pressable>
+                {compatibleInstalledPacks.map((pack) => {
+                  const selected = activeGalleryId === pack.id;
+                  return (
+                    <Pressable
+                      key={pack.id}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected }}
+                      onPress={() => {
+                        setActiveGalleryId(pack.id);
+                        setKidCarouselIndex(0);
+                      }}
+                      style={[
+                        styles.galleryTab,
+                        {
+                          backgroundColor: selected ? colors.primary : colors.panelAlt,
+                          borderColor: selected ? colors.primary : `${colors.accent}45`,
+                        },
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.galleryTabText,
+                          { color: selected ? colors.background : colors.text },
+                        ]}
+                      >
+                        {t(pack.titlePt, pack.titleEn)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
             <View style={styles.kidHeading}>
               <Ionicons name="sparkles" size={19} color={colors.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.kidTitle, { color: colors.text }]}>
-                  {ageGroup === "child"
-                    ? t("Escolha uma aventura", "Choose an adventure")
-                    : t("Coleção inicial", "Starter collection")}
+                <Text style={[styles.kidTitle, { color: colors.text }]}> 
+                  {activePack
+                    ? t(activePack.titlePt, activePack.titleEn)
+                    : ageGroup === "child"
+                      ? t("Escolha uma aventura", "Choose an adventure")
+                      : t("Coleção inicial", "Starter collection")}
                 </Text>
-                <Text style={[styles.kidSwipeHint, { color: colors.muted }]}>
-                  {ageGroup === "child"
-                    ? t("Deslize para ver mais imagens", "Swipe to see more pictures")
-                    : t(
-                        "8 imagens inclusas · deslize para explorar",
-                        "8 included pictures · swipe to explore",
-                      )}
+                <Text style={[styles.kidSwipeHint, { color: colors.muted }]}> 
+                  {activePack
+                    ? `${availableKidPictures.length} ${t("imagens", "pictures")} · ${t("deslize para explorar", "swipe to explore")}`
+                    : ageGroup === "child"
+                      ? t("Deslize para ver mais imagens", "Swipe to see more pictures")
+                      : t(
+                          "8 imagens inclusas · deslize para explorar",
+                          "8 included pictures · swipe to explore",
+                        )}
                 </Text>
               </View>
               <Ionicons name="swap-horizontal" size={20} color={colors.accent} />
             </View>
             <FlatList
+              key={visibleGalleryId}
               data={availableKidPictures}
               horizontal
               nestedScrollEnabled
@@ -719,448 +791,5 @@ export default function CreateScreen() {
         onInstalledChange={updateInstalledPacks}
       />
     </Screen>
-  );
-}
-
-function CollapsibleStepCard({
-  children,
-  expanded,
-  onToggle,
-  step,
-  subtitle,
-  title,
-}: {
-  children: ReactNode;
-  expanded: boolean;
-  onToggle: () => void;
-  step: string;
-  subtitle: string;
-  title: string;
-}) {
-  const { preferences, theme } = useApp();
-  const colors = mobileThemes[theme];
-  const chevronProgress = useSharedValue(expanded ? 1 : 0);
-
-  useEffect(() => {
-    chevronProgress.set(
-      preferences.reducedMotion
-        ? expanded
-          ? 1
-          : 0
-        : withTiming(expanded ? 1 : 0, { duration: 220 }),
-    );
-  }, [chevronProgress, expanded, preferences.reducedMotion]);
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${chevronProgress.value * 180}deg` }],
-  }));
-
-  return (
-    <Animated.View
-      layout={
-        preferences.reducedMotion
-          ? undefined
-          : LinearTransition.springify().damping(18).stiffness(180)
-      }
-      style={styles.stepCardWrap}
-    >
-      <Card style={styles.collapsibleCard}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          accessibilityLabel={`${title}. ${subtitle}`}
-          android_ripple={{ color: `${colors.accent}18` }}
-          onPress={onToggle}
-          style={styles.stepHeader}
-        >
-          <View style={[styles.stepNumber, { backgroundColor: colors.panelAlt }]}>
-            <Text style={[styles.stepNumberText, { color: colors.accent }]}>{step}</Text>
-          </View>
-          <View style={styles.stepHeadingCopy}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>{title}</Text>
-            <Text numberOfLines={2} style={[styles.stepSubtitle, { color: colors.muted }]}>
-              {subtitle}
-            </Text>
-          </View>
-          <Animated.View
-            style={[
-              styles.stepChevron,
-              { backgroundColor: `${colors.accent}14`, borderColor: `${colors.accent}35` },
-              chevronStyle,
-            ]}
-          >
-            <Ionicons name="chevron-down" size={20} color={colors.accent} />
-          </Animated.View>
-        </Pressable>
-
-        {expanded ? (
-          <Animated.View
-            entering={preferences.reducedMotion ? undefined : FadeIn.duration(220)}
-            exiting={preferences.reducedMotion ? undefined : FadeOut.duration(150)}
-            style={styles.stepContent}
-          >
-            {children}
-          </Animated.View>
-        ) : null}
-      </Card>
-    </Animated.View>
-  );
-}
-
-const styles = StyleSheet.create({
-  stepCardWrap: { width: "100%", marginBottom: 16 },
-  collapsibleCard: { padding: 0 },
-  stepHeader: {
-    minHeight: 78,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    overflow: "hidden",
-  },
-  stepNumber: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepNumberText: { fontFamily: "Inter_700Bold", fontSize: 15 },
-  stepHeadingCopy: { flex: 1, minWidth: 0 },
-  stepTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
-  stepSubtitle: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
-  stepChevron: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepContent: { gap: 14, paddingHorizontal: 18, paddingBottom: 18 },
-  kidGallery: { gap: 12 },
-  kidHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
-  kidTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 19 },
-  kidSwipeHint: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 2 },
-  kidCarousel: { marginHorizontal: -20, overflow: "visible" },
-  kidGalleryContent: { paddingHorizontal: 20, paddingRight: 48, gap: 12 },
-  kidPictureShell: { borderRadius: 24, borderWidth: 2, overflow: "hidden" },
-  kidPicture: { width: "100%", padding: 8 },
-  kidImage: { width: "100%", aspectRatio: 1.45, borderRadius: 17 },
-  kidCardFooter: {
-    minHeight: 54,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 6,
-    paddingTop: 8,
-    paddingBottom: 3,
-  },
-  kidName: { flex: 1, minWidth: 0, fontFamily: "Inter_700Bold", fontSize: 14, lineHeight: 18 },
-  kidSelectIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  kidPagination: {
-    height: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  kidDot: { height: 7, borderRadius: 99 },
-  packLibraryButton: {
-    minHeight: 72,
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  packLibraryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  packLibraryTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 15 },
-  packLibraryMeta: { fontFamily: "Inter_400Regular", fontSize: 10, lineHeight: 14, marginTop: 2 },
-  orDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
-  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  orText: { fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.1 },
-  detectedFormat: {
-    minHeight: 68,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  detectedFormatIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  detectedFormatCopy: { flex: 1, minWidth: 0 },
-  detectedFormatTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 14 },
-  detectedFormatMeta: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 2 },
-  difficultyHero: {
-    minHeight: 112,
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  difficultyHeroIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 15,
-    backgroundColor: "rgba(5,12,28,.28)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 13,
-  },
-  difficultyHeroCopy: { flex: 1, minWidth: 0 },
-  difficultyHeroLabel: { color: "#08111f", fontFamily: "BricolageGrotesque_700Bold", fontSize: 22 },
-  difficultyHeroMeta: {
-    color: "rgba(8,17,31,.68)",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    marginTop: 3,
-  },
-  difficultyHeroCount: {
-    color: "#08111f",
-    fontFamily: "BricolageGrotesque_800ExtraBold",
-    fontSize: 35,
-    lineHeight: 37,
-    textAlign: "right",
-  },
-  difficultyHeroUnit: {
-    color: "rgba(8,17,31,.68)",
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    letterSpacing: 1,
-    textAlign: "right",
-  },
-  slider: { height: 48, justifyContent: "center", marginTop: 3 },
-  sliderLine: { position: "absolute", left: 14, right: 14, height: 5, borderRadius: 99 },
-  sliderMarks: {
-    position: "absolute",
-    left: 10,
-    right: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sliderMark: { width: 9, height: 9, borderRadius: 5, borderWidth: 2 },
-  sliderThumb: {
-    position: "absolute",
-    left: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    padding: 3,
-  },
-  sliderThumbInner: { flex: 1, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  sliderFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: -2,
-  },
-  sliderEndpoint: { fontFamily: "Inter_700Bold", fontSize: 11 },
-  sliderHint: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
-});
-
-function DifficultySlider({
-  selectedIndex,
-  orientation,
-  onSelect,
-}: {
-  selectedIndex: number;
-  orientation: ReturnType<typeof resolvePuzzleOrientation>;
-  onSelect: (index: number) => void;
-}) {
-  const { t, theme } = useApp();
-  const colors = mobileThemes[theme];
-  const preset = presets[selectedIndex] ?? presets[0];
-  const displayGrid = orientPuzzleGrid(preset.rows, preset.columns, orientation);
-  const [ptLabel, enLabel] = difficultyLabels[preset.id];
-  const [sliderWidth, setSliderWidth] = useState(0);
-  const thumbX = useSharedValue(0);
-  const maxIndex = presets.length - 1;
-
-  useEffect(() => {
-    if (sliderWidth > 0) {
-      thumbX.set(
-        withSpring((selectedIndex / maxIndex) * (sliderWidth - 32), {
-          damping: 16,
-          stiffness: 210,
-        }),
-      );
-    }
-  }, [maxIndex, selectedIndex, sliderWidth, thumbX]);
-
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: thumbX.value }],
-  }));
-
-  const usableWidth = Math.max(1, sliderWidth - 32);
-  const panGesture = Gesture.Pan()
-    .activeOffsetX([-5, 5])
-    .failOffsetY([-12, 12])
-    .onUpdate((event) => {
-      thumbX.set(Math.max(0, Math.min(usableWidth, event.x - 16)));
-    })
-    .onEnd(() => {
-      const next = Math.round((thumbX.value / usableWidth) * maxIndex);
-      thumbX.set(withSpring((next / maxIndex) * usableWidth, { damping: 15, stiffness: 240 }));
-      runOnJS(onSelect)(next);
-    });
-  const tapGesture = Gesture.Tap().onEnd((event) => {
-    const next = Math.round(
-      (Math.max(0, Math.min(usableWidth, event.x - 16)) / usableWidth) * maxIndex,
-    );
-    thumbX.set(withSpring((next / maxIndex) * usableWidth, { damping: 15, stiffness: 240 }));
-    runOnJS(onSelect)(next);
-  });
-  const sliderGesture = Gesture.Race(panGesture, tapGesture);
-
-  function adjust(direction: -1 | 1) {
-    onSelect(Math.max(0, Math.min(maxIndex, selectedIndex + direction)));
-  }
-
-  return (
-    <View style={{ gap: 12 }}>
-      <LinearGradient
-        colors={[colors.accent, colors.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.difficultyHero}
-      >
-        <View style={styles.difficultyHeroIcon}>
-          <Ionicons name="speedometer-outline" size={25} color="#08111f" />
-        </View>
-        <View style={styles.difficultyHeroCopy}>
-          <Text numberOfLines={1} style={styles.difficultyHeroLabel}>
-            {t(ptLabel, enLabel)}
-          </Text>
-          <Text style={styles.difficultyHeroMeta}>
-            {displayGrid.rows} × {displayGrid.columns} ·{" "}
-            {String(selectedIndex + 1).padStart(2, "0")}/{String(presets.length).padStart(2, "0")}
-          </Text>
-        </View>
-        <View>
-          <Text style={styles.difficultyHeroCount}>{preset.pieces}</Text>
-          <Text style={styles.difficultyHeroUnit}>{t("PEÇAS", "PIECES")}</Text>
-        </View>
-      </LinearGradient>
-
-      <GestureDetector gesture={sliderGesture}>
-        <Animated.View
-          accessible
-          accessibilityRole="adjustable"
-          accessibilityLabel={t("Dificuldade do quebra-cabeça", "Puzzle difficulty")}
-          accessibilityValue={{
-            min: 1,
-            max: presets.length,
-            now: selectedIndex + 1,
-            text: `${t(ptLabel, enLabel)}, ${preset.pieces} ${t("peças", "pieces")}`,
-          }}
-          accessibilityActions={[
-            { name: "increment", label: t("Aumentar dificuldade", "Increase difficulty") },
-            { name: "decrement", label: t("Diminuir dificuldade", "Decrease difficulty") },
-          ]}
-          onAccessibilityAction={(event) =>
-            adjust(event.nativeEvent.actionName === "increment" ? 1 : -1)
-          }
-          onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
-          style={styles.slider}
-        >
-          <View style={[styles.sliderLine, { backgroundColor: `${colors.muted}38` }]} />
-          <View pointerEvents="none" style={styles.sliderMarks}>
-            {presets.map((item, index) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.sliderMark,
-                  {
-                    backgroundColor: index <= selectedIndex ? colors.accent : colors.panelAlt,
-                    borderColor: index === selectedIndex ? colors.primary : colors.panel,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-          <Animated.View pointerEvents="none" style={[styles.sliderThumb, thumbStyle]}>
-            <LinearGradient
-              colors={[colors.primary, colors.accent]}
-              style={styles.sliderThumbInner}
-            >
-              <Ionicons name="sparkles" size={13} color="#08111f" />
-            </LinearGradient>
-          </Animated.View>
-        </Animated.View>
-      </GestureDetector>
-      <View style={styles.sliderFooter}>
-        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>12</Text>
-        <Text style={[styles.sliderHint, { color: colors.accent }]}>
-          {t("ARRASTE PARA AJUSTAR", "DRAG TO ADJUST")}
-        </Text>
-        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>1000</Text>
-      </View>
-    </View>
-  );
-}
-
-function OptionRow({
-  icon,
-  title,
-  subtitle,
-  value,
-  onChange,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  value: boolean;
-  onChange: () => void;
-}) {
-  const { theme } = useApp();
-  const colors = mobileThemes[theme];
-  return (
-    <View
-      className="min-h-[76px] flex-row items-center gap-3 border-b py-3"
-      style={{ borderBottomColor: `${colors.accent}16` }}
-    >
-      <View
-        className="h-11 w-11 items-center justify-center rounded-2xl"
-        style={{ backgroundColor: colors.panelAlt }}
-      >
-        <Ionicons name={icon} size={21} color={colors.accent} />
-      </View>
-      <View className="flex-1">
-        <Label>{title}</Label>
-        <MutedText>{subtitle}</MutedText>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: colors.panelAlt, true: `${colors.accent}99` }}
-        thumbColor={value ? colors.accent : colors.muted}
-      />
-    </View>
   );
 }

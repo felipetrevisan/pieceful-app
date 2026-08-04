@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import type { PurchasesPackage } from "react-native-purchases";
 import {
   Pressable,
   ScrollView,
@@ -13,12 +12,15 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import type { PurchasesPackage } from "react-native-purchases";
 import { usePiecefulAlert } from "@/components/pieceful-alert";
 import { AppHeader, PrimaryButton, Screen, SecondaryButton } from "@/components/pieceful-ui";
 import { mobileThemeCatalog, mobileThemes } from "@/constants/pieceful-theme";
 import { type AppLanguage, type MobileTheme, useApp } from "@/state/app-provider";
 import { useMonetization } from "@/state/monetization-provider";
 import { useSocial } from "@/state/social-provider";
+import { Benefit, PremiumPlanOption } from "@/features/tabs/premium-plan-option";
+import { styles } from "@/features/tabs/settings.styles";
 
 export default function SettingsScreen() {
   const {
@@ -53,8 +55,8 @@ export default function SettingsScreen() {
   const helpCardWidth = Math.max(0, (helpRowWidth - 12) / 2);
   const premiumPlans = useMemo(() => {
     if (!offering) return [];
-    const preferred = [offering.monthly, offering.annual].filter(
-      (item): item is PurchasesPackage => Boolean(item),
+    const preferred = [offering.monthly, offering.annual].filter((item): item is PurchasesPackage =>
+      Boolean(item),
     );
     return preferred.length > 0 ? preferred : offering.availablePackages;
   }, [offering]);
@@ -73,9 +75,7 @@ export default function SettingsScreen() {
     monthlyPackage.product.price > 0
       ? Math.max(
           0,
-          Math.round(
-            (1 - annualPackage.product.price / (monthlyPackage.product.price * 12)) * 100,
-          ),
+          Math.round((1 - annualPackage.product.price / (monthlyPackage.product.price * 12)) * 100),
         )
       : 0;
 
@@ -197,7 +197,18 @@ export default function SettingsScreen() {
   const visibleThemes =
     ageGroup === "child"
       ? mobileThemeCatalog.filter((item) =>
-          ["candy", "jungle", "rainbow", "ocean", "castle", "storybook", "space", "sunset", "enchanted", "sakura"].includes(item.id),
+          [
+            "candy",
+            "jungle",
+            "rainbow",
+            "ocean",
+            "castle",
+            "storybook",
+            "space",
+            "sunset",
+            "enchanted",
+            "sakura",
+          ].includes(item.id),
         )
       : mobileThemeCatalog;
   return (
@@ -255,10 +266,9 @@ export default function SettingsScreen() {
             const preview = mobileThemes[item.id];
             const selected = item.id === theme;
             const rewardedUnlocked = isRewardedThemeUnlocked(item.id);
-            const locked = !premium && (
-              item.access === "premium" ||
-              (item.access === "rewarded" && !rewardedUnlocked)
-            );
+            const locked =
+              !premium &&
+              (item.access === "premium" || (item.access === "rewarded" && !rewardedUnlocked));
             return (
               <Pressable
                 key={item.id}
@@ -297,14 +307,18 @@ export default function SettingsScreen() {
                     {t(item.description[0], item.description[1])}
                   </Text>
                   {item.access === "rewarded" && !premium ? (
-                    <View style={[styles.rewardedBadge, { backgroundColor: `${preview.accent}22` }]}>
+                    <View
+                      style={[styles.rewardedBadge, { backgroundColor: `${preview.accent}22` }]}
+                    >
                       <Ionicons
                         name={rewardedUnlocked ? "time-outline" : "play-circle-outline"}
                         size={12}
                         color={preview.accent}
                       />
                       <Text style={[styles.rewardedBadgeText, { color: preview.accent }]}>
-                        {rewardedUnlocked ? t("LIBERADO 24H", "24H UNLOCK") : t("ASSISTIR", "WATCH")}
+                        {rewardedUnlocked
+                          ? t("LIBERADO 24H", "24H UNLOCK")
+                          : t("ASSISTIR", "WATCH")}
                       </Text>
                     </View>
                   ) : null}
@@ -450,7 +464,10 @@ export default function SettingsScreen() {
                   ? t("13 a 17 anos", "13 to 17")
                   : t("18 anos ou mais", "18 or older")}
             </Text>
-            <Text maxFontSizeMultiplier={1.2} style={[styles.ageDescription, { color: colors.muted }]}>
+            <Text
+              maxFontSizeMultiplier={1.2}
+              style={[styles.ageDescription, { color: colors.muted }]}
+            >
               {t("Alterar configuração", "Change setting")}
             </Text>
           </View>
@@ -578,94 +595,6 @@ export default function SettingsScreen() {
   );
 }
 
-function Benefit({ text }: { text: string }) {
-  const { theme } = useApp();
-  const colors = mobileThemes[theme];
-  return (
-    <View style={styles.benefit}>
-      <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
-      <Text style={[styles.benefitText, { color: colors.text }]}>{text}</Text>
-    </View>
-  );
-}
-
-function PremiumPlanOption({
-  plan,
-  selected,
-  savings,
-  colors,
-  t,
-  onPress,
-}: {
-  plan: PurchasesPackage;
-  selected: boolean;
-  savings: number;
-  colors: (typeof mobileThemes)[keyof typeof mobileThemes];
-  t: (portuguese: string, english: string) => string;
-  onPress: () => void;
-}) {
-  const annual = plan.packageType === "ANNUAL";
-  const monthly = plan.packageType === "MONTHLY";
-  const title = annual
-    ? t("Anual", "Annual")
-    : monthly
-      ? t("Mensal", "Monthly")
-      : plan.product.title;
-  const cadence = annual
-    ? t("cobrado uma vez por ano", "billed once per year")
-    : monthly
-      ? t("cobrado todos os meses", "billed every month")
-      : t("plano Premium", "Premium plan");
-  const monthlyEquivalent = annual ? plan.product.pricePerMonthString : null;
-
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.planOption,
-        {
-          backgroundColor: selected ? `${colors.accent}1f` : `${colors.panelAlt}c8`,
-          borderColor: selected ? colors.accent : `${colors.muted}38`,
-          borderRadius: Math.max(18, colors.radius),
-        },
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      {annual ? (
-        <View style={[styles.planBadge, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.planBadgeText, { color: colors.background }]}>
-            {savings > 0
-              ? t(`ECONOMIZE ${savings}%`, `SAVE ${savings}%`)
-              : t("MELHOR VALOR", "BEST VALUE")}
-          </Text>
-        </View>
-      ) : null}
-      <View style={styles.planTopRow}>
-        <Text style={[styles.planTitle, { color: colors.text }]}>{title}</Text>
-        <View
-          style={[
-            styles.planRadio,
-            { borderColor: selected ? colors.accent : colors.muted },
-          ]}
-        >
-          {selected ? <View style={[styles.planRadioDot, { backgroundColor: colors.accent }]} /> : null}
-        </View>
-      </View>
-      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.planPrice, { color: colors.text }]}>
-        {plan.product.priceString}
-      </Text>
-      <Text style={[styles.planCadence, { color: colors.muted }]}>{cadence}</Text>
-      {monthlyEquivalent ? (
-        <Text style={[styles.planEquivalent, { color: colors.accent }]}>
-          {t(`${monthlyEquivalent} por mês`, `${monthlyEquivalent} per month`)}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
@@ -787,166 +716,3 @@ function HelpCard({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  section: { alignSelf: "stretch", marginBottom: 30, width: "100%" },
-  sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 1.4, marginBottom: 13 },
-  language: { flexDirection: "row", borderWidth: 1, padding: 4 },
-  languageOption: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center" },
-  languageText: { fontFamily: "Inter_700Bold", fontSize: 16 },
-  themePressable: { width: 174, height: 150 },
-  themeCard: {
-    flex: 1,
-    borderWidth: 1.5,
-    padding: 14,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-  },
-  themeStripe: { position: "absolute", left: 0, right: 0, top: 0, height: 6 },
-  themeIcon: {
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  themeName: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 18 },
-  themeDescription: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 3 },
-  rewardedBadge: { position: "absolute", top: 14, left: 12, minHeight: 25, borderRadius: 13, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 4 },
-  rewardedBadgeText: { fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: .35 },
-  check: {
-    position: "absolute",
-    top: 14,
-    right: 12,
-    width: 25,
-    height: 25,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  group: { borderWidth: 1, overflow: "hidden" },
-  settingRow: {
-    minHeight: 72,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-  },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  settingText: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 16 },
-  switchSlot: { width: 62, minHeight: 48, alignItems: "flex-end", justifyContent: "center" },
-  switch: { transform: [{ scaleX: 0.88 }, { scaleY: 0.88 }] },
-  tourGroup: { marginBottom: 12 },
-  helpRow: { alignSelf: "flex-start", flexDirection: "row", alignItems: "stretch", gap: 12 },
-  helpPressable: { width: "100%", minWidth: 0 },
-  help: {
-    width: "100%",
-    minHeight: 154,
-    borderWidth: 1,
-    alignItems: "flex-start",
-    justifyContent: "center",
-    padding: 16,
-  },
-  helpIcon: {
-    width: 47,
-    height: 47,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-  helpText: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 17 },
-  helpSubtitle: { fontFamily: "Inter_600SemiBold", fontSize: 10, marginTop: 3 },
-  pressed: { opacity: 0.68, transform: [{ scale: 0.98 }] },
-  danger: {
-    minHeight: 64,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    gap: 12,
-    overflow: "hidden",
-  },
-  dangerText: { flex: 1, minWidth: 0, fontFamily: "Inter_700Bold", fontSize: 17 },
-  dangerIcon: { width: 28, height: 28, flexShrink: 0, alignItems: "center", justifyContent: "center" },
-  dangerDisabled: { opacity: 0.38 },
-  premiumCard: { borderWidth: 1, padding: 18, gap: 14, overflow: "hidden" },
-  premiumHeader: { flexDirection: "row", alignItems: "center", gap: 13 },
-  premiumIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  premiumTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 21 },
-  premiumSubtitle: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18, marginTop: 3 },
-  benefits: { gap: 9 },
-  benefit: { flexDirection: "row", alignItems: "center", gap: 9 },
-  benefitText: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 13 },
-  planGrid: { width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  planOption: {
-    flex: 1,
-    minWidth: "45%",
-    minHeight: 148,
-    borderWidth: 1.5,
-    paddingHorizontal: 14,
-    paddingTop: 17,
-    paddingBottom: 14,
-    overflow: "hidden",
-  },
-  planBadge: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 10,
-  },
-  planBadgeText: { fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: 0.7 },
-  planTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  planTitle: { flex: 1, fontFamily: "BricolageGrotesque_700Bold", fontSize: 17 },
-  planRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  planRadioDot: { width: 10, height: 10, borderRadius: 5 },
-  planPrice: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 22, marginTop: 10 },
-  planCadence: { fontFamily: "Inter_600SemiBold", fontSize: 9, lineHeight: 13, marginTop: 2 },
-  planEquivalent: { fontFamily: "Inter_700Bold", fontSize: 10, marginTop: 7 },
-  parentNote: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    lineHeight: 16,
-    textAlign: "center",
-  },
-  monetizationError: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    lineHeight: 16,
-    textAlign: "center",
-  },
-  ageCard: {
-    minHeight: 82,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  ageCopy: { flex: 1, minWidth: 0, justifyContent: "center" },
-  ageTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, lineHeight: 21 },
-  ageDescription: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, marginTop: 2 },
-});

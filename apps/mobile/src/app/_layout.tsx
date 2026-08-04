@@ -5,6 +5,7 @@ import { BricolageGrotesque_800ExtraBold } from "@expo-google-fonts/bricolage-gr
 import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
 import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
 import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
+import * as Sentry from "@sentry/react-native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -21,11 +22,22 @@ import { NavigationDrawer } from "@/components/navigation-drawer";
 import { PiecefulAlertProvider } from "@/components/pieceful-alert";
 import { StartupSplash } from "@/components/startup-splash";
 import { isLightMobileTheme, mobileThemes } from "@/constants/pieceful-theme";
+import { reportInsecureAuthCallbackIfNeeded } from "@/services/social-auth";
 import { AppProvider, useApp } from "@/state/app-provider";
 import { MonetizationProvider } from "@/state/monetization-provider";
 import { SocialProvider, useSocial } from "@/state/social-provider";
 
 void SplashScreen.preventAutoHideAsync();
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enabled: Boolean(process.env.EXPO_PUBLIC_SENTRY_DSN),
+  environment: process.env.EXPO_PUBLIC_APP_ENV ?? "development",
+  release: process.env.EXPO_PUBLIC_APP_RELEASE,
+  sendDefaultPii: false,
+  tracesSampleRate: Number(process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? "0.05"),
+});
+reportInsecureAuthCallbackIfNeeded();
 
 function RootNavigator() {
   const { ageGateCompleted, ageGroup, ready, theme } = useApp();
@@ -94,7 +106,7 @@ function RootNavigator() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
@@ -109,6 +121,8 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   gate: {

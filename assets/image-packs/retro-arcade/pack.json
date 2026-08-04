@@ -1,0 +1,72 @@
+{
+  "slug": "retro-arcade",
+  "title_pt": "Jogos Retrô",
+  "title_en": "Retro Arcade",
+  "description_pt": "Uma viagem original pela era de ouro dos videogames: fliperamas neon, corridas, naves, masmorras e aventuras em pixel art.",
+  "description_en": "An original trip through gaming's golden age: neon arcades, racers, starships, dungeons and pixel-art adventures.",
+  "audience": "all",
+  "is_free": true,
+  "images": [
+    {
+      "file": "01-neon-arcade.png",
+      "title_pt": "Noite no Fliperama",
+      "title_en": "Neon Arcade Night",
+      "sort_order": 10,
+      "make_cover": true
+    },
+    {
+      "file": "02-turbo-night-race.png",
+      "title_pt": "Corrida Turbo Noturna",
+      "title_en": "Turbo Night Race",
+      "sort_order": 20
+    },
+    {
+      "file": "03-star-patrol.png",
+      "title_pt": "Patrulha Estelar",
+      "title_en": "Star Patrol",
+      "sort_order": 30
+    },
+    {
+      "file": "04-crystal-dungeon.png",
+      "title_pt": "Masmorra de Cristais",
+      "title_en": "Crystal Dungeon",
+      "sort_order": 40
+    },
+    {
+      "file": "05-cyber-courier.png",
+      "title_pt": "Mensageiro Cyber",
+      "title_en": "Cyber Courier",
+      "sort_order": 50
+    },
+    {
+      "file": "06-mecha-arena.png",
+      "title_pt": "Arena de Mechas",
+      "title_en": "Mecha Arena",
+      "sort_order": 60
+    },
+    {
+      "file": "07-jungle-quest.png",
+      "title_pt": "Aventura na Selva",
+      "title_en": "Jungle Quest",
+      "sort_order": 70
+    },
+    {
+      "file": "08-deep-sea-discovery.png",
+      "title_pt": "Descoberta Submarina",
+      "title_en": "Deep Sea Discovery",
+      "sort_order": 80
+    },
+    {
+      "file": "09-downtown-team.png",
+      "title_pt": "Heróis da Cidade",
+      "title_en": "Downtown Heroes",
+      "sort_order": 90
+    },
+    {
+      "file": "10-sky-island-grand-prix.png",
+      "title_pt": "Grande Prêmio nas Nuvens",
+      "title_en": "Sky Island Grand Prix",
+      "sort_order": 100
+    }
+  ]
+}

@@ -1,5 +1,6 @@
-import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Sentry from "@sentry/react-native";
+import Constants from "expo-constants";
 import {
   createContext,
   type ReactNode,
@@ -19,6 +20,7 @@ const REWARDED_THEME_STORAGE_KEY = "pieceful:rewarded-theme-unlocks-v1";
 const REWARDED_THEME_DURATION = 24 * 60 * 60 * 1000;
 const REWARDED_THEMES: MobileTheme[] = ["sunset", "enchanted", "sakura"];
 let purchasesConfigured = false;
+let purchasesUserId: string | null = null;
 
 interface MonetizationState {
   ready: boolean;
@@ -50,7 +52,9 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
   const [packProducts, setPackProducts] = useState<Record<string, PurchasesStoreProduct>>({});
   const [ownedProductIds, setOwnedProductIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [rewardedThemeUnlocks, setRewardedThemeUnlocks] = useState<Partial<Record<MobileTheme, number>>>({});
+  const [rewardedThemeUnlocks, setRewardedThemeUnlocks] = useState<
+    Partial<Record<MobileTheme, number>>
+  >({});
   const [themeUnlocksReady, setThemeUnlocksReady] = useState(false);
   const revenueCatKey = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
 
@@ -103,6 +107,18 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
           });
           await ads.default().initialize();
           if (active) setAdsAvailable(true);
+          if (
+            process.env.EXPO_PUBLIC_APP_ENV === "production" &&
+            !process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID
+          ) {
+            // app.config.js falls back to Google's sample AdMob App ID when
+            // this is unset; that's fine for dev/preview but should never
+            // ship, so make it loud instead of silently serving no/test ads.
+            Sentry.captureMessage(
+              "Production build is using Google's sample AdMob Android App ID. Set EXPO_PUBLIC_ADMOB_ANDROID_APP_ID.",
+              "warning",
+            );
+          }
         } catch (caught) {
           if (active)
             setError(caught instanceof Error ? caught.message : "Unable to initialize ads.");
@@ -116,19 +132,28 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
             Purchases.configure({
               apiKey: revenueCatKey,
               appUserID: session?.user.id ?? undefined,
+              entitlementVerificationMode: Purchases.ENTITLEMENT_VERIFICATION_MODE.INFORMATIONAL,
             });
             purchasesConfigured = true;
-          } else if (session?.user.id) {
+            purchasesUserId = session?.user.id ?? null;
+          } else if (session?.user.id && purchasesUserId !== session.user.id) {
             await Purchases.logIn(session.user.id);
+            purchasesUserId = session.user.id;
+          } else if (!session?.user.id && purchasesUserId) {
+            await Purchases.logOut();
+            purchasesUserId = null;
           }
           const [customer, offerings] = await Promise.all([
             Purchases.getCustomerInfo(),
             Purchases.getOfferings(),
           ]);
+          const verified =
+            customer.entitlements.verification !== Purchases.VERIFICATION_RESULT.FAILED;
           if (active) {
-            setPremium(Boolean(customer.entitlements.active[PREMIUM_ENTITLEMENT]));
-            setOwnedProductIds(customer.allPurchasedProductIdentifiers);
+            setPremium(verified && Boolean(customer.entitlements.active[PREMIUM_ENTITLEMENT]));
+            setOwnedProductIds(verified ? customer.allPurchasedProductIdentifiers : []);
             setOffering(offerings.current);
+            if (!verified) setError("Purchase verification failed.");
           }
         } catch (caught) {
           if (active)
@@ -142,46 +167,53 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     };
   }, [ageGroup, revenueCatKey, session?.user.id]);
 
-  const showRewardedAd = useCallback(async (configuredUnitId?: string) => {
-    if (premium) return true;
-    if (!adsAvailable || Platform.OS !== "android") return false;
-    const ads = await import("react-native-google-mobile-ads");
-    // Closed/internal Play tests are release builds too, so __DEV__ is false.
-    // Keep the official demo unit as a safe fallback until the production
-    // rewarded unit is configured; this also prevents testers from clicking
-    // real ads and creating invalid traffic.
-    const unitId = __DEV__
-      ? ads.TestIds.REWARDED
-      : configuredUnitId || ads.TestIds.REWARDED;
-    return new Promise<boolean>((resolve) => {
-      const rewarded = ads.RewardedAd.createForAdRequest(unitId, {
-        requestNonPersonalizedAdsOnly: true,
-      });
-      let earned = false;
-      let settled = false;
-      let subscriptions: (() => void)[] = [];
-      let timeout: ReturnType<typeof setTimeout>;
-      const finish = (value: boolean) => {
-        if (settled) return;
-        settled = true;
-        subscriptions.forEach((item) => {
-          item();
+  const showRewardedAd = useCallback(
+    async (configuredUnitId?: string) => {
+      if (premium) return true;
+      if (!adsAvailable || Platform.OS !== "android") return false;
+      const ads = await import("react-native-google-mobile-ads");
+      // Closed/internal Play tests are release builds too, so __DEV__ is false.
+      // Keep the official demo unit as a safe fallback until the production
+      // rewarded unit is configured; this also prevents testers from clicking
+      // real ads and creating invalid traffic.
+      if (!configuredUnitId && !__DEV__ && process.env.EXPO_PUBLIC_APP_ENV === "production") {
+        Sentry.captureMessage(
+          "Production rewarded ad request fell back to Google's demo ad unit — no EXPO_PUBLIC_ADMOB_REWARDED_*_ID configured.",
+          "warning",
+        );
+      }
+      const unitId = __DEV__ ? ads.TestIds.REWARDED : configuredUnitId || ads.TestIds.REWARDED;
+      return new Promise<boolean>((resolve) => {
+        const rewarded = ads.RewardedAd.createForAdRequest(unitId, {
+          requestNonPersonalizedAdsOnly: true,
         });
-        clearTimeout(timeout);
-        resolve(value);
-      };
-      subscriptions = [
-        rewarded.addAdEventListener(ads.RewardedAdEventType.LOADED, () => void rewarded.show()),
-        rewarded.addAdEventListener(ads.RewardedAdEventType.EARNED_REWARD, () => {
-          earned = true;
-        }),
-        rewarded.addAdEventListener(ads.AdEventType.CLOSED, () => finish(earned)),
-        rewarded.addAdEventListener(ads.AdEventType.ERROR, () => finish(false)),
-      ];
-      timeout = setTimeout(() => finish(false), 45_000);
-      rewarded.load();
-    });
-  }, [adsAvailable, premium]);
+        let earned = false;
+        let settled = false;
+        let subscriptions: (() => void)[] = [];
+        let timeout: ReturnType<typeof setTimeout>;
+        const finish = (value: boolean) => {
+          if (settled) return;
+          settled = true;
+          subscriptions.forEach((item) => {
+            item();
+          });
+          clearTimeout(timeout);
+          resolve(value);
+        };
+        subscriptions = [
+          rewarded.addAdEventListener(ads.RewardedAdEventType.LOADED, () => void rewarded.show()),
+          rewarded.addAdEventListener(ads.RewardedAdEventType.EARNED_REWARD, () => {
+            earned = true;
+          }),
+          rewarded.addAdEventListener(ads.AdEventType.CLOSED, () => finish(earned)),
+          rewarded.addAdEventListener(ads.AdEventType.ERROR, () => finish(false)),
+        ];
+        timeout = setTimeout(() => finish(false), 45_000);
+        rewarded.load();
+      });
+    },
+    [adsAvailable, premium],
+  );
 
   const showRewardedHint = useCallback(
     () => showRewardedAd(process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID),
@@ -193,39 +225,48 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     [premium, rewardedThemeUnlocks],
   );
 
-  const unlockRewardedTheme = useCallback(async (nextTheme: MobileTheme) => {
-    if (premium) return true;
-    if (!REWARDED_THEMES.includes(nextTheme)) return false;
-    const earned = await showRewardedAd(
-      process.env.EXPO_PUBLIC_ADMOB_REWARDED_THEME_ID ??
-        process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID,
-    );
-    if (!earned) return false;
-    const nextUnlocks = {
-      ...rewardedThemeUnlocks,
-      [nextTheme]: Date.now() + REWARDED_THEME_DURATION,
-    };
-    setRewardedThemeUnlocks(nextUnlocks);
-    await AsyncStorage.setItem(REWARDED_THEME_STORAGE_KEY, JSON.stringify(nextUnlocks));
-    return true;
-  }, [premium, rewardedThemeUnlocks, showRewardedAd]);
+  const unlockRewardedTheme = useCallback(
+    async (nextTheme: MobileTheme) => {
+      if (premium) return true;
+      if (!REWARDED_THEMES.includes(nextTheme)) return false;
+      const earned = await showRewardedAd(
+        process.env.EXPO_PUBLIC_ADMOB_REWARDED_THEME_ID ??
+          process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID,
+      );
+      if (!earned) return false;
+      const nextUnlocks = {
+        ...rewardedThemeUnlocks,
+        [nextTheme]: Date.now() + REWARDED_THEME_DURATION,
+      };
+      setRewardedThemeUnlocks(nextUnlocks);
+      await AsyncStorage.setItem(REWARDED_THEME_STORAGE_KEY, JSON.stringify(nextUnlocks));
+      return true;
+    },
+    [premium, rewardedThemeUnlocks, showRewardedAd],
+  );
 
-  const purchasePremium = useCallback(async (packageIdentifier?: string) => {
-    const selected = packageIdentifier
-      ? offering?.availablePackages.find((item) => item.identifier === packageIdentifier)
-      : offering?.annual ?? offering?.monthly ?? offering?.availablePackages[0];
-    if (!selected || !revenueCatKey) return false;
-    try {
-      const { default: Purchases } = await import("react-native-purchases");
-      const result = await Purchases.purchasePackage(selected);
-      const active = Boolean(result.customerInfo.entitlements.active[PREMIUM_ENTITLEMENT]);
-      setPremium(active);
-      return active;
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to complete purchase.");
-      return false;
-    }
-  }, [offering, revenueCatKey]);
+  const purchasePremium = useCallback(
+    async (packageIdentifier?: string) => {
+      const selected = packageIdentifier
+        ? offering?.availablePackages.find((item) => item.identifier === packageIdentifier)
+        : (offering?.annual ?? offering?.monthly ?? offering?.availablePackages[0]);
+      if (!selected || !revenueCatKey) return false;
+      try {
+        const { default: Purchases } = await import("react-native-purchases");
+        const result = await Purchases.purchasePackage(selected);
+        const verified =
+          result.customerInfo.entitlements.verification !== Purchases.VERIFICATION_RESULT.FAILED;
+        const active =
+          verified && Boolean(result.customerInfo.entitlements.active[PREMIUM_ENTITLEMENT]);
+        setPremium(active);
+        return active;
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Unable to complete purchase.");
+        return false;
+      }
+    },
+    [offering, revenueCatKey],
+  );
 
   const loadPackProducts = useCallback(
     async (productIds: string[]) => {
@@ -262,8 +303,11 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
           (await Purchases.getProducts([productId], PRODUCT_CATEGORY.NON_SUBSCRIPTION))[0];
         if (!product) return false;
         const result = await Purchases.purchaseStoreProduct(product);
-        const purchased = result.customerInfo.allPurchasedProductIdentifiers.includes(productId);
-        setOwnedProductIds(result.customerInfo.allPurchasedProductIdentifiers);
+        const verified =
+          result.customerInfo.entitlements.verification !== Purchases.VERIFICATION_RESULT.FAILED;
+        const purchased =
+          verified && result.customerInfo.allPurchasedProductIdentifiers.includes(productId);
+        setOwnedProductIds(verified ? result.customerInfo.allPurchasedProductIdentifiers : []);
         return purchased;
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "Unable to complete pack purchase.");
@@ -278,10 +322,11 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     try {
       const { default: Purchases } = await import("react-native-purchases");
       const customer = await Purchases.restorePurchases();
-      const active = Boolean(customer.entitlements.active[PREMIUM_ENTITLEMENT]);
+      const verified = customer.entitlements.verification !== Purchases.VERIFICATION_RESULT.FAILED;
+      const active = verified && Boolean(customer.entitlements.active[PREMIUM_ENTITLEMENT]);
       setPremium(active);
-      setOwnedProductIds(customer.allPurchasedProductIdentifiers);
-      return active || customer.allPurchasedProductIdentifiers.length > 0;
+      setOwnedProductIds(verified ? customer.allPurchasedProductIdentifiers : []);
+      return verified && (active || customer.allPurchasedProductIdentifiers.length > 0);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to restore purchases.");
       return false;

@@ -1,6 +1,3 @@
-import { registerWebModule, NativeModule } from "expo";
-
-// PiecefulGameServicesModule is not available on the web platform.
-class PiecefulGameServicesModule extends NativeModule<{}> {}
-
-export default registerWebModule(PiecefulGameServicesModule, "PiecefulGameServices");
+// The game-services and native timelapse APIs intentionally have no web
+// implementation. Exporting null also keeps static rendering bridge-free.
+export default null;

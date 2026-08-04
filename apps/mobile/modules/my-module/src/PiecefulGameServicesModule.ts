@@ -1,4 +1,5 @@
 import { NativeModule, requireOptionalNativeModule } from "expo";
+import { Platform } from "react-native";
 
 export interface PlatformPlayer {
   authenticated: boolean;
@@ -43,4 +44,9 @@ declare class PiecefulGameServicesModule extends NativeModule<PiecefulGameServic
   saveVideoToGallery(uri: string): Promise<string>;
 }
 
-export default requireOptionalNativeModule<PiecefulGameServicesModule>("PiecefulGameServices");
+// Expo Router also evaluates this module while statically rendering web pages.
+// Looking up a native module in that Node process initializes the React Native
+// bridge and crashes because no native bridge exists there.
+export default Platform.OS === "web"
+  ? null
+  : requireOptionalNativeModule<PiecefulGameServicesModule>("PiecefulGameServices");

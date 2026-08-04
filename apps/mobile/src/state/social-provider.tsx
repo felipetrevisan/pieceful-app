@@ -12,12 +12,21 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  authenticateGamePlatform,
-  reportPlatformAchievement,
-} from "@/services/game-platform";
 import { getPlayerProgression } from "@/lib/progression";
+import { authenticateGamePlatform, reportPlatformAchievement } from "@/services/game-platform";
+import {
+  completeOAuthCallback,
+  isNativeAuthCallback,
+  NATIVE_AUTH_CALLBACK,
+  openAuthSession,
+} from "@/services/social-auth";
 import { isSupabaseConfigured, supabase } from "@/services/supabase";
+import {
+  deleteRemoteAccount,
+  deleteRemotePuzzles,
+  uploadAvatarImage,
+  uploadPuzzleImage,
+} from "@/services/uploads";
 import { useApp } from "@/state/app-provider";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -67,110 +76,19 @@ interface SocialState {
   signIn: (provider: "google" | "azure") => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
-  updateProfile: (
-    input: Pick<PlayerProfile, "displayName" | "avatarUrl" | "bio">,
-  ) => Promise<void>;
+  updateProfile: (input: Pick<PlayerProfile, "displayName" | "avatarUrl" | "bio">) => Promise<void>;
   uploadAvatar: (uri: string) => Promise<string>;
   refreshFriends: () => Promise<void>;
   searchPlayers: (query: string) => Promise<void>;
   clearPlayerSearch: () => void;
   sendFriendRequest: (targetId: string) => Promise<boolean>;
-  respondFriendRequest: (
-    requesterId: string,
-    accept: boolean,
-  ) => Promise<boolean>;
+  respondFriendRequest: (requesterId: string, accept: boolean) => Promise<boolean>;
   removeFriend: (targetId: string) => Promise<boolean>;
   blockPlayer: (targetId: string) => Promise<boolean>;
 }
 
 const PROFILE_KEY = "pieceful-mobile-profile-v1";
 const DEV_ACCESS_KEY = "pieceful-mobile-dev-access-v1";
-const NATIVE_AUTH_CALLBACK = "pieceful://auth/callback";
-const OAUTH_TIMEOUT_MS = 90_000;
-const handledOAuthCallbacks = new Map<string, Promise<void>>();
-
-function isNativeAuthCallback(url: string) {
-  try {
-    const callback = new URL(url);
-    return (
-      callback.protocol === "pieceful:" &&
-      callback.host === "auth" &&
-      callback.pathname.replace(/\/$/, "") === "/callback"
-    );
-  } catch {
-    return false;
-  }
-}
-
-function completeOAuthCallback(url: string) {
-  const existing = handledOAuthCallbacks.get(url);
-  if (existing) return existing;
-
-  const completion = (async () => {
-    if (!supabase)
-      throw new Error("Supabase environment variables are not configured.");
-
-    const { data: current } = await supabase.auth.getSession();
-    if (current.session) return;
-
-    const callback = new URL(url);
-    const fragment = new URLSearchParams(callback.hash.replace(/^#/, ""));
-    const callbackErrorCode =
-      callback.searchParams.get("error_code") ??
-      callback.searchParams.get("error") ??
-      fragment.get("error_code") ??
-      fragment.get("error");
-    const callbackError =
-      callback.searchParams.get("error_description") ??
-      fragment.get("error_description");
-    if (callbackErrorCode || callbackError)
-      throw new Error(
-        callbackErrorCode ?? callbackError ?? "AUTH_CALLBACK_FAILED",
-      );
-
-    const code = callback.searchParams.get("code");
-    if (code) {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) throw error;
-      return;
-    }
-
-    const accessToken =
-      fragment.get("access_token") ?? callback.searchParams.get("access_token");
-    const refreshToken =
-      fragment.get("refresh_token") ??
-      callback.searchParams.get("refresh_token");
-    if (!accessToken || !refreshToken)
-      throw new Error("OAuth did not return a valid app session.");
-
-    const { error } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
-    if (error) throw error;
-  })();
-
-  handledOAuthCallbacks.set(url, completion);
-  return completion;
-}
-
-async function openAuthSession(url: string, redirectTo: string) {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      WebBrowser.openAuthSessionAsync(url, redirectTo),
-      new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(
-          () => reject(new Error("AUTH_TIMEOUT")),
-          OAUTH_TIMEOUT_MS,
-        );
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-}
-
 const fallbackProfile: PlayerProfile = {
   id: null,
   displayName: "Player One",
@@ -182,6 +100,7 @@ const fallbackProfile: PlayerProfile = {
 
 const SocialContext = createContext<SocialState | null>(null);
 const uploadedPuzzleImages = new Map<string, string>();
+const syncedPuzzleVersions = new Map<string, string>();
 
 function isRemotePuzzleSafe(row: Record<string, unknown>) {
   const configuration = row.configuration as Record<string, unknown> | null;
@@ -199,12 +118,7 @@ function isRemotePuzzleSafe(row: Record<string, unknown>) {
 
   const rows = Number(configuration.rows);
   const columns = Number(configuration.columns);
-  if (
-    !Number.isInteger(rows) ||
-    !Number.isInteger(columns) ||
-    rows <= 0 ||
-    columns <= 0
-  )
+  if (!Number.isInteger(rows) || !Number.isInteger(columns) || rows <= 0 || columns <= 0)
     return false;
 
   return session.pieces.every((piece) => {
@@ -227,14 +141,8 @@ function isRemotePuzzleSafe(row: Record<string, unknown>) {
 }
 
 export function SocialProvider({ children }: { children: ReactNode }) {
-  const {
-    acknowledgeDeletedPuzzles,
-    ageGroup,
-    deletedPuzzleIds,
-    mergeRemotePuzzles,
-    puzzles,
-    t,
-  } = useApp();
+  const { acknowledgeDeletedPuzzles, ageGroup, deletedPuzzleIds, mergeRemotePuzzles, puzzles, t } =
+    useApp();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [devAccess, setDevAccess] = useState(false);
@@ -274,20 +182,9 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     async (userId: string) => {
       if (!supabase) return;
       const client = supabase;
-      const initial = await client
-        .from("profiles")
-        .select("id, display_name, avatar_url, bio, xp, friend_code")
-        .eq("id", userId)
-        .maybeSingle();
-      let data: Record<string, unknown> | null = initial.data;
-      if (initial.error && /friend_code/i.test(initial.error.message)) {
-        const fallback = await client
-          .from("profiles")
-          .select("id, display_name, avatar_url, bio, xp")
-          .eq("id", userId)
-          .maybeSingle();
-        data = fallback.data;
-      }
+      const initial = await client.rpc("my_profile");
+      if (initial.error) throw initial.error;
+      const data = (initial.data?.[0] as Record<string, unknown> | undefined) ?? null;
       if (!data) return;
       const next: PlayerProfile = {
         id: String(data.id),
@@ -295,8 +192,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         avatarUrl: typeof data.avatar_url === "string" ? data.avatar_url : null,
         bio: String(data.bio || "One piece at a time."),
         xp: Number(data.xp || 0),
-        friendCode:
-          typeof data.friend_code === "string" ? data.friend_code : null,
+        friendCode: typeof data.friend_code === "string" ? data.friend_code : null,
       };
       setProfile(next);
       await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(next));
@@ -321,6 +217,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
                   imageUri = signedImage.signedUrl;
                   uploadedPuzzleImages.set(row.id, row.image_uri);
                 }
+                syncedPuzzleVersions.set(row.id, row.updated_at);
                 return {
                   id: row.id,
                   name: row.name,
@@ -357,8 +254,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     let active = true;
     AsyncStorage.getItem(PROFILE_KEY)
       .then((stored) => {
-        if (stored && active)
-          setProfile({ ...fallbackProfile, ...JSON.parse(stored) });
+        if (stored && active) setProfile({ ...fallbackProfile, ...JSON.parse(stored) });
       })
       .catch(() => undefined)
       .finally(async () => {
@@ -372,12 +268,10 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         if (data.session) await loadRemoteProfile(data.session.user.id);
         setReady(true);
       });
-    const subscription = supabase?.auth.onAuthStateChange(
-      (_event, nextSession) => {
-        setSession(nextSession);
-        if (nextSession) void loadRemoteProfile(nextSession.user.id);
-      },
-    ).data.subscription;
+    const subscription = supabase?.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      if (nextSession) void loadRemoteProfile(nextSession.user.id);
+    }).data.subscription;
     return () => {
       active = false;
       subscription?.unsubscribe();
@@ -397,16 +291,14 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         await completeOAuthCallback(url);
         const { data, error: sessionError } = await client.auth.getSession();
         if (sessionError) throw sessionError;
-        if (!data.session)
-          throw new Error("OAuth did not create a valid app session.");
+        if (!data.session) throw new Error("OAuth did not create a valid app session.");
         if (!active) return;
         setSession(data.session);
         await loadRemoteProfile(data.session.user.id);
         void WebBrowser.dismissBrowser().catch(() => undefined);
       } catch (caught) {
         if (!active) return;
-        const message =
-          caught instanceof Error ? caught.message : "Unable to sign in.";
+        const message = caught instanceof Error ? caught.message : "Unable to sign in.";
         setError(
           message === "AUTH_CALLBACK_FAILED"
             ? t(
@@ -421,10 +313,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     };
 
     void Linking.getInitialURL().then(handleCallback);
-    const subscription = Linking.addEventListener(
-      "url",
-      ({ url }) => void handleCallback(url),
-    );
+    const subscription = Linking.addEventListener("url", ({ url }) => void handleCallback(url));
     return () => {
       active = false;
       subscription.remove();
@@ -453,8 +342,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       (leaderboard.data ?? []).map((friend: Record<string, unknown>) => ({
         id: String(friend.id),
         displayName: String(friend.display_name ?? "Player"),
-        avatarUrl:
-          typeof friend.avatar_url === "string" ? friend.avatar_url : null,
+        avatarUrl: typeof friend.avatar_url === "string" ? friend.avatar_url : null,
         xp: Number(friend.xp ?? 0),
         online: Boolean(friend.online),
       })),
@@ -463,18 +351,15 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       (requests.data ?? []).map((request: Record<string, unknown>) => ({
         id: String(request.id),
         displayName: String(request.display_name ?? "Player"),
-        avatarUrl:
-          typeof request.avatar_url === "string" ? request.avatar_url : null,
+        avatarUrl: typeof request.avatar_url === "string" ? request.avatar_url : null,
         xp: Number(request.xp ?? 0),
         online: Boolean(request.online),
         direction: request.direction === "incoming" ? "incoming" : "outgoing",
         createdAt: String(request.created_at ?? new Date().toISOString()),
       })),
     );
-    const code = (identity.data?.[0] as Record<string, unknown> | undefined)
-      ?.friend_code;
-    if (typeof code === "string")
-      setProfile((current) => ({ ...current, friendCode: code }));
+    const code = (identity.data?.[0] as Record<string, unknown> | undefined)?.friend_code;
+    if (typeof code === "string") setProfile((current) => ({ ...current, friendCode: code }));
     setError(null);
   }, [session]);
 
@@ -488,23 +373,20 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       setSocialBusy(true);
       setError(null);
       try {
-        const { data, error: searchError } = await supabase.rpc(
-          "search_players",
-          { search_text: trimmed },
-        );
+        const { data, error: searchError } = await supabase.rpc("search_players", {
+          search_text: trimmed,
+        });
         if (searchError) throw searchError;
         setSearchResults(
           (data ?? []).map((player: Record<string, unknown>) => ({
             id: String(player.id),
             displayName: String(player.display_name ?? "Player"),
-            avatarUrl:
-              typeof player.avatar_url === "string" ? player.avatar_url : null,
+            avatarUrl: typeof player.avatar_url === "string" ? player.avatar_url : null,
             xp: Number(player.xp ?? 0),
             online: Boolean(player.online),
             friendCode: String(player.friend_code ?? ""),
             relationshipStatus:
-              player.relationship_status === "pending" ||
-              player.relationship_status === "accepted"
+              player.relationship_status === "pending" || player.relationship_status === "accepted"
                 ? player.relationship_status
                 : null,
             relationshipDirection:
@@ -515,11 +397,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
           })),
         );
       } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Unable to search players.",
-        );
+        setError(caught instanceof Error ? caught.message : "Unable to search players.");
       } finally {
         setSocialBusy(false);
       }
@@ -541,11 +419,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         setSearchResults([]);
         return true;
       } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Unable to update friendship.",
-        );
+        setError(caught instanceof Error ? caught.message : "Unable to update friendship.");
         return false;
       } finally {
         setSocialBusy(false);
@@ -555,8 +429,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   );
 
   const sendFriendRequest = useCallback(
-    (targetId: string) =>
-      runFriendAction("send_friend_request", { target_id: targetId }),
+    (targetId: string) => runFriendAction("send_friend_request", { target_id: targetId }),
     [runFriendAction],
   );
   const respondFriendRequest = useCallback(
@@ -568,13 +441,11 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     [runFriendAction],
   );
   const removeFriend = useCallback(
-    (targetId: string) =>
-      runFriendAction("remove_friend", { target_id: targetId }),
+    (targetId: string) => runFriendAction("remove_friend", { target_id: targetId }),
     [runFriendAction],
   );
   const blockPlayer = useCallback(
-    (targetId: string) =>
-      runFriendAction("block_player", { target_id: targetId }),
+    (targetId: string) => runFriendAction("block_player", { target_id: targetId }),
     [runFriendAction],
   );
 
@@ -583,6 +454,11 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     const timeout = setTimeout(() => void refreshFriends(), 0);
     return () => clearTimeout(timeout);
   }, [ageGroup, refreshFriends, session]);
+
+  const friendIds = useMemo(
+    () => [...new Set(friends.map((friend) => friend.id))].sort().join(","),
+    [friends],
+  );
 
   useEffect(() => {
     if (ageGroup === "child" || !supabase || !session) return;
@@ -593,14 +469,17 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         { event: "*", schema: "pieceful", table: "friendships" },
         () => void refreshFriends(),
       );
-    for (const friend of friends) {
+    // Depends on the friend-ID set (not the `friends` array reference) so a
+    // no-op refreshFriends() call (heartbeat, or this channel's own UPDATE
+    // callback) doesn't tear down and recreate the subscription.
+    for (const friendId of friendIds ? friendIds.split(",") : []) {
       channel = channel.on(
         "postgres_changes",
         {
           event: "UPDATE",
           schema: "pieceful",
           table: "profiles",
-          filter: `id=eq.${friend.id}`,
+          filter: `id=eq.${friendId}`,
         },
         () => void refreshFriends(),
       );
@@ -609,49 +488,32 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     return () => {
       void supabase?.removeChannel(channel);
     };
-  }, [ageGroup, friends, refreshFriends, session]);
+  }, [ageGroup, friendIds, refreshFriends, session]);
 
   useEffect(() => {
     if (ageGroup === "child" || !supabase || !session) return;
-    const heartbeat = () =>
-      void supabase
-        ?.from("profiles")
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq("id", session.user.id);
+    const heartbeat = () => void supabase?.rpc("touch_my_profile");
     heartbeat();
     const interval = setInterval(heartbeat, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, [ageGroup, session]);
 
   useEffect(() => {
-    if (
-      ageGroup === "child" ||
-      !supabase ||
-      !session ||
-      deletedPuzzleIds.length === 0
-    )
-      return;
-    const client = supabase;
+    if (ageGroup === "child" || !supabase || !session || deletedPuzzleIds.length === 0) return;
     const ids = [...deletedPuzzleIds];
     let active = true;
     const timeout = setTimeout(() => {
       void (async () => {
-        const { error: deleteError } = await client
-          .from("puzzles")
-          .delete()
-          .eq("user_id", session.user.id)
-          .in("id", ids);
-        if (deleteError) {
-          if (active) setError(deleteError.message);
+        try {
+          await deleteRemotePuzzles(ids);
+        } catch (caught) {
+          if (active)
+            setError(caught instanceof Error ? caught.message : "Puzzle deletion failed.");
           return;
         }
-        const imagePaths = ids.flatMap((id) => {
-          const path = uploadedPuzzleImages.get(id);
+        for (const id of ids) {
           uploadedPuzzleImages.delete(id);
-          return path ? [path] : [];
-        });
-        if (imagePaths.length > 0) {
-          await client.storage.from("puzzle-images").remove(imagePaths);
+          syncedPuzzleVersions.delete(id);
         }
         if (active) acknowledgeDeletedPuzzles(ids);
       })();
@@ -667,33 +529,22 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     const client = supabase;
     const userId = session.user.id;
     const timeout = setTimeout(() => {
-      void client
-        .from("profiles")
-        .update({ xp, last_seen_at: new Date().toISOString() })
-        .eq("id", userId);
-      if (puzzles.length > 0)
+      const pendingPuzzles = puzzles.filter(
+        (puzzle) => syncedPuzzleVersions.get(puzzle.id) !== puzzle.updatedAt,
+      );
+      if (pendingPuzzles.length > 0)
         void (async () => {
           const rows = [];
-          for (const puzzle of puzzles) {
+          for (const puzzle of pendingPuzzles) {
             let imagePath = uploadedPuzzleImages.get(puzzle.id) ?? null;
             if (!imagePath) {
               try {
-                const image = await fetch(puzzle.imageUri).then((response) =>
-                  response.arrayBuffer(),
-                );
-                const path = `${userId}/${puzzle.id}.jpg`;
-                const { error: imageError } = await client.storage
-                  .from("puzzle-images")
-                  .upload(path, image, {
-                    contentType: "image/jpeg",
-                    upsert: true,
-                  });
-                if (!imageError) {
-                  imagePath = path;
-                  uploadedPuzzleImages.set(puzzle.id, path);
-                }
+                const path = await uploadPuzzleImage(puzzle.id, puzzle.imageUri);
+                imagePath = path;
+                uploadedPuzzleImages.set(puzzle.id, path);
               } catch {
                 /* The JSON remains local until the image becomes readable again. */
+                continue;
               }
             }
             rows.push({
@@ -702,49 +553,28 @@ export function SocialProvider({ children }: { children: ReactNode }) {
               name: puzzle.name,
               difficulty: puzzle.difficulty,
               configuration: puzzle.configuration,
-              session: puzzle.session,
+              session: { ...puzzle.session, timelapse: undefined },
               image_uri: imagePath,
               completed_at: puzzle.session.completedAt,
               created_at: puzzle.createdAt,
               updated_at: puzzle.updatedAt,
             });
           }
-          await client.from("puzzles").upsert(rows);
+          for (let index = 0; index < rows.length; index += 5) {
+            const batch = rows.slice(index, index + 5);
+            const { error: syncError } = await client.rpc("sync_my_puzzles", {
+              payloads: batch,
+            });
+            if (syncError) {
+              setError(syncError.message);
+              return;
+            }
+            for (const row of batch) syncedPuzzleVersions.set(row.id, row.updated_at);
+          }
         })();
-      const progress = [
-        {
-          key: "first_puzzle",
-          progress: completed ? 100 : 0,
-          unlocked: completed >= 1,
-        },
-        {
-          key: "no_hints",
-          progress: puzzles.some(
-            (p) => p.session.completedAt && p.session.hintsUsed === 0,
-          )
-            ? 100
-            : 0,
-          unlocked: puzzles.some(
-            (p) => p.session.completedAt && p.session.hintsUsed === 0,
-          ),
-        },
-        {
-          key: "pieces_250",
-          progress: Math.min(100, placed / 2.5),
-          unlocked: placed >= 250,
-        },
-        {
-          key: "puzzles_10",
-          progress: Math.min(100, completed * 10),
-          unlocked: completed >= 10,
-        },
-      ];
-      void client
-        .from("user_achievements")
-        .upsert(progress.map((item) => ({ ...item, user_id: userId })));
-    }, 700);
+    }, 2000);
     return () => clearTimeout(timeout);
-  }, [ageGroup, completed, placed, puzzles, session, xp]);
+  }, [ageGroup, puzzles, session]);
 
   useEffect(() => {
     if (ageGroup === "child") return;
@@ -753,15 +583,10 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       void reportPlatformAchievement("first_puzzle", completed ? 100 : 0);
       void reportPlatformAchievement(
         "no_hints",
-        puzzles.some((p) => p.session.completedAt && p.session.hintsUsed === 0)
-          ? 100
-          : 0,
+        puzzles.some((p) => p.session.completedAt && p.session.hintsUsed === 0) ? 100 : 0,
       );
       void reportPlatformAchievement("pieces_250", Math.min(100, placed / 2.5));
-      void reportPlatformAchievement(
-        "puzzles_10",
-        Math.min(100, completed * 10),
-      );
+      void reportPlatformAchievement("puzzles_10", Math.min(100, completed * 10));
     });
   }, [ageGroup, completed, placed, puzzles]);
 
@@ -784,20 +609,15 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       setBusy(true);
       try {
         const redirectTo = NATIVE_AUTH_CALLBACK;
-        const { data, error: oauthError } = await supabase.auth.signInWithOAuth(
-          {
-            provider,
-            options: {
-              redirectTo,
-              skipBrowserRedirect: true,
-              scopes: provider === "azure" ? "email" : undefined,
-              queryParams:
-                provider === "google"
-                  ? { prompt: "select_account" }
-                  : undefined,
-            },
+        const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo,
+            skipBrowserRedirect: true,
+            scopes: provider === "azure" ? "email" : undefined,
+            queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
           },
-        );
+        });
         if (oauthError) throw oauthError;
         const result = await openAuthSession(data.url, redirectTo);
         if (result.type !== "success") {
@@ -808,8 +628,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         await completeOAuthCallback(result.url);
       } catch (caught) {
         void WebBrowser.dismissBrowser().catch(() => undefined);
-        const message =
-          caught instanceof Error ? caught.message : "Unable to sign in.";
+        const message = caught instanceof Error ? caught.message : "Unable to sign in.";
         if (message === "AUTH_TIMEOUT") {
           setError(
             t(
@@ -817,10 +636,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
               "Sign-in took too long. Check your connection and try again.",
             ),
           );
-        } else if (
-          message === "signup_disabled" ||
-          /signup|signups|cadastro/i.test(message)
-        ) {
+        } else if (message === "signup_disabled" || /signup|signups|cadastro/i.test(message)) {
           setError(
             t(
               "Novos usuários estão desativados no Supabase. Ative ‘Allow new users to sign up’ e tente novamente.",
@@ -847,6 +663,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     setBusy(true);
     await supabase?.auth.signOut();
+    syncedPuzzleVersions.clear();
+    uploadedPuzzleImages.clear();
     setSession(null);
     setFriends([]);
     setBusy(false);
@@ -856,13 +674,16 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     if (!supabase || !session) return;
     setBusy(true);
     setError(null);
-    const { error: deleteError } = await supabase.rpc("delete_my_account");
-    if (deleteError) {
-      setError(deleteError.message);
+    try {
+      await deleteRemoteAccount();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Account deletion failed.");
       setBusy(false);
-      throw deleteError;
+      throw caught;
     }
     await supabase.auth.signOut({ scope: "local" });
+    syncedPuzzleVersions.clear();
+    uploadedPuzzleImages.clear();
     await AsyncStorage.removeItem(PROFILE_KEY);
     setSession(null);
     setFriends([]);
@@ -881,12 +702,10 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       setProfile(next);
       await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(next));
       if (supabase && session) {
-        const { error: updateError } = await supabase.from("profiles").upsert({
-          id: session.user.id,
-          display_name: next.displayName,
-          avatar_url: next.avatarUrl,
-          bio: next.bio,
-          xp,
+        const { error: updateError } = await supabase.rpc("update_my_profile", {
+          next_display_name: next.displayName,
+          next_avatar_url: next.avatarUrl,
+          next_bio: next.bio,
         });
         if (updateError) setError(updateError.message);
       }
@@ -897,16 +716,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const uploadAvatar = useCallback(
     async (uri: string) => {
       if (!supabase || !session) return uri;
-      const body = await fetch(uri).then((response) => response.arrayBuffer());
-      const path = `${session.user.id}/avatar-${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(path, body, {
-          contentType: "image/jpeg",
-          upsert: true,
-        });
-      if (uploadError) throw uploadError;
-      return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+      return uploadAvatarImage(uri);
     },
     [session],
   );
@@ -969,9 +779,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return (
-    <SocialContext.Provider value={value}>{children}</SocialContext.Provider>
-  );
+  return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;
 }
 
 export function useSocial() {

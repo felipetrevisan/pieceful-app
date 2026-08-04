@@ -301,7 +301,8 @@ html[data-theme="space"] .game-shell {
       circle at 50% 90%,
       color-mix(in srgb, var(--primary) 22%, transparent),
       transparent 24rem
-    ), var(--bg);
+    ),
+    var(--bg);
   background-size: 118% 118%;
   animation: playful-background 13s ease-in-out infinite alternate;
 }
@@ -1404,7 +1405,8 @@ details {
       circle at 100% 0,
       color-mix(in srgb, var(--cyan) 8%, transparent),
       transparent 38%
-    ), color-mix(in srgb, var(--bg-deep) 42%, transparent);
+    ),
+    color-mix(in srgb, var(--bg-deep) 42%, transparent);
 }
 .advanced-options-heading {
   display: flex;
@@ -3103,7 +3105,8 @@ html[data-theme] .delete-puzzle-button:active {
         circle at 0 100%,
         color-mix(in srgb, var(--primary) 22%, transparent),
         transparent 42%
-      ), color-mix(in srgb, var(--surface) 96%, #061022);
+      ),
+      color-mix(in srgb, var(--surface) 96%, #061022);
     box-shadow:
       0 26px 80px rgba(0, 0, 0, 0.58),
       inset 0 1px rgba(255, 255, 255, 0.06);

@@ -1,37 +1,22 @@
-import { neighborSnapOffset, normalizeQuarterTurn, type PuzzlePiece, type PuzzlePieceShape } from "@puzzled/puzzle-engine";
-import { Ionicons } from "@expo/vector-icons";
+import { normalizeQuarterTurn, type PuzzlePiece } from "@puzzled/puzzle-engine";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  FadeInDown,
-  FadeOutDown,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSequence,
-  withSpring,
-  withTiming,
-  type SharedValue,
-} from "react-native-reanimated";
-import Svg, { ClipPath, Defs, Image as SvgImage, Path, Rect } from "react-native-svg";
-import { mobileThemes } from "@/constants/pieceful-theme";
+import Animated, { useSharedValue } from "react-native-reanimated";
+import Svg, { Path, Rect } from "react-native-svg";
 import type { ScreenFrame } from "@/components/puzzle-piece-drawer";
-import type {
-  AppLanguage,
-  MobilePreferences,
-  MobileTheme,
-} from "@/state/app-provider";
+import { mobileThemes } from "@/constants/pieceful-theme";
+import { useBoardCamera } from "@/hooks/use-board-camera";
+import { applyPieceTransition } from "@/lib/puzzle-piece-transitions";
+import type { MobilePreferences, MobileTheme } from "@/state/app-provider";
+import { DraggablePiece, StaticPlacedPiece } from "./native-puzzle-piece";
 
 interface NativePuzzleBoardProps {
   imageUri: string;
   rows: number;
   columns: number;
   pieces: PuzzlePiece[];
-  language: AppLanguage;
   preferences: MobilePreferences;
   theme: MobileTheme;
   rotationEnabled: boolean;
@@ -42,7 +27,6 @@ interface NativePuzzleBoardProps {
   initialZoom: number;
   initialPanX: number;
   initialPanY: number;
-  externalDrawer?: boolean;
   headerScreenTarget?: ScreenFrame | null;
   storageScreenTarget?: ScreenFrame | null;
   onBoardFrameChange?: (frame: ScreenFrame) => void;
@@ -62,76 +46,15 @@ export interface PuzzleHintCommand {
   pieceId: string;
 }
 
-function cameraBounds({
-  zoom,
-  boardWidth,
-  boardHeight,
-  viewportWidth,
-  viewportTop,
-  viewportBottom,
-  visibleGrip,
-}: {
-  zoom: number;
-  boardWidth: number;
-  boardHeight: number;
-  viewportWidth: number;
-  viewportTop: number;
-  viewportBottom: number;
-  visibleGrip: number;
-}) {
-  "worklet";
-  const safeZoom = Math.max(0.8, zoom);
-  // The board behaves like a free sheet above a fixed workspace. Every edge can
-  // be brought across the entire useful viewport; only a small grip remains on
-  // screen so the sheet cannot be lost completely.
-  const horizontalLimit =
-    (boardWidth * safeZoom + viewportWidth - visibleGrip * 2) / (2 * safeZoom);
-  const minimumY = (viewportTop + visibleGrip - boardHeight * safeZoom) / safeZoom;
-  const maximumY = (viewportBottom - visibleGrip) / safeZoom;
-  return { horizontalLimit, minimumY, maximumY };
-}
-
-function piecePath(shape: PuzzlePieceShape, size: number, margin: number) {
-  const x = margin;
-  const y = margin;
-  const bump = size * 0.22;
-  const edge = (kind: "top" | "right" | "bottom" | "left") => {
-    const value = shape[kind];
-    const direction = value === "tab" ? 1 : value === "blank" ? -1 : 0;
-    if (kind === "top") {
-      if (!direction) return `L ${x + size} ${y}`;
-      return `L ${x + size * 0.32} ${y} C ${x + size * 0.34} ${y - bump * direction} ${x + size * 0.66} ${y - bump * direction} ${x + size * 0.68} ${y} L ${x + size} ${y}`;
-    }
-    if (kind === "right") {
-      if (!direction) return `L ${x + size} ${y + size}`;
-      return `L ${x + size} ${y + size * 0.32} C ${x + size + bump * direction} ${y + size * 0.34} ${x + size + bump * direction} ${y + size * 0.66} ${x + size} ${y + size * 0.68} L ${x + size} ${y + size}`;
-    }
-    if (kind === "bottom") {
-      if (!direction) return `L ${x} ${y + size}`;
-      return `L ${x + size * 0.68} ${y + size} C ${x + size * 0.66} ${y + size + bump * direction} ${x + size * 0.34} ${y + size + bump * direction} ${x + size * 0.32} ${y + size} L ${x} ${y + size}`;
-    }
-    if (!direction) return `L ${x} ${y}`;
-    return `L ${x} ${y + size * 0.68} C ${x - bump * direction} ${y + size * 0.66} ${x - bump * direction} ${y + size * 0.34} ${x} ${y + size * 0.32} L ${x} ${y}`;
-  };
-  return `M ${x} ${y} ${edge("top")} ${edge("right")} ${edge("bottom")} ${edge("left")} Z`;
-}
-
-function drawerOrder(id: string) {
-  let hash = 2166136261;
-  for (let index = 0; index < id.length; index += 1) {
-    hash ^= id.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  hash ^= hash >>> 16;
-  return Math.imul(hash, 2246822507) >>> 0;
-}
+// Stable reference so DraggablePiece's memoization isn't broken by a fresh
+// closure every render; the board on this screen has no visible drag indicator.
+function noop() {}
 
 export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   imageUri,
   rows,
   columns,
   pieces,
-  language,
   preferences,
   theme,
   rotationEnabled,
@@ -142,7 +65,6 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   initialZoom,
   initialPanX,
   initialPanY,
-  externalDrawer = false,
   headerScreenTarget,
   storageScreenTarget,
   onBoardFrameChange,
@@ -151,12 +73,10 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   onCameraChange,
   onHintAnimationComplete,
 }: NativePuzzleBoardProps) {
-  const t = (portuguese: string, english: string) =>
-    language === "en" ? english : portuguese;
   const { height, width } = useWindowDimensions();
   const colors = mobileThemes[theme];
   const boardWidth = Math.min(352, width - 24);
-  const canvasWidth = externalDrawer ? width - 24 : boardWidth;
+  const canvasWidth = width - 24;
   const boardOffsetX = (canvasWidth - boardWidth) / 2;
   const cell = boardWidth / columns;
   const boardHeight = rows * cell;
@@ -165,194 +85,54 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
     () => pieces.filter((piece) => !piece.isPlaced && piece.trayId !== null),
     [pieces],
   );
-  const drawerColumns = Math.max(3, Math.min(columns, Math.floor(columns * 0.75)));
-  const drawerColumnStep = columns / drawerColumns;
-  const displayedStoredPieces = useMemo(
-    () =>
-      externalDrawer
-        ? []
-        : [...storedPieces]
-            .sort((left, right) => drawerOrder(left.id) - drawerOrder(right.id))
-            .map((piece, index) => ({
-              ...piece,
-              currentPosition: {
-                ...piece.currentPosition,
-                x:
-                  (index % drawerColumns) * drawerColumnStep +
-                  Math.max(0, (drawerColumnStep - 1) / 2),
-                y: rows + 1.55 + Math.floor(index / drawerColumns) * 1.12,
-              },
-            })),
-    [drawerColumnStep, drawerColumns, externalDrawer, rows, storedPieces],
-  );
-  const placedPieces = useMemo(
-    () => pieces.filter((piece) => piece.isPlaced),
-    [pieces],
-  );
+  const placedPieces = useMemo(() => pieces.filter((piece) => piece.isPlaced), [pieces]);
   const movablePieces = useMemo(
     () => pieces.filter((piece) => !piece.isPlaced && piece.trayId === null),
     [pieces],
   );
-  const drawerRows = Math.ceil(storedPieces.length / drawerColumns);
+  // Off-board anchor for the archive/storage drop target; the visible tray UI
+  // lives in the separate, already-virtualized PuzzlePieceDrawer component.
   const drawerTop = boardHeight + Math.max(16, cell * 0.36);
   const drawerHeaderHeight = Math.max(62, cell * 1.02);
-  const drawerBodyTop = drawerTop + drawerHeaderHeight;
-  const drawerBodyHeight = Math.max(cell * 1.3, drawerRows * cell * 1.12 + cell * 0.42);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [draggingActivePiece, setDraggingActivePiece] = useState(false);
-  const contentHeight = externalDrawer
-    ? Math.max(boardHeight, height - 356)
-    : drawerOpen
-    ? drawerBodyTop + drawerBodyHeight
-    : drawerTop + drawerHeaderHeight + cell * 0.16;
+  const contentHeight = Math.max(boardHeight, height - 356);
   const storageDockSize = Math.max(42, Math.min(54, cell * 0.82));
   const storageDockLeft = boardWidth - storageDockSize - 42;
   const storageDockTop = drawerTop + (drawerHeaderHeight - storageDockSize) / 2;
-  const storageTarget = useMemo(() => ({
-    x: storageDockLeft / cell,
-    y: storageDockTop / cell,
-    width: storageDockSize / cell,
-    height: storageDockSize / cell,
-  }), [cell, storageDockLeft, storageDockSize, storageDockTop]);
+  const storageTarget = useMemo(
+    () => ({
+      x: storageDockLeft / cell,
+      y: storageDockTop / cell,
+      width: storageDockSize / cell,
+      height: storageDockSize / cell,
+    }),
+    [cell, storageDockLeft, storageDockSize, storageDockTop],
+  );
   const migratedLegacyTray = useRef(false);
   const piecesRef = useRef(pieces);
   piecesRef.current = pieces;
-  const normalizedInitialPanX = initialPanX;
-  const normalizedInitialPanY = initialPanY;
   const boardRef = useRef<View>(null);
-  const scale = useSharedValue(initialZoom);
-  const savedScale = useSharedValue(initialZoom);
-  const panX = useSharedValue(normalizedInitialPanX);
-  const panY = useSharedValue(normalizedInitialPanY);
-  const savedPanX = useSharedValue(normalizedInitialPanX);
-  const savedPanY = useSharedValue(normalizedInitialPanY);
-  const pieceDragActive = useSharedValue(false);
   const activeGroupId = useSharedValue<string | null>(null);
   const activeGroupPieceId = useSharedValue<string | null>(null);
   const groupTranslationX = useSharedValue(0);
   const groupTranslationY = useSharedValue(0);
-  const lastZoomCommandId = useRef(0);
-  const lastHintCommandId = useRef(0);
 
-  useEffect(() => {
-    if (!hintCommand || lastHintCommandId.current === hintCommand.id) return;
-    const target = pieces.find((piece) => piece.id === hintCommand.pieceId);
-    if (!target) return;
-    lastHintCommandId.current = hintCommand.id;
-
-    const startCenterX = boardOffsetX + (target.currentPosition.x + 0.5) * cell;
-    const startCenterY = (target.currentPosition.y + 0.5) * cell;
-    const targetCenterX = boardOffsetX + (target.correctPosition.x + 0.5) * cell;
-    const targetCenterY = (target.correctPosition.y + 0.5) * cell;
-    const viewportCenterY = (cameraViewportTop + cameraViewportBottom) / 2;
-    const overviewZoom = Math.max(
-      1,
-      Math.min(1.32, 1.45 - Math.hypot(startCenterX - targetCenterX, startCenterY - targetCenterY) / Math.max(boardWidth, boardHeight) * 0.35),
-    );
-    const focusZoom = Math.min(2.05, Math.max(1.55, 72 / Math.max(32, cell)));
-    const midpointX = (startCenterX + targetCenterX) / 2;
-    const midpointY = (startCenterY + targetCenterY) / 2;
-    const overviewPanX = canvasWidth / 2 - midpointX;
-    const overviewPanY = viewportCenterY / overviewZoom - midpointY;
-    const focusPanX = canvasWidth / 2 - targetCenterX;
-    const focusPanY = viewportCenterY / focusZoom - targetCenterY;
-
-    scale.set(
-      withSequence(
-        withTiming(overviewZoom, { duration: 300 }),
-        withTiming(focusZoom, { duration: 620 }),
-      ),
-    );
-    panX.set(
-      withSequence(
-        withTiming(overviewPanX, { duration: 300 }),
-        withTiming(focusPanX, { duration: 620 }),
-      ),
-    );
-    panY.set(
-      withSequence(
-        withTiming(overviewPanY, { duration: 300 }),
-        withTiming(focusPanY, { duration: 620 }),
-      ),
-    );
-    savedScale.set(focusZoom);
-    savedPanX.set(focusPanX);
-    savedPanY.set(focusPanY);
-    onCameraChange(focusPanX, focusPanY, focusZoom);
-  }, [
+  const { scale, panX, panY, pieceDragActive, pinch, boardPan, zoomStyle } = useBoardCamera({
+    pieces,
+    boardWidth,
     boardHeight,
     boardOffsetX,
-    boardWidth,
-    cameraViewportBottom,
-    cameraViewportTop,
     canvasWidth,
     cell,
+    cameraViewportTop,
+    cameraViewportBottom,
+    cameraVisibleGrip,
+    initialZoom,
+    initialPanX,
+    initialPanY,
+    zoomCommand,
     hintCommand,
     onCameraChange,
-    panX,
-    panY,
-    pieces,
-    savedPanX,
-    savedPanY,
-    savedScale,
-    scale,
-  ]);
-
-  useEffect(() => {
-    if (!zoomCommand || lastZoomCommandId.current === zoomCommand.id) return;
-    lastZoomCommandId.current = zoomCommand.id;
-
-    const currentScale = scale.get();
-    const nextScale =
-      zoomCommand.action === "reset"
-        ? 1
-        : Math.max(
-            0.8,
-            Math.min(2.4, currentScale + (zoomCommand.action === "in" ? 0.25 : -0.25)),
-          );
-    let nextPanX = panX.get();
-    let nextPanY = panY.get();
-
-    if (zoomCommand.action === "reset") {
-      nextPanX = 0;
-      nextPanY = 0;
-    } else {
-      const bounds = cameraBounds({
-        zoom: nextScale,
-        boardWidth,
-        boardHeight,
-        viewportWidth: canvasWidth,
-        viewportTop: cameraViewportTop,
-        viewportBottom: cameraViewportBottom,
-        visibleGrip: cameraVisibleGrip,
-      });
-      nextPanX = Math.max(-bounds.horizontalLimit, Math.min(bounds.horizontalLimit, nextPanX));
-      nextPanY = Math.max(bounds.minimumY, Math.min(bounds.maximumY, nextPanY));
-    }
-
-    scale.set(withTiming(nextScale, { duration: 180 }));
-    savedScale.set(nextScale);
-    panX.set(withTiming(nextPanX, { duration: 180 }));
-    panY.set(withTiming(nextPanY, { duration: 180 }));
-    savedPanX.set(nextPanX);
-    savedPanY.set(nextPanY);
-    onCameraChange(nextPanX, nextPanY, nextScale);
-  }, [
-    boardHeight,
-    boardWidth,
-    cameraVisibleGrip,
-    cameraViewportBottom,
-    cameraViewportTop,
-    canvasWidth,
-    onCameraChange,
-    panX,
-    panY,
-    savedPanX,
-    savedPanY,
-    savedScale,
-    scale,
-    zoomCommand,
-  ]);
+  });
 
   useEffect(() => {
     const invalidGroups = new Set(
@@ -371,7 +151,8 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
         ? normalizeQuarterTurn(piece.currentPosition.rotation)
         : 0;
       const mustReleaseInvalidGroup = Boolean(piece.groupId && invalidGroups.has(piece.groupId));
-      if (normalizedRotation === piece.currentPosition.rotation && !mustReleaseInvalidGroup) return piece;
+      if (normalizedRotation === piece.currentPosition.rotation && !mustReleaseInvalidGroup)
+        return piece;
       changed = true;
       return {
         ...piece,
@@ -382,233 +163,31 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
     if (changed) onPiecesChange(normalizedPieces);
   }, [onPiecesChange, pieces, rotationEnabled]);
 
-  const pinch = Gesture.Pinch()
-    .enabled(!hintCommand)
-    .onUpdate((event) => {
-      scale.set(Math.max(0.8, Math.min(2.4, savedScale.get() * event.scale)));
-    })
-    .onEnd(() => {
-      savedScale.set(scale.get());
-      const bounds = cameraBounds({
-        zoom: scale.get(),
-        boardWidth,
-        boardHeight,
-        viewportWidth: canvasWidth,
-        viewportTop: cameraViewportTop,
-        viewportBottom: cameraViewportBottom,
-        visibleGrip: cameraVisibleGrip,
-      });
-      panX.set(Math.max(-bounds.horizontalLimit, Math.min(bounds.horizontalLimit, panX.get())));
-      panY.set(Math.max(bounds.minimumY, Math.min(bounds.maximumY, panY.get())));
-      savedPanX.set(panX.get());
-      savedPanY.set(panY.get());
-      runOnJS(onCameraChange)(panX.get(), panY.get(), scale.get());
-    });
-  const boardPan = Gesture.Pan()
-    .enabled(!hintCommand)
-    .maxPointers(1)
-    .activeOffsetX([-4, 4])
-    .activeOffsetY([-4, 4])
-    .onStart(() => {
-      savedPanX.set(panX.get());
-      savedPanY.set(panY.get());
-    })
-    .onUpdate((event) => {
-      if (pieceDragActive.get()) return;
-      const bounds = cameraBounds({
-        zoom: scale.get(),
-        boardWidth,
-        boardHeight,
-        viewportWidth: canvasWidth,
-        viewportTop: cameraViewportTop,
-        viewportBottom: cameraViewportBottom,
-        visibleGrip: cameraVisibleGrip,
-      });
-      panX.set(
-        Math.max(
-          -bounds.horizontalLimit,
-          Math.min(bounds.horizontalLimit, savedPanX.get() + event.translationX / scale.get()),
-        ),
+  const updatePiece = useCallback(
+    (
+      id: string,
+      x: number,
+      y: number,
+      rotation: number,
+      isPlaced: boolean,
+      destination: "board" | "drawer",
+    ) => {
+      const result = applyPieceTransition(
+        piecesRef.current,
+        { id, x, y, rotation, isPlaced, destination },
+        { rows, columns, cell, rotationEnabled },
       );
-      panY.set(
-        Math.max(
-          bounds.minimumY,
-          Math.min(bounds.maximumY, savedPanY.get() + event.translationY / scale.get()),
-        ),
-      );
-    })
-    .onEnd(() => {
-      savedPanX.set(panX.get());
-      savedPanY.set(panY.get());
-      runOnJS(onCameraChange)(panX.get(), panY.get(), scale.get());
-    });
-  const zoomStyle = useAnimatedStyle(() => ({
-    transform: [
-      // Camera pan is stored in board coordinates. Scaling first keeps the
-      // rendered transform aligned with tray-to-board coordinate conversion.
-      { scale: scale.get() },
-      { translateX: panX.get() },
-      { translateY: panY.get() },
-    ],
-  }));
-
-  function toggleDrawer() {
-    setDrawerOpen((current) => !current);
-    if (preferences.haptics) void Haptics.selectionAsync();
-  }
-
-  const drawerTap = Gesture.Tap()
-    .maxDuration(350)
-    .onEnd((_event, success) => {
-      if (success) runOnJS(toggleDrawer)();
-    });
-
-  const updatePiece = useCallback((
-    id: string,
-    x: number,
-    y: number,
-    rotation: number,
-    isPlaced: boolean,
-    destination: "board" | "drawer",
-  ) => {
-    const currentPieces = piecesRef.current;
-    const movingPiece = currentPieces.find((piece) => piece.id === id);
-    if (!movingPiece) return;
-    const effectiveRotation = rotationEnabled
-      ? movingPiece.groupId
-        ? normalizeQuarterTurn(movingPiece.currentPosition.rotation)
-        : normalizeQuarterTurn(rotation)
-      : 0;
-    const storedSlot = currentPieces.filter(
-      (piece) => piece.id !== id && !piece.isPlaced && piece.trayId !== null,
-    ).length;
-    if (destination === "drawer") {
-      const next = currentPieces.map((piece) =>
-        piece.id === id
-          ? {
-              ...piece,
-              isPlaced: false,
-              groupId: null,
-              trayId: "drawer",
-              currentPosition: {
-                x: storedSlot % columns,
-                y: rows + 1.55 + Math.floor(storedSlot / columns) * 1.18,
-                rotation: effectiveRotation,
-              },
-            }
-          : piece,
-      );
-      onPiecesChange(next);
-      onPieceStored?.();
-      if (preferences.haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      return;
-    }
-
-    const memberIds = new Set(
-      movingPiece.groupId && movingPiece.groupId !== "tabuleiro"
-        ? currentPieces.filter((piece) => piece.groupId === movingPiece.groupId).map((piece) => piece.id)
-        : [id],
-    );
-    const deltaX = x - movingPiece.currentPosition.x;
-    const deltaY = y - movingPiece.currentPosition.y;
-    let next = currentPieces.map((piece) =>
-      memberIds.has(piece.id)
-        ? {
-            ...piece,
-            trayId: null,
-            currentPosition: {
-              x: piece.currentPosition.x + deltaX,
-              y: piece.currentPosition.y + deltaY,
-              rotation: normalizeQuarterTurn(
-                piece.id === id ? effectiveRotation : piece.currentPosition.rotation,
-              ),
-            },
-          }
-        : piece,
-    );
-
-    let connected = false;
-    if (isPlaced) {
-      next = next.map((piece) =>
-        memberIds.has(piece.id)
-          ? { ...piece, isPlaced: true, groupId: "tabuleiro", currentPosition: { ...piece.correctPosition } }
-          : piece,
-      );
-      connected = true;
-    } else {
-      let match: { offsetX: number; offsetY: number; stationary: PuzzlePiece } | null = null;
-      const movingMembers = next.filter((piece) => memberIds.has(piece.id));
-      for (const moving of movingMembers) {
-        // Connected groups are locked against rotation. Only correctly oriented
-        // loose pieces may create a new group, avoiding an unsolvable rotated set.
-        if (normalizeQuarterTurn(moving.currentPosition.rotation) !== 0) continue;
-        for (const stationary of next) {
-          if (memberIds.has(stationary.id) || stationary.trayId !== null) continue;
-          if (normalizeQuarterTurn(stationary.currentPosition.rotation) !== 0) continue;
-          const neighborTolerance = Math.min(
-            0.68,
-            Math.max(0.38, 10 / Math.max(1, cell)),
-          );
-          const offset = neighborSnapOffset(moving, stationary, neighborTolerance);
-          if (offset) {
-            match = { offsetX: offset.x, offsetY: offset.y, stationary };
-            break;
-          }
-        }
-        if (match) break;
+      if (!result) return;
+      onPiecesChange(result.pieces);
+      if (result.stored) {
+        onPieceStored?.();
+        if (preferences.haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else if (result.connected && preferences.haptics) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-
-      if (match) {
-        const connectedIds = new Set(
-          match.stationary.groupId
-            ? next.filter((piece) => piece.groupId === match?.stationary.groupId).map((piece) => piece.id)
-            : [match.stationary.id],
-        );
-        const groupId = match.stationary.isPlaced
-          ? "tabuleiro"
-          : (match.stationary.groupId ?? movingPiece.groupId ?? `grupo-${match.stationary.id}`);
-        next = next.map((piece) => {
-          if (memberIds.has(piece.id)) {
-            return {
-              ...piece,
-              groupId,
-              isPlaced: groupId === "tabuleiro",
-              currentPosition: {
-                ...piece.currentPosition,
-                x: piece.currentPosition.x + match.offsetX,
-                y: piece.currentPosition.y + match.offsetY,
-              },
-            };
-          }
-          return connectedIds.has(piece.id)
-            ? { ...piece, groupId, isPlaced: groupId === "tabuleiro" }
-            : piece;
-        });
-        connected = true;
-      }
-    }
-
-    // Loose pieces and movable groups that were just touched stay above other
-    // loose pieces. Placed pieces keep their lower board layer.
-    const resolvedMovingPiece = next.find((piece) => piece.id === id);
-    if (resolvedMovingPiece && !resolvedMovingPiece.isPlaced) {
-      const foregroundIds = new Set(
-        resolvedMovingPiece.groupId && resolvedMovingPiece.groupId !== "tabuleiro"
-          ? next
-              .filter((piece) => piece.groupId === resolvedMovingPiece.groupId)
-              .map((piece) => piece.id)
-          : memberIds,
-      );
-      next = [
-        ...next.filter((piece) => !foregroundIds.has(piece.id)),
-        ...next.filter((piece) => foregroundIds.has(piece.id)),
-      ];
-    }
-
-    onPiecesChange(next);
-    if (connected && preferences.haptics)
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [cell, columns, onPieceStored, onPiecesChange, preferences.haptics, rotationEnabled, rows]);
+    },
+    [cell, columns, onPieceStored, onPiecesChange, preferences.haptics, rotationEnabled, rows],
+  );
 
   useEffect(() => {
     if (migratedLegacyTray.current || pieces.length === 0) return;
@@ -636,9 +215,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
 
   return (
     <View style={styles.container}>
-      <View
-        style={{ width: canvasWidth, height: contentHeight, overflow: "visible" }}
-      >
+      <View style={{ width: canvasWidth, height: contentHeight, overflow: "visible" }}>
         <View
           ref={boardRef}
           collapsable={false}
@@ -648,7 +225,13 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
               onBoardFrameChange?.({ x, y, width: measuredWidth, height: boardHeight });
             });
           }}
-          style={{ position: "absolute", left: boardOffsetX, top: 0, width: boardWidth, height: boardHeight }}
+          style={{
+            position: "absolute",
+            left: boardOffsetX,
+            top: 0,
+            width: boardWidth,
+            height: boardHeight,
+          }}
         />
         <GestureDetector gesture={Gesture.Simultaneous(pinch, boardPan)}>
           <Animated.View
@@ -661,140 +244,81 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
               zoomStyle,
             ]}
           >
-          {!externalDrawer && drawerOpen ? (
-            <Animated.View
-              entering={FadeInDown.duration(240)}
-              exiting={FadeOutDown.duration(160)}
-              pointerEvents="none"
-              style={[
-                styles.drawerPanel,
-                {
-                  top: drawerTop,
-                  height: drawerHeaderHeight + drawerBodyHeight,
-                  borderColor: `${colors.accent}62`,
-                  borderRadius: Math.max(11, colors.radius),
-                  shadowColor: colors.accent,
-                },
-              ]}
+            <Svg
+              width={boardWidth}
+              height={boardHeight}
+              style={{ position: "absolute", left: boardOffsetX, top: 0 }}
             >
-              <LinearGradient colors={[colors.panel, `${colors.panelAlt}fa`, `${colors.primary}16`]} style={StyleSheet.absoluteFill} />
-              <View style={[styles.drawerInnerGlow, { backgroundColor: `${colors.accent}0d` }]} />
-            </Animated.View>
-          ) : null}
-          {!externalDrawer && drawerOpen ? <Animated.View entering={FadeInDown.delay(70).duration(220)} pointerEvents="none" style={[styles.traySurface, { top: drawerBodyTop, height: drawerBodyHeight, borderRadius: Math.max(8, colors.radius) }]}>
-            {storedPieces.length === 0 ? <View style={styles.emptyDrawer}><Ionicons name="sparkles-outline" size={28} color={colors.accent} /><Text style={[styles.emptyDrawerText, { color: colors.muted }]}>{t("A caixa está vazia", "The drawer is empty")}</Text></View> : null}
-            <Ionicons name="extension-puzzle-outline" size={92} color={`${colors.accent}0c`} style={styles.trayWatermark} />
-          </Animated.View> : null}
-          <Svg width={boardWidth} height={boardHeight} style={{ position: "absolute", left: boardOffsetX, top: 0 }}>
-            <Rect x={1} y={1} width={boardWidth - 2} height={boardHeight - 2} rx={Math.max(5, colors.radius)} fill={colors.panelAlt} stroke={`${colors.accent}70`} strokeWidth={2} />
-            {Array.from({ length: columns - 1 }, (_, index) => (
-              <Path key={`column-${index}`} d={`M ${(index + 1) * cell} 0 V ${boardHeight}`} stroke={`${colors.accent}18`} strokeWidth={1} />
+              <Rect
+                x={1}
+                y={1}
+                width={boardWidth - 2}
+                height={boardHeight - 2}
+                rx={Math.max(5, colors.radius)}
+                fill={colors.panelAlt}
+                stroke={`${colors.accent}70`}
+                strokeWidth={2}
+              />
+              {Array.from({ length: columns - 1 }, (_, index) => (
+                <Path
+                  key={`column-${index}`}
+                  d={`M ${(index + 1) * cell} 0 V ${boardHeight}`}
+                  stroke={`${colors.accent}18`}
+                  strokeWidth={1}
+                />
+              ))}
+              {Array.from({ length: rows - 1 }, (_, index) => (
+                <Path
+                  key={`row-${index}`}
+                  d={`M 0 ${(index + 1) * cell} H ${boardWidth}`}
+                  stroke={`${colors.accent}18`}
+                  strokeWidth={1}
+                />
+              ))}
+            </Svg>
+
+            {placedPieces.map((piece) => (
+              <StaticPlacedPiece
+                key={piece.id}
+                piece={piece}
+                imageUri={imageUri}
+                boardWidth={boardWidth}
+                boardHeight={boardHeight}
+                boardOffsetX={boardOffsetX}
+                cell={cell}
+                stroke={colors.accent}
+              />
             ))}
-            {Array.from({ length: rows - 1 }, (_, index) => (
-              <Path key={`row-${index}`} d={`M 0 ${(index + 1) * cell} H ${boardWidth}`} stroke={`${colors.accent}18`} strokeWidth={1} />
+
+            {movablePieces.map((piece) => (
+              <DraggablePiece
+                key={piece.id}
+                piece={piece}
+                imageUri={imageUri}
+                boardWidth={boardWidth}
+                boardHeight={boardHeight}
+                boardOffsetX={boardOffsetX}
+                cell={cell}
+                rows={rows}
+                columns={columns}
+                scale={scale}
+                pieceDragActive={pieceDragActive}
+                activeGroupId={activeGroupId}
+                activeGroupPieceId={activeGroupPieceId}
+                groupTranslationX={groupTranslationX}
+                groupTranslationY={groupTranslationY}
+                storageTarget={storageTarget}
+                headerScreenTarget={headerScreenTarget}
+                storageScreenTarget={storageScreenTarget}
+                rotationEnabled={rotationEnabled}
+                stored={false}
+                stroke={piece.isPlaced ? colors.accent : `${colors.text}99`}
+                onChange={updatePiece}
+                onDragState={noop}
+                hintCommand={hintCommand}
+                onHintAnimationComplete={onHintAnimationComplete}
+              />
             ))}
-          </Svg>
-
-          {placedPieces.map((piece) => (
-            <StaticPlacedPiece
-              key={piece.id}
-              piece={piece}
-              imageUri={imageUri}
-              boardWidth={boardWidth}
-              boardHeight={boardHeight}
-              boardOffsetX={boardOffsetX}
-              cell={cell}
-              stroke={colors.accent}
-            />
-          ))}
-
-          {!externalDrawer ? <GestureDetector gesture={drawerTap}>
-            <View
-              accessible
-              accessibilityRole="button"
-              accessibilityState={{ expanded: drawerOpen }}
-              accessibilityLabel={drawerOpen ? t("Fechar bandeja", "Close tray") : t("Abrir bandeja", "Open tray")}
-              style={[
-                styles.drawerHeaderShell,
-                {
-                  top: drawerTop,
-                  height: drawerHeaderHeight,
-                  borderColor: draggingActivePiece ? colors.accent : `${colors.accent}45`,
-                  backgroundColor: drawerOpen ? "transparent" : colors.panel,
-                  borderRadius: Math.max(9, colors.radius),
-                },
-              ]}
-            >
-              <LinearGradient colors={[`${colors.accent}16`, `${colors.primary}0d`]} style={StyleSheet.absoluteFill} />
-              <View style={[styles.drawerLeadIcon, { backgroundColor: `${colors.accent}18` }]}><Ionicons name="file-tray-full-outline" size={22} color={colors.accent} /></View>
-              <View style={styles.drawerCopy}><Text style={[styles.drawerTitle, { color: colors.text }]}>{drawerOpen ? t("Bandeja de peças", "Piece tray") : t("Abrir bandeja", "Open piece tray")}</Text><Text style={[styles.drawerMeta, { color: colors.muted }]}>{storedPieces.length} {drawerOpen ? t("peças · arraste para o tabuleiro", "pieces · drag onto the board") : t("peças guardadas", "stored pieces")}</Text></View>
-              <View
-                pointerEvents="none"
-                style={[styles.storageDock, { left: storageDockLeft, top: (drawerHeaderHeight - storageDockSize) / 2, width: storageDockSize, height: storageDockSize, borderColor: draggingActivePiece ? colors.accent : `${colors.muted}44`, backgroundColor: draggingActivePiece ? `${colors.accent}30` : colors.panelAlt }]}
-              >
-                <Ionicons name={draggingActivePiece ? "archive" : "archive-outline"} size={22} color={draggingActivePiece ? colors.accent : colors.muted} />
-              </View>
-              <Ionicons name={drawerOpen ? "chevron-down" : "chevron-up"} size={20} color={colors.muted} />
-            </View>
-          </GestureDetector> : null}
-
-          {movablePieces.map((piece) => (
-            <DraggablePiece
-              key={piece.id}
-              piece={piece}
-              imageUri={imageUri}
-              boardWidth={boardWidth}
-              boardHeight={boardHeight}
-              boardOffsetX={boardOffsetX}
-              cell={cell}
-              rows={rows}
-              columns={columns}
-              scale={scale}
-              pieceDragActive={pieceDragActive}
-              activeGroupId={activeGroupId}
-              activeGroupPieceId={activeGroupPieceId}
-              groupTranslationX={groupTranslationX}
-              groupTranslationY={groupTranslationY}
-              storageTarget={storageTarget}
-              headerScreenTarget={headerScreenTarget}
-              storageScreenTarget={storageScreenTarget}
-              rotationEnabled={rotationEnabled}
-              stored={false}
-              stroke={piece.isPlaced ? colors.accent : `${colors.text}99`}
-              onChange={updatePiece}
-              onDragState={setDraggingActivePiece}
-              hintCommand={hintCommand}
-              onHintAnimationComplete={onHintAnimationComplete}
-            />
-          ))}
-          {!externalDrawer && drawerOpen ? displayedStoredPieces.map((piece) => (
-            <DraggablePiece
-              key={piece.id}
-              piece={piece}
-              imageUri={imageUri}
-              boardWidth={boardWidth}
-              boardHeight={boardHeight}
-              boardOffsetX={boardOffsetX}
-              cell={cell}
-              rows={rows}
-              columns={columns}
-              scale={scale}
-              pieceDragActive={pieceDragActive}
-              activeGroupId={activeGroupId}
-              activeGroupPieceId={activeGroupPieceId}
-              groupTranslationX={groupTranslationX}
-              groupTranslationY={groupTranslationY}
-              storageTarget={storageTarget}
-              headerScreenTarget={headerScreenTarget}
-              storageScreenTarget={storageScreenTarget}
-              rotationEnabled={rotationEnabled}
-              stored
-              stroke={`${colors.text}b8`}
-              onChange={updatePiece}
-              onDragState={setDraggingActivePiece}
-              hintCommand={null}
-            />
-          )) : null}
           </Animated.View>
         </GestureDetector>
       </View>
@@ -802,385 +326,6 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   );
 });
 
-const StaticPlacedPiece = memo(function StaticPlacedPiece({
-  piece,
-  imageUri,
-  boardWidth,
-  boardHeight,
-  boardOffsetX,
-  cell,
-  stroke,
-}: {
-  piece: PuzzlePiece;
-  imageUri: string;
-  boardWidth: number;
-  boardHeight: number;
-  boardOffsetX: number;
-  cell: number;
-  stroke: string;
-}) {
-  const margin = cell * 0.24;
-  const extent = cell + margin * 2;
-  const path = useMemo(
-    () => piecePath(piece.shape, cell, margin),
-    [cell, margin, piece.shape],
-  );
-  const clipId = `placed-${piece.id}`;
-  return (
-    <Svg
-      pointerEvents="none"
-      width={extent}
-      height={extent}
-      style={{
-        position: "absolute",
-        left: boardOffsetX + piece.correctPosition.x * cell - margin,
-        top: piece.correctPosition.y * cell - margin,
-        zIndex: 1,
-      }}
-    >
-      <Defs>
-        <ClipPath id={clipId}>
-          <Path d={path} />
-        </ClipPath>
-      </Defs>
-      <SvgImage
-        href={{ uri: imageUri }}
-        x={margin - piece.column * cell}
-        y={margin - piece.row * cell}
-        width={boardWidth}
-        height={boardHeight}
-        preserveAspectRatio="xMidYMid slice"
-        clipPath={`url(#${clipId})`}
-      />
-      <Path
-        d={path}
-        fill="transparent"
-        stroke={stroke}
-        strokeOpacity={0.32}
-        strokeWidth={Math.max(0.7, cell * 0.022)}
-      />
-    </Svg>
-  );
-});
-
-const DraggablePiece = memo(function DraggablePiece({
-  piece,
-  imageUri,
-  boardWidth,
-  boardHeight,
-  boardOffsetX,
-  cell,
-  rows,
-  columns,
-  scale,
-  pieceDragActive,
-  activeGroupId,
-  activeGroupPieceId,
-  groupTranslationX,
-  groupTranslationY,
-  storageTarget,
-  headerScreenTarget,
-  storageScreenTarget,
-  rotationEnabled,
-  stored,
-  stroke,
-  onChange,
-  onDragState,
-  hintCommand,
-  onHintAnimationComplete,
-}: {
-  piece: PuzzlePiece;
-  imageUri: string;
-  boardWidth: number;
-  boardHeight: number;
-  boardOffsetX: number;
-  cell: number;
-  rows: number;
-  columns: number;
-  scale: SharedValue<number>;
-  pieceDragActive: SharedValue<boolean>;
-  activeGroupId: SharedValue<string | null>;
-  activeGroupPieceId: SharedValue<string | null>;
-  groupTranslationX: SharedValue<number>;
-  groupTranslationY: SharedValue<number>;
-  storageTarget: { x: number; y: number; width: number; height: number };
-  headerScreenTarget?: ScreenFrame | null;
-  storageScreenTarget?: ScreenFrame | null;
-  rotationEnabled: boolean;
-  stored: boolean;
-  stroke: string;
-  onChange: (
-    id: string,
-    x: number,
-    y: number,
-    rotation: number,
-    isPlaced: boolean,
-    destination: "board" | "drawer",
-  ) => void;
-  onDragState: (active: boolean) => void;
-  hintCommand?: PuzzleHintCommand | null;
-  onHintAnimationComplete?: (pieceId: string) => void;
-}) {
-  const margin = cell * 0.24;
-  const extent = cell + margin * 2;
-  const x = useSharedValue(piece.currentPosition.x * cell);
-  const y = useSharedValue(piece.currentPosition.y * cell);
-  const rotation = useSharedValue(normalizeQuarterTurn(piece.currentPosition.rotation));
-  const startX = useSharedValue(piece.currentPosition.x * cell);
-  const startY = useSharedValue(piece.currentPosition.y * cell);
-  const dragging = useSharedValue(false);
-  const path = useMemo(() => piecePath(piece.shape, cell, margin), [cell, margin, piece.shape]);
-  const clipId = `clip-${piece.id}`;
-  const snapRadius = Math.max(cell * 0.52, 10);
-  const lastHintCommandId = useRef(0);
-
-  useEffect(() => {
-    const belongsToMovableGroup = Boolean(piece.groupId && piece.groupId !== "tabuleiro");
-    if (belongsToMovableGroup || piece.isPlaced) {
-      // Connected pieces must update as one rigid object. A spring per piece
-      // creates a visible "tail" where the other members arrive afterwards.
-      x.set(piece.currentPosition.x * cell);
-      y.set(piece.currentPosition.y * cell);
-    } else {
-      x.set(withSpring(piece.currentPosition.x * cell, { damping: 18, stiffness: 210 }));
-      y.set(withSpring(piece.currentPosition.y * cell, { damping: 18, stiffness: 210 }));
-    }
-    if (activeGroupPieceId.get() === piece.id) {
-      groupTranslationX.set(0);
-      groupTranslationY.set(0);
-      activeGroupId.set(null);
-      activeGroupPieceId.set(null);
-    }
-    rotation.set(withTiming(normalizeQuarterTurn(piece.currentPosition.rotation), { duration: 180 }));
-  }, [activeGroupId, activeGroupPieceId, cell, groupTranslationX, groupTranslationY, piece.currentPosition.rotation, piece.currentPosition.x, piece.currentPosition.y, piece.groupId, piece.id, piece.isPlaced, rotation, x, y]);
-
-  useEffect(() => {
-    if (
-      !hintCommand ||
-      hintCommand.pieceId !== piece.id ||
-      lastHintCommandId.current === hintCommand.id
-    )
-      return;
-    lastHintCommandId.current = hintCommand.id;
-    const targetX = piece.correctPosition.x * cell;
-    const targetY = piece.correctPosition.y * cell;
-    rotation.set(withDelay(260, withTiming(0, { duration: 520 })));
-    x.set(withDelay(260, withTiming(targetX, { duration: 980 })));
-    y.set(
-      withDelay(
-        260,
-        withTiming(targetY, { duration: 980 }, (finished) => {
-          if (finished && onHintAnimationComplete)
-            runOnJS(onHintAnimationComplete)(piece.id);
-        }),
-      ),
-    );
-  }, [cell, hintCommand, onHintAnimationComplete, piece.correctPosition.x, piece.correctPosition.y, piece.id, rotation, x, y]);
-
-  const notify = (
-    nextX: number,
-    nextY: number,
-    nextRotation: number,
-    destination: "board" | "drawer",
-  ) => {
-    const normalized = normalizeQuarterTurn(nextRotation);
-    if (destination === "drawer") {
-      onChange(piece.id, nextX / cell, nextY / cell, normalized, false, "drawer");
-      return;
-    }
-    const targetX = piece.correctPosition.x * cell;
-    const targetY = piece.correctPosition.y * cell;
-    const closeEnough = Math.hypot(nextX - targetX, nextY - targetY) <= snapRadius;
-    onChange(
-      piece.id,
-      nextX / cell,
-      nextY / cell,
-      normalized,
-      closeEnough && normalized === 0,
-      "board",
-    );
-  };
-
-  const pan = Gesture.Pan()
-    .enabled(!piece.isPlaced && hintCommand?.pieceId !== piece.id)
-    .minDistance(2)
-    .shouldCancelWhenOutside(false)
-    .onStart(() => {
-      dragging.set(true);
-      startX.set(x.get());
-      startY.set(y.get());
-      pieceDragActive.set(true);
-      if (piece.groupId && piece.groupId !== "tabuleiro") {
-        activeGroupId.set(piece.groupId);
-        activeGroupPieceId.set(piece.id);
-        groupTranslationX.set(0);
-        groupTranslationY.set(0);
-      } else {
-        activeGroupId.set(null);
-        activeGroupPieceId.set(null);
-      }
-      if (!stored) runOnJS(onDragState)(true);
-    })
-    .onUpdate((event) => {
-      const translationX = event.translationX / scale.get();
-      const translationY = event.translationY / scale.get();
-      x.set(startX.get() + translationX);
-      y.set(startY.get() + translationY);
-      if (activeGroupPieceId.get() === piece.id) {
-        groupTranslationX.set(translationX);
-        groupTranslationY.set(translationY);
-      }
-    })
-    .onEnd((event) => {
-      if (stored) {
-        const worldX = x.get() / cell;
-        const worldY = y.get() / cell;
-        const releasedOnBoard =
-          worldX > -0.9 && worldX < columns - 0.1 && worldY > -0.9 && worldY < rows - 0.1;
-        if (releasedOnBoard) {
-          const releasedX = Math.max(-0.15, Math.min(columns - 0.85, worldX)) * cell;
-          const releasedY = Math.max(-0.15, Math.min(rows - 0.85, worldY)) * cell;
-          x.set(withSpring(releasedX));
-          y.set(withSpring(releasedY));
-          runOnJS(notify)(releasedX, releasedY, rotation.get(), "board");
-        } else {
-          x.set(withSpring(piece.currentPosition.x * cell));
-          y.set(withSpring(piece.currentPosition.y * cell));
-        }
-        return;
-      }
-
-      const droppedOnHeader = headerScreenTarget
-        ? event.absoluteY <= headerScreenTarget.y + headerScreenTarget.height
-        : false;
-      if (droppedOnHeader) {
-        x.set(withSpring(startX.get()));
-        y.set(withSpring(startY.get()));
-        if (activeGroupPieceId.get() === piece.id) {
-          groupTranslationX.set(0);
-          groupTranslationY.set(0);
-          activeGroupId.set(null);
-          activeGroupPieceId.set(null);
-        }
-        return;
-      }
-
-      const worldCenterX = x.get() / cell + 0.5;
-      const worldCenterY = y.get() / cell + 0.5;
-      const droppedOnScreenStorage = storageScreenTarget
-        ? event.absoluteX >= storageScreenTarget.x &&
-          event.absoluteX <= storageScreenTarget.x + storageScreenTarget.width &&
-          event.absoluteY >= storageScreenTarget.y &&
-          event.absoluteY <= storageScreenTarget.y + storageScreenTarget.height
-        : false;
-      const droppedOnStorage = droppedOnScreenStorage ||
-        (!storageScreenTarget &&
-          worldCenterX >= storageTarget.x &&
-          worldCenterX <= storageTarget.x + storageTarget.width &&
-          worldCenterY >= storageTarget.y &&
-          worldCenterY <= storageTarget.y + storageTarget.height);
-      if (droppedOnStorage) {
-        runOnJS(notify)(x.get(), y.get(), rotation.get(), "drawer");
-        return;
-      }
-
-      const targetX = piece.correctPosition.x * cell;
-      const targetY = piece.correctPosition.y * cell;
-      const currentQuarterTurn = Math.round(rotation.get() / 90) * 90;
-      const normalized = ((currentQuarterTurn % 360) + 360) % 360;
-      const snaps = Math.hypot(x.get() - targetX, y.get() - targetY) <= snapRadius && normalized === 0;
-      if (snaps) {
-        x.set(targetX);
-        y.set(targetY);
-      }
-      runOnJS(notify)(
-        snaps ? targetX : x.get(),
-        snaps ? targetY : y.get(),
-        rotation.get(),
-        "board",
-      );
-    })
-    .onFinalize((_event, success) => {
-      dragging.set(false);
-      pieceDragActive.set(false);
-      if (!success && activeGroupPieceId.get() === piece.id) {
-        groupTranslationX.set(0);
-        groupTranslationY.set(0);
-        activeGroupId.set(null);
-        activeGroupPieceId.set(null);
-      }
-      if (!stored) runOnJS(onDragState)(false);
-    });
-
-  const rotate = Gesture.Tap()
-    .enabled(rotationEnabled && !piece.isPlaced && !stored && piece.groupId === null && hintCommand?.pieceId !== piece.id)
-    .numberOfTaps(2)
-    .maxDuration(280)
-    .onEnd(() => {
-      const currentQuarterTurn = Math.round(rotation.get() / 90) * 90;
-      const nextRotation = ((currentQuarterTurn + 90) % 360 + 360) % 360;
-      rotation.set(withTiming(nextRotation, { duration: 180 }));
-      runOnJS(notify)(x.get(), y.get(), nextRotation, "board");
-    });
-
-  const gesture = Gesture.Race(rotate, pan);
-  const animatedStyle = useAnimatedStyle(() => {
-    const followsActiveGroup = Boolean(
-      piece.groupId &&
-      activeGroupId.get() === piece.groupId &&
-      activeGroupPieceId.get() !== piece.id,
-    );
-    return {
-      left: boardOffsetX + x.get() + (followsActiveGroup ? groupTranslationX.get() : 0),
-      top: y.get() + (followsActiveGroup ? groupTranslationY.get() : 0),
-      zIndex: dragging.get() ? 100 : piece.isPlaced ? 1 : 30,
-      transform: [{ rotate: `${rotation.get()}deg` }, { scale: stored ? 0.76 : 1 }],
-    };
-  });
-
-  return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View
-        style={[
-          {
-            position: "absolute",
-            width: cell,
-            height: cell,
-            overflow: "visible",
-          },
-          animatedStyle,
-        ]}
-      >
-        <Svg width={extent} height={extent} style={{ position: "absolute", left: -margin, top: -margin }}>
-          <Defs><ClipPath id={clipId}><Path d={path} /></ClipPath></Defs>
-          <SvgImage
-            href={{ uri: imageUri }}
-            x={margin - piece.column * cell}
-            y={margin - piece.row * cell}
-            width={boardWidth}
-            height={boardHeight}
-            preserveAspectRatio="xMidYMid slice"
-            clipPath={`url(#${clipId})`}
-          />
-          <Path d={path} fill="transparent" stroke={stroke} strokeWidth={Math.max(1, cell * 0.025)} />
-        </Svg>
-      </Animated.View>
-    </GestureDetector>
-  );
-});
-
 const styles = StyleSheet.create({
   container: { alignItems: "center" },
-  drawerPanel: { position: "absolute", left: 0, right: 0, zIndex: 10, borderWidth: 1.5, overflow: "hidden", shadowOpacity: .22, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, elevation: 9 },
-  drawerInnerGlow: { position: "absolute", left: 10, right: 10, top: 70, bottom: 10, borderRadius: 18 },
-  traySurface: { position: "absolute", left: 0, width: "100%", zIndex: 11, overflow: "hidden" },
-  trayWatermark: { position: "absolute", right: -16, top: 38 },
-  drawerHeaderShell: { position: "absolute", left: 0, right: 0, zIndex: 20, borderWidth: 1.5, overflow: "hidden", flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 10, paddingRight: 10 },
-  drawerLeadIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  drawerCopy: { flex: 1, minWidth: 0, paddingRight: 58 },
-  drawerTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 15 },
-  drawerMeta: { fontFamily: "Inter_600SemiBold", fontSize: 9, marginTop: 2 },
-  storageDock: { position: "absolute", zIndex: 2, borderWidth: 1.5, borderStyle: "dashed", borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  emptyDrawer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 7 },
-  emptyDrawerText: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
 });

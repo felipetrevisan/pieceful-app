@@ -47,6 +47,10 @@ export function ImagePackLibrary({
   const [error, setError] = useState(false);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const installedIds = useMemo(() => new Set(installed.map((pack) => pack.id)), [installed]);
+  const availableCatalog = useMemo(
+    () => catalog.filter((pack) => !installedIds.has(pack.id)),
+    [catalog, installedIds],
+  );
   const progression = getPlayerProgression(puzzles);
   const rewards = getLevelRewards(ageGroup);
   const ownsLevelPack = useCallback((pack: ImagePack) => {
@@ -293,7 +297,7 @@ export function ImagePackLibrary({
                 </Text>
               </View>
             ) : null}
-            {catalog.map((pack) => (
+            {availableCatalog.map((pack) => (
               <PackCard
                 key={pack.id}
                 pack={pack}
@@ -374,7 +378,7 @@ function PackCard({
               : owned
                 ? t("COMPRADO", "OWNED")
                 : (price ?? t("PAGO", "PAID"))}{" "}
-            · {pack.pictures.length} {t("imagens", "pictures")}
+            · {pack.imageCount ?? pack.pictures.length} {t("imagens", "pictures")}
             {pack.totalBytes ? ` · ${formatPackSize(pack.totalBytes)}` : ""}
           </Text>
         </View>
