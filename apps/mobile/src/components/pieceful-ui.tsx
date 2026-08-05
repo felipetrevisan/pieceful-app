@@ -31,10 +31,19 @@ export function Screen({
   children,
   parallax = false,
   scroll = true,
+  footer,
+  footerBottomOffset = 0,
 }: {
   children: ReactNode;
   parallax?: boolean;
   scroll?: boolean;
+  /** Rendered outside the scroll area, pinned to the bottom of the screen — for
+   * an action (like a wizard's "Continue" button) that must stay reachable
+   * regardless of scroll position. */
+  footer?: ReactNode;
+  /** Extra bottom offset for the pinned footer, e.g. to clear a floating tab
+   * bar that would otherwise sit underneath it. */
+  footerBottomOffset?: number;
 }) {
   const { theme } = useApp();
   const colors = mobileThemes[theme];
@@ -49,8 +58,9 @@ export function Screen({
         paddingHorizontal: 20,
         // 126 clears the floating tab bar on iOS, where the home indicator inset
         // is already small and baked in; Android's edge-to-edge system nav bar
-        // isn't covered by that margin, so add its inset on top here.
-        paddingBottom: 126 + insets.bottom,
+        // isn't covered by that margin, so add its inset on top here. A pinned
+        // footer needs extra clearance so it never overlaps the last item.
+        paddingBottom: 126 + insets.bottom + (footer ? 76 : 0),
         paddingTop: 8,
         flexGrow: 1,
       }}
@@ -74,6 +84,21 @@ export function Screen({
       ) : (
         content
       )}
+      {footer ? (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.stickyFooter,
+            {
+              paddingBottom: insets.bottom + 14 + footerBottomOffset,
+              backgroundColor: `${colors.background}f2`,
+              borderTopColor: `${colors.accent}18`,
+            },
+          ]}
+        >
+          {footer}
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -591,6 +616,15 @@ export function MutedText({
 }
 
 const styles = StyleSheet.create({
+  stickyFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   headerActionSpacer: { width: 48, height: 48 },
   buttonShell: {
     alignSelf: "stretch",

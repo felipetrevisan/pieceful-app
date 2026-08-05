@@ -16,7 +16,13 @@ export default function DifficultyScreen() {
   const { resolvedOrientation, selectPreset, selectedPreset } = useCreateFlow();
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <PrimaryButton icon="arrow-forward" onPress={() => router.push("/create/options")}>
+          {t("Continuar", "Continue")}
+        </PrimaryButton>
+      }
+    >
       <AppHeader title={t("Escolha a dificuldade", "Choose difficulty")} showTitle back />
       <Text style={[styles.wizardStep, { color: colors.accent }]}>
         {t("PASSO 2 DE 3 · DIFICULDADE", "STEP 2 OF 3 · DIFFICULTY")}
@@ -30,10 +36,6 @@ export default function DifficultyScreen() {
         orientation={resolvedOrientation}
         onSelect={(index) => selectPreset(presets[index] ?? presets[0])}
       />
-
-      <PrimaryButton icon="arrow-forward" onPress={() => router.push("/create/options")}>
-        {t("Continuar", "Continue")}
-      </PrimaryButton>
     </Screen>
   );
 }

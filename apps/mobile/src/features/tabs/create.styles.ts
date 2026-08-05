@@ -64,6 +64,7 @@ export const styles = StyleSheet.create({
     gap: 11,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    marginTop: 18,
   },
   packLibraryIcon: {
     width: 44,
@@ -74,7 +75,7 @@ export const styles = StyleSheet.create({
   },
   packLibraryTitle: { fontFamily: "BricolageGrotesque_700Bold", fontSize: 15 },
   packLibraryMeta: { fontFamily: "Inter_400Regular", fontSize: 10, lineHeight: 14, marginTop: 2 },
-  orDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  orDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 20, marginBottom: 18 },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth },
   orText: { fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.1 },
   detectedFormat: {

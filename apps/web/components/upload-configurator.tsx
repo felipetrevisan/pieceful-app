@@ -394,6 +394,7 @@ export function UploadConfigurator(props: Props) {
                           advanced: "Advanced",
                           master: "Master",
                           legendary: "Legendary",
+                          mythic: "Mythic",
                           custom: "Custom",
                         } as const
                       )[preset.id]

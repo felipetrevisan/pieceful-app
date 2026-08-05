@@ -13,7 +13,13 @@ export default function OptionsScreen() {
   const { canAdvanceFromPhoto, configuration, createAndStart, toggle } = useCreateFlow();
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <PrimaryButton icon="play" onPress={createAndStart} disabled={!canAdvanceFromPhoto}>
+          {t("Criar e começar", "Create and start")}
+        </PrimaryButton>
+      }
+    >
       <AppHeader title={t("Opções da partida", "Game options")} showTitle back />
       <Text style={[styles.wizardStep, { color: colors.accent }]}>
         {t("PASSO 3 DE 3 · OPÇÕES", "STEP 3 OF 3 · OPTIONS")}
@@ -58,9 +64,6 @@ export default function OptionsScreen() {
         onChange={() => toggle("timerEnabled")}
       />
 
-      <PrimaryButton icon="play" onPress={createAndStart} disabled={!canAdvanceFromPhoto}>
-        {t("Criar e começar", "Create and start")}
-      </PrimaryButton>
     </Screen>
   );
 }

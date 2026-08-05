@@ -42,7 +42,18 @@ export default function CreateScreen() {
   } = useCreateFlow();
 
   return (
-    <Screen>
+    <Screen
+      footerBottomOffset={82}
+      footer={
+        <PrimaryButton
+          icon="arrow-forward"
+          onPress={() => router.push("/create/difficulty")}
+          disabled={!canAdvanceFromPhoto}
+        >
+          {t("Continuar", "Continue")}
+        </PrimaryButton>
+      }
+    >
       <AppHeader title={t("Novo quebra-cabeça", "New Puzzle")} showTitle />
       <Text style={[styles.wizardStep, { color: colors.accent }]}>
         {t("PASSO 1 DE 3 · ESCOLHA UMA FOTO", "STEP 1 OF 3 · CHOOSE A PHOTO")}
@@ -314,9 +325,6 @@ export default function CreateScreen() {
         </Pressable>
       )}
 
-      <PrimaryButton icon="arrow-forward" onPress={() => router.push("/create/difficulty")} disabled={!canAdvanceFromPhoto}>
-        {t("Continuar", "Continue")}
-      </PrimaryButton>
       <ImagePackLibrary
         visible={showPackLibrary}
         onClose={() => setShowPackLibrary(false)}

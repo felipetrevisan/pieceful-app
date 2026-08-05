@@ -7,6 +7,7 @@ export type PuzzleDifficulty =
   | "advanced"
   | "master"
   | "legendary"
+  | "mythic"
   | "custom";
 
 export type PuzzleOrientation = "automatic" | "portrait" | "landscape";
@@ -50,6 +51,7 @@ export const DIFFICULTIES: readonly DifficultyPreset[] = [
   { id: "advanced", label: "Avançado", rows: 15, columns: 20, pieces: 300 },
   { id: "master", label: "Mestre", rows: 20, columns: 25, pieces: 500 },
   { id: "legendary", label: "Lendário", rows: 25, columns: 40, pieces: 1000 },
+  { id: "mythic", label: "Mítico", rows: 40, columns: 50, pieces: 2000 },
 ] as const;
 
 export interface PuzzleConfiguration {
@@ -83,9 +85,9 @@ export function validateConfiguration(value: unknown): PuzzleConfiguration {
     !Number.isInteger(rows) ||
     !Number.isInteger(columns) ||
     totalPieces < 6 ||
-    totalPieces > 1000
+    totalPieces > 2000
   ) {
-    throw new Error("A grade deve ter entre 6 e 1.000 peças.");
+    throw new Error("A grade deve ter entre 6 e 2.000 peças.");
   }
   return {
     rows,

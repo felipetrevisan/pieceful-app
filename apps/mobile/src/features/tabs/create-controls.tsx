@@ -30,6 +30,7 @@ const difficultyLabels: Record<PuzzleDifficulty, [string, string]> = {
   advanced: ["Avançado", "Advanced"],
   master: ["Mestre", "Master"],
   legendary: ["Lendário", "Legendary"],
+  mythic: ["Mítico", "Mythic"],
   custom: ["Personalizado", "Custom"],
 };
 
@@ -164,11 +165,13 @@ export function DifficultySlider({
         </Animated.View>
       </GestureDetector>
       <View style={styles.sliderFooter}>
-        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>12</Text>
+        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>{presets[0].pieces}</Text>
         <Text style={[styles.sliderHint, { color: colors.accent }]}>
           {t("ARRASTE PARA AJUSTAR", "DRAG TO ADJUST")}
         </Text>
-        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>1000</Text>
+        <Text style={[styles.sliderEndpoint, { color: colors.muted }]}>
+          {presets[presets.length - 1].pieces}
+        </Text>
       </View>
     </View>
   );

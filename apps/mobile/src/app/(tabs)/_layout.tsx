@@ -54,7 +54,9 @@ export default function TabsLayout() {
         options={{
           title: t("Início", "Home"),
           tabBarLabel: ({ color }) => <TabLabel color={color} label={t("Início", "Home")} />,
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" color={color} size={size} style={styles.tabIcon} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -62,7 +64,9 @@ export default function TabsLayout() {
         options={{
           title: t("Criar", "Create"),
           tabBarLabel: ({ color }) => <TabLabel color={color} label={t("Criar", "Create")} />,
-          tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="add-circle" color={color} size={size} style={styles.tabIcon} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -70,7 +74,9 @@ export default function TabsLayout() {
         options={{
           title: t("Coleção", "Collection"),
           tabBarLabel: ({ color }) => <TabLabel color={color} label={t("Coleção", "Collection")} />,
-          tabBarIcon: ({ color, size }) => <Ionicons name="albums" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="albums" color={color} size={size} style={styles.tabIcon} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -102,12 +108,14 @@ function TabLabel({ color, label }: { color: ColorValue; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  tabBarItem: { flex: 1, minWidth: 0, paddingHorizontal: 2 },
+  tabBarItem: { flex: 1, minWidth: 0, paddingHorizontal: 10 },
+  tabIcon: { marginBottom: 3 },
   tabLabel: {
     alignSelf: "stretch",
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
     lineHeight: 15,
+    marginTop: 2,
     paddingHorizontal: 2,
     textAlign: "center",
     width: "100%",
