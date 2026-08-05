@@ -114,10 +114,15 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
             // app.config.js falls back to Google's sample AdMob App ID when
             // this is unset; that's fine for dev/preview but should never
             // ship, so make it loud instead of silently serving no/test ads.
-            Sentry.captureMessage(
-              "Production build is using Google's sample AdMob Android App ID. Set EXPO_PUBLIC_ADMOB_ANDROID_APP_ID.",
-              "warning",
-            );
+            // Best-effort only — never let a telemetry call break ad init.
+            try {
+              Sentry.captureMessage(
+                "Production build is using Google's sample AdMob Android App ID. Set EXPO_PUBLIC_ADMOB_ANDROID_APP_ID.",
+                "warning",
+              );
+            } catch {
+              /* reporting failure must not affect ad availability */
+            }
           }
         } catch (caught) {
           if (active)
@@ -177,10 +182,16 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
       // rewarded unit is configured; this also prevents testers from clicking
       // real ads and creating invalid traffic.
       if (!configuredUnitId && !__DEV__ && process.env.EXPO_PUBLIC_APP_ENV === "production") {
-        Sentry.captureMessage(
-          "Production rewarded ad request fell back to Google's demo ad unit — no EXPO_PUBLIC_ADMOB_REWARDED_*_ID configured.",
-          "warning",
-        );
+        // Best-effort only — a reporting failure here must never prevent the
+        // ad itself from loading.
+        try {
+          Sentry.captureMessage(
+            "Production rewarded ad request fell back to Google's demo ad unit — no EXPO_PUBLIC_ADMOB_REWARDED_*_ID configured.",
+            "warning",
+          );
+        } catch {
+          /* ignore */
+        }
       }
       const unitId = __DEV__ ? ads.TestIds.REWARDED : configuredUnitId || ads.TestIds.REWARDED;
       return new Promise<boolean>((resolve) => {

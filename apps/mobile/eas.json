@@ -40,7 +40,7 @@
   "submit": {
     "production": {
       "android": {
-        "track": "alpha",
+        "track": "Teste fechado - Closed Beta",
         "releaseStatus": "completed"
       }
     }

@@ -19,10 +19,16 @@ export function reportInsecureAuthCallbackIfNeeded() {
   // .env.example): any app registering the same scheme can intercept or
   // replay the callback URL. PKCE keeps this from yielding a session, but a
   // shipped build should use the configured Universal/App Link instead.
-  Sentry.captureMessage(
-    "Production build is using the pieceful:// OAuth fallback instead of an HTTPS callback URL. Set EXPO_PUBLIC_AUTH_CALLBACK_URL to the configured Universal/App Link.",
-    "warning",
-  );
+  // This runs at app startup, before anything can catch it — a reporting
+  // failure here must never be able to take down the whole app.
+  try {
+    Sentry.captureMessage(
+      "Production build is using the pieceful:// OAuth fallback instead of an HTTPS callback URL. Set EXPO_PUBLIC_AUTH_CALLBACK_URL to the configured Universal/App Link.",
+      "warning",
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 export function isNativeAuthCallback(url: string) {
