@@ -7,13 +7,14 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 import Svg, { ClipPath, Defs, Path, Image as SvgImage } from "react-native-svg";
 import type { ScreenFrame } from "@/components/puzzle-piece-drawer";
 import { piecePath } from "@/lib/piece-path";
-import type { PuzzleHintCommand } from "./native-puzzle-board";
+import type { PuzzleHighlightCommand, PuzzleHintCommand } from "./native-puzzle-board";
 
 export const StaticPlacedPiece = memo(function StaticPlacedPiece({
   piece,
@@ -98,6 +99,7 @@ export const DraggablePiece = memo(function DraggablePiece({
   onChange,
   onDragState,
   hintCommand,
+  highlightCommand,
   onHintAnimationComplete,
 }: {
   piece: PuzzlePiece;
@@ -131,6 +133,7 @@ export const DraggablePiece = memo(function DraggablePiece({
   ) => void;
   onDragState: (active: boolean) => void;
   hintCommand?: PuzzleHintCommand | null;
+  highlightCommand?: PuzzleHighlightCommand | null;
   onHintAnimationComplete?: (pieceId: string) => void;
 }) {
   const margin = cell * 0.24;
@@ -148,6 +151,8 @@ export const DraggablePiece = memo(function DraggablePiece({
   // entirely (a literal zero tolerance would be unplayable given touch imprecision).
   const snapRadius = magnetismEnabled ? Math.max(cell * 0.52, 10) : Math.max(cell * 0.12, 4);
   const lastHintCommandId = useRef(0);
+  const lastHighlightCommandId = useRef(0);
+  const highlightProgress = useSharedValue(0);
 
   useEffect(() => {
     const belongsToMovableGroup = Boolean(piece.groupId && piece.groupId !== "tabuleiro");
@@ -217,6 +222,21 @@ export const DraggablePiece = memo(function DraggablePiece({
     x,
     y,
   ]);
+
+  useEffect(() => {
+    if (!highlightCommand || lastHighlightCommandId.current === highlightCommand.id) return;
+    lastHighlightCommandId.current = highlightCommand.id;
+    // Quick flash in, a held glow so a piece buried under others has time to
+    // be spotted, then a slow fade back out — never touches position/z-order
+    // beyond the temporary bump in animatedStyle below.
+    highlightProgress.set(
+      withSequence(
+        withTiming(1, { duration: 220 }),
+        withTiming(1, { duration: 2400 }),
+        withTiming(0, { duration: 900 }),
+      ),
+    );
+  }, [highlightCommand, highlightProgress]);
 
   const notify = (
     nextX: number,
@@ -382,10 +402,14 @@ export const DraggablePiece = memo(function DraggablePiece({
     return {
       left: boardOffsetX + x.get() + (followsActiveGroup ? groupTranslationX.get() : 0),
       top: y.get() + (followsActiveGroup ? groupTranslationY.get() : 0),
-      zIndex: dragging.get() ? 100 : piece.isPlaced ? 1 : 30,
+      zIndex: dragging.get() ? 100 : highlightProgress.get() > 0 ? 95 : piece.isPlaced ? 1 : 30,
       transform: [{ rotate: `${rotation.get()}deg` }, { scale: stored ? 0.76 : 1 }],
     };
   });
+  const highlightStyle = useAnimatedStyle(() => ({
+    opacity: highlightProgress.get(),
+    transform: [{ scale: 1 + highlightProgress.get() * 0.1 }],
+  }));
 
   return (
     <GestureDetector gesture={gesture}>
@@ -400,6 +424,26 @@ export const DraggablePiece = memo(function DraggablePiece({
           animatedStyle,
         ]}
       >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              left: -margin - cell * 0.15,
+              top: -margin - cell * 0.15,
+              width: extent + cell * 0.3,
+              height: extent + cell * 0.3,
+              borderRadius: (extent + cell * 0.3) / 2,
+              borderWidth: Math.max(2, cell * 0.06),
+              borderColor: "#ffcc33",
+              shadowColor: "#ffcc33",
+              shadowOpacity: 0.9,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 0 },
+            },
+            highlightStyle,
+          ]}
+        />
         <Svg
           width={extent}
           height={extent}

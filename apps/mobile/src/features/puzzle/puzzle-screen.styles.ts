@@ -46,6 +46,8 @@ export const styles = StyleSheet.create({
     left: 16,
     bottom: 264,
     zIndex: 72,
+    flexDirection: "column",
+    gap: 8,
   },
   pieceStoredNotice: {
     position: "absolute",

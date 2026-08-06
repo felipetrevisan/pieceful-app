@@ -23,6 +23,7 @@ interface NativePuzzleBoardProps {
   magnetismEnabled: boolean;
   zoomCommand?: PuzzleZoomCommand | null;
   hintCommand?: PuzzleHintCommand | null;
+  highlightCommand?: PuzzleHighlightCommand | null;
   cameraViewportTop: number;
   cameraViewportBottom: number;
   initialZoom: number;
@@ -47,6 +48,10 @@ export interface PuzzleHintCommand {
   pieceId: string;
 }
 
+export interface PuzzleHighlightCommand {
+  id: number;
+}
+
 // Stable reference so DraggablePiece's memoization isn't broken by a fresh
 // closure every render; the board on this screen has no visible drag indicator.
 function noop() {}
@@ -62,6 +67,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
   magnetismEnabled,
   zoomCommand,
   hintCommand,
+  highlightCommand,
   cameraViewportTop,
   cameraViewportBottom,
   initialZoom,
@@ -265,7 +271,6 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
                 y={1}
                 width={boardWidth - 2}
                 height={boardHeight - 2}
-                rx={Math.max(5, colors.radius)}
                 fill={colors.panelAlt}
                 stroke={`${colors.accent}70`}
                 strokeWidth={2}
@@ -328,6 +333,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
                 onChange={updatePiece}
                 onDragState={noop}
                 hintCommand={hintCommand}
+                highlightCommand={highlightCommand}
                 onHintAnimationComplete={onHintAnimationComplete}
               />
             ))}

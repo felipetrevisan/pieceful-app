@@ -32,6 +32,7 @@ interface MonetizationState {
   ownedProductIds: string[];
   error: string | null;
   showRewardedHint: () => Promise<boolean>;
+  showRewardedHighlight: () => Promise<boolean>;
   unlockRewardedTheme: (theme: MobileTheme) => Promise<boolean>;
   isRewardedThemeUnlocked: (theme: MobileTheme) => boolean;
   purchasePremium: (packageIdentifier?: string) => Promise<boolean>;
@@ -231,6 +232,15 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
     [showRewardedAd],
   );
 
+  const showRewardedHighlight = useCallback(
+    () =>
+      showRewardedAd(
+        process.env.EXPO_PUBLIC_ADMOB_REWARDED_HIGHLIGHT_ID ??
+          process.env.EXPO_PUBLIC_ADMOB_REWARDED_HINT_ID,
+      ),
+    [showRewardedAd],
+  );
+
   const isRewardedThemeUnlocked = useCallback(
     (nextTheme: MobileTheme) => premium || (rewardedThemeUnlocks[nextTheme] ?? 0) > Date.now(),
     [premium, rewardedThemeUnlocks],
@@ -355,6 +365,7 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
       packProducts,
       ownedProductIds,
       showRewardedHint,
+      showRewardedHighlight,
       unlockRewardedTheme,
       isRewardedThemeUnlocked,
       purchasePremium,
@@ -371,6 +382,7 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
       ready,
       restorePurchases,
       showRewardedHint,
+      showRewardedHighlight,
       unlockRewardedTheme,
       isRewardedThemeUnlocked,
       packProducts,

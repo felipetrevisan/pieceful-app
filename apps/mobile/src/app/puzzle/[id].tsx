@@ -21,6 +21,7 @@ import Animated, { FadeInDown, FadeOutDown, useSharedValue } from "react-native-
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   NativePuzzleBoard,
+  type PuzzleHighlightCommand,
   type PuzzleHintCommand,
   type PuzzleZoomCommand,
 } from "@/components/native-puzzle-board";
@@ -76,7 +77,7 @@ export default function PuzzleScreen() {
     updatePuzzleElapsedTime,
     updatePuzzlePieces,
   } = useApp();
-  const { premium, showRewardedHint } = useMonetization();
+  const { premium, showRewardedHighlight, showRewardedHint } = useMonetization();
   const { showAlert } = usePiecefulAlert();
   const colors = mobileThemes[theme];
   const insets = useSafeAreaInsets();
@@ -94,6 +95,7 @@ export default function PuzzleScreen() {
   });
   const [zoomCommand, setZoomCommand] = useState<PuzzleZoomCommand | null>(null);
   const [hintCommand, setHintCommand] = useState<PuzzleHintCommand | null>(null);
+  const [highlightCommand, setHighlightCommand] = useState<PuzzleHighlightCommand | null>(null);
   const [elapsedTime, setElapsedTime] = useState(puzzle?.session.elapsedTime ?? 0);
   const [workspaceReady, setWorkspaceReady] = useState((puzzle?.session.pieces.length ?? 0) < 300);
   const elapsedTimeRef = useRef(puzzle?.session.elapsedTime ?? 0);
@@ -105,10 +107,15 @@ export default function PuzzleScreen() {
   const toolbarRef = useRef<View>(null);
   const zoomCommandId = useRef(0);
   const hintCommandId = useRef(0);
+  const highlightCommandId = useRef(0);
   const activeHintPieceId = useRef<string | null>(null);
   const pieceStoredNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardedHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardedHintAppStateSubscription = useRef<ReturnType<
+    typeof NativeAppState.addEventListener
+  > | null>(null);
+  const rewardedHighlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rewardedHighlightAppStateSubscription = useRef<ReturnType<
     typeof NativeAppState.addEventListener
   > | null>(null);
   const largeWorkspace = (puzzle?.session.pieces.length ?? 0) >= 300;
@@ -167,6 +174,8 @@ export default function PuzzleScreen() {
       if (pieceStoredNoticeTimer.current) clearTimeout(pieceStoredNoticeTimer.current);
       if (rewardedHintTimer.current) clearTimeout(rewardedHintTimer.current);
       rewardedHintAppStateSubscription.current?.remove();
+      if (rewardedHighlightTimer.current) clearTimeout(rewardedHighlightTimer.current);
+      rewardedHighlightAppStateSubscription.current?.remove();
     },
     [],
   );
@@ -323,6 +332,79 @@ export default function PuzzleScreen() {
           onPress: () =>
             void showRewardedHint().then((earned) => {
               if (earned) placeRewardedHintWhenActive();
+              else
+                showAlert(
+                  t("Anúncio indisponível", "Ad unavailable"),
+                  t(
+                    "Não foi possível carregar o anúncio. Tente novamente mais tarde.",
+                    "The ad couldn't be loaded. Try again later.",
+                  ),
+                );
+            }),
+        },
+      ],
+    );
+  }
+
+  const placeHighlight = useCallback(() => {
+    highlightCommandId.current += 1;
+    setHighlightCommand({ id: highlightCommandId.current });
+    if (preferences.haptics) void Haptics.selectionAsync();
+  }, [preferences.haptics]);
+
+  useEffect(() => {
+    if (!highlightCommand) return;
+    // Matches the flash-in + hold + fade-out sequence driven per piece in
+    // native-puzzle-piece.tsx (220 + 2400 + 900ms).
+    const timeout = setTimeout(() => setHighlightCommand(null), 3520);
+    return () => clearTimeout(timeout);
+  }, [highlightCommand]);
+
+  const placeRewardedHighlightWhenActive = useCallback(() => {
+    rewardedHighlightAppStateSubscription.current?.remove();
+    const beginAfterTransition = () => {
+      rewardedHighlightAppStateSubscription.current?.remove();
+      rewardedHighlightAppStateSubscription.current = null;
+      InteractionManager.runAfterInteractions(() => {
+        if (rewardedHighlightTimer.current) clearTimeout(rewardedHighlightTimer.current);
+        rewardedHighlightTimer.current = setTimeout(() => {
+          rewardedHighlightTimer.current = null;
+          placeHighlight();
+        }, 350);
+      });
+    };
+
+    if (NativeAppState.currentState === "active") {
+      beginAfterTransition();
+      return;
+    }
+    rewardedHighlightAppStateSubscription.current = NativeAppState.addEventListener(
+      "change",
+      (state) => {
+        if (state === "active") beginAfterTransition();
+      },
+    );
+  }, [placeHighlight]);
+
+  function useHighlight() {
+    if (premium) {
+      placeHighlight();
+      return;
+    }
+    showAlert(
+      t("Destacar peças", "Highlight pieces"),
+      t(
+        "Assista a um anúncio recompensado para destacar por alguns segundos todas as peças soltas no tabuleiro. O anúncio só abre se você confirmar.",
+        "Watch a rewarded ad to briefly highlight every loose piece on the board. The ad only opens after you confirm.",
+      ),
+      [
+        { text: t("Agora não", "Not now"), style: "cancel" },
+        {
+          text: t("Assistir anúncio", "Watch ad"),
+          icon: "play-circle",
+          onPress: () =>
+            void showRewardedHighlight().then((earned) => {
+              if (earned) placeRewardedHighlightWhenActive();
               else
                 showAlert(
                   t("Anúncio indisponível", "Ad unavailable"),
@@ -558,6 +640,7 @@ export default function PuzzleScreen() {
             magnetismEnabled={puzzle.configuration.magnetismEnabled}
             zoomCommand={zoomCommand}
             hintCommand={hintCommand}
+            highlightCommand={highlightCommand}
             cameraViewportTop={cameraViewportTop}
             cameraViewportBottom={cameraViewportBottom}
             initialZoom={puzzle.session.camera.zoom}
@@ -605,17 +688,29 @@ export default function PuzzleScreen() {
           />
           <IconButton
             round
-            disabled={boardZoom >= 2.4}
+            disabled={boardZoom >= 3.5}
             icon="add"
             label={t("Aumentar zoom", "Zoom in")}
             onPress={() => controlZoom("in")}
-            style={boardZoom >= 2.4 ? styles.zoomButtonDisabled : undefined}
+            style={boardZoom >= 3.5 ? styles.zoomButtonDisabled : undefined}
           />
         </View>
       ) : null}
 
       {workspaceReady ? (
         <View style={styles.storeLooseControl}>
+          <IconButton
+            round
+            disabled={Boolean(highlightCommand)}
+            icon="flashlight-outline"
+            label={
+              premium
+                ? t("Destacar peças", "Highlight pieces")
+                : t("Assistir anúncio para destacar peças", "Watch ad to highlight pieces")
+            }
+            onPress={useHighlight}
+            style={highlightCommand ? styles.zoomButtonDisabled : undefined}
+          />
           <IconButton
             round
             disabled={!looseBoardPieces.length}
