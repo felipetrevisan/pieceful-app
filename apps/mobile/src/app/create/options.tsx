@@ -43,13 +43,6 @@ export default function OptionsScreen() {
         onChange={() => toggle("magnetismEnabled")}
       />
       <OptionRow
-        icon="bulb-outline"
-        title={t("Dicas", "Hints")}
-        subtitle={t("Ajuda quando você precisar", "Help when you need it")}
-        value={configuration.hintsEnabled}
-        onChange={() => toggle("hintsEnabled")}
-      />
-      <OptionRow
         icon="eye-outline"
         title={t("Imagem de referência", "Reference image")}
         subtitle={t("Consulte a foto durante o jogo", "View the photo while playing")}

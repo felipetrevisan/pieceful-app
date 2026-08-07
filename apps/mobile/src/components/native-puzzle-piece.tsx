@@ -467,7 +467,7 @@ export const DraggablePiece = memo(function DraggablePiece({
             d={path}
             fill="transparent"
             stroke={stroke}
-            strokeWidth={Math.max(1, cell * 0.025)}
+            strokeWidth={Math.max(0.8, cell * 0.022)}
           />
         </Svg>
       </Animated.View>

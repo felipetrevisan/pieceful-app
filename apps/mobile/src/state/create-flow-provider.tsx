@@ -151,7 +151,7 @@ const defaultConfiguration: PuzzleConfiguration = {
 
 type ToggleableConfigKey = keyof Pick<
   PuzzleConfiguration,
-  "rotationEnabled" | "hintsEnabled" | "referenceEnabled" | "timerEnabled" | "magnetismEnabled"
+  "rotationEnabled" | "referenceEnabled" | "timerEnabled" | "magnetismEnabled"
 >;
 
 interface CreateFlowState {

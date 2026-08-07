@@ -273,7 +273,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
                 height={boardHeight - 2}
                 fill={colors.panelAlt}
                 stroke={`${colors.accent}70`}
-                strokeWidth={2}
+                strokeWidth={1}
               />
               {Array.from({ length: columns - 1 }, (_, index) => (
                 <Path
@@ -329,7 +329,7 @@ export const NativePuzzleBoard = memo(function NativePuzzleBoard({
                 rotationEnabled={rotationEnabled}
                 magnetismEnabled={magnetismEnabled}
                 stored={false}
-                stroke={piece.isPlaced ? colors.accent : `${colors.text}99`}
+                stroke={piece.isPlaced ? `${colors.accent}55` : `${colors.text}99`}
                 onChange={updatePiece}
                 onDragState={noop}
                 hintCommand={hintCommand}

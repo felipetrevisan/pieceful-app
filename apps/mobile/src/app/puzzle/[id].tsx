@@ -598,7 +598,7 @@ export default function PuzzleScreen() {
             label={t("Ver imagem original", "View original image")}
             onPress={() => setShowReference(true)}
           />
-          {puzzle.configuration.hintsEnabled && progress < 100 ? (
+          {progress < 100 ? (
             <IconButton
               round
               icon="bulb-outline"
@@ -688,11 +688,9 @@ export default function PuzzleScreen() {
           />
           <IconButton
             round
-            disabled={boardZoom >= 3.5}
             icon="add"
             label={t("Aumentar zoom", "Zoom in")}
             onPress={() => controlZoom("in")}
-            style={boardZoom >= 3.5 ? styles.zoomButtonDisabled : undefined}
           />
         </View>
       ) : null}

@@ -160,7 +160,7 @@ export function useBoardCamera({
     const nextScale =
       zoomCommand.action === "reset"
         ? 1
-        : Math.max(0.8, Math.min(3.5, currentScale + (zoomCommand.action === "in" ? 0.25 : -0.25)));
+        : Math.max(0.8, currentScale + (zoomCommand.action === "in" ? 0.25 : -0.25));
     let nextPanX = panX.get();
     let nextPanY = panY.get();
 
@@ -208,7 +208,7 @@ export function useBoardCamera({
   const pinch = Gesture.Pinch()
     .enabled(!hintCommand)
     .onUpdate((event) => {
-      scale.set(Math.max(0.8, Math.min(3.5, savedScale.get() * event.scale)));
+      scale.set(Math.max(0.8, savedScale.get() * event.scale));
     })
     .onEnd(() => {
       savedScale.set(scale.get());
