@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
   type SharedValue,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -15,6 +16,9 @@ import Svg, { ClipPath, Defs, Path, Image as SvgImage } from "react-native-svg";
 import type { ScreenFrame } from "@/components/puzzle-piece-drawer";
 import { piecePath } from "@/lib/piece-path";
 import type { PuzzleHighlightCommand, PuzzleHintCommand } from "./native-puzzle-board";
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const HIGHLIGHT_COLOR = "#ffcc33";
 
 export const StaticPlacedPiece = memo(function StaticPlacedPiece({
   piece,
@@ -406,9 +410,17 @@ export const DraggablePiece = memo(function DraggablePiece({
       transform: [{ rotate: `${rotation.get()}deg` }, { scale: stored ? 0.76 : 1 }],
     };
   });
-  const highlightStyle = useAnimatedStyle(() => ({
-    opacity: highlightProgress.get(),
-    transform: [{ scale: 1 + highlightProgress.get() * 0.1 }],
+  // A soft halo bleeding just past the piece's own silhouette, plus a thin
+  // crisp outline on top — both traced from the same clip path as the piece
+  // artwork, so they follow its jigsaw shape instead of a generic circle.
+  const glowOuterProps = useAnimatedProps(() => ({
+    strokeOpacity: highlightProgress.get() * 0.22,
+  }));
+  const glowInnerProps = useAnimatedProps(() => ({
+    strokeOpacity: highlightProgress.get() * 0.4,
+  }));
+  const glowOutlineProps = useAnimatedProps(() => ({
+    strokeOpacity: highlightProgress.get(),
   }));
 
   return (
@@ -424,26 +436,6 @@ export const DraggablePiece = memo(function DraggablePiece({
           animatedStyle,
         ]}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            {
-              position: "absolute",
-              left: -margin - cell * 0.15,
-              top: -margin - cell * 0.15,
-              width: extent + cell * 0.3,
-              height: extent + cell * 0.3,
-              borderRadius: (extent + cell * 0.3) / 2,
-              borderWidth: Math.max(2, cell * 0.06),
-              borderColor: "#ffcc33",
-              shadowColor: "#ffcc33",
-              shadowOpacity: 0.9,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 0 },
-            },
-            highlightStyle,
-          ]}
-        />
         <Svg
           width={extent}
           height={extent}
@@ -454,6 +446,20 @@ export const DraggablePiece = memo(function DraggablePiece({
               <Path d={path} />
             </ClipPath>
           </Defs>
+          <AnimatedPath
+            d={path}
+            fill="none"
+            stroke={HIGHLIGHT_COLOR}
+            strokeWidth={Math.max(3, cell * 0.4)}
+            animatedProps={glowOuterProps}
+          />
+          <AnimatedPath
+            d={path}
+            fill="none"
+            stroke={HIGHLIGHT_COLOR}
+            strokeWidth={Math.max(2, cell * 0.22)}
+            animatedProps={glowInnerProps}
+          />
           <SvgImage
             href={{ uri: imageUri }}
             x={margin - piece.column * cell}
@@ -468,6 +474,13 @@ export const DraggablePiece = memo(function DraggablePiece({
             fill="transparent"
             stroke={stroke}
             strokeWidth={Math.max(0.8, cell * 0.022)}
+          />
+          <AnimatedPath
+            d={path}
+            fill="none"
+            stroke={HIGHLIGHT_COLOR}
+            strokeWidth={Math.max(1, cell * 0.035)}
+            animatedProps={glowOutlineProps}
           />
         </Svg>
       </Animated.View>

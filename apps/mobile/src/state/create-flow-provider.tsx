@@ -292,7 +292,10 @@ export function CreateFlowProvider({ children }: { children: ReactNode }) {
         const directory = new Directory(Paths.document, "puzzle-images");
         directory.create({ idempotent: true, intermediates: true });
         const longestSide = Math.max(asset.width, asset.height);
-        const resizeScale = Math.min(1, 2048 / Math.max(1, longestSide));
+        // Every piece redraws this whole photo clipped to its own shape, so the
+        // board's zoomed-in sharpness is capped by this resolution — kept high
+        // enough to stay crisp well past the board's max zoom.
+        const resizeScale = Math.min(1, 3072 / Math.max(1, longestSide));
         const optimized = await ImageManipulator.manipulateAsync(
           asset.uri,
           resizeScale < 1
@@ -306,7 +309,7 @@ export function CreateFlowProvider({ children }: { children: ReactNode }) {
               ]
             : [],
           {
-            compress: 0.88,
+            compress: 0.94,
             format: ImageManipulator.SaveFormat.JPEG,
           },
         );
